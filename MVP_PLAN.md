@@ -142,7 +142,7 @@ Local Studio has **no** “URL Configuration” or “Providers” UI. Everythin
 
 ---
 
-### Phase 4: Split-Screen & React Flow
+### Phase 4: Split-Screen & React Flow ✅ Done
 
 **Goal:** Left: React Flow with AWS-style nodes; right: chat placeholder. Canvas load/save per session.
 
@@ -154,7 +154,7 @@ Local Studio has **no** “URL Configuration” or “Providers” UI. Everythin
 
 ---
 
-### Phase 5: Chat UI & Transcript
+### Phase 5: Chat UI & Transcript ✅ Done
 
 **Goal:** Transcript list + input; useChat targeting /api/chat; canvas (nodes, edges) in request body.
 
