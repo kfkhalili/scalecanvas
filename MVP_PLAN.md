@@ -4,7 +4,7 @@
 
 **Architecture:** BFF at `/api/chat`; client never calls AWS. Auth via Supabase (session from cookies); streaming via `streamText`/`toDataStreamResponse()`; canvas in request body, pure `parseCanvasState(nodes, edges)` for LLM context.
 
-**Hard rules (typing, lint, TDD, security, state, etc.)** are in **`.cursor/rules/`** — follow them for all implementation.
+**Hard rules (typing, lint, TDD, security, state, etc.)** are in **`.cursor/rules/`** — **mandatory** for all implementation; no exceptions.
 
 ---
 
@@ -118,7 +118,7 @@ Local Studio has **no** “URL Configuration” or “Providers” UI. Everythin
 
 ---
 
-### Phase 2: Schema & Profile
+### Phase 2: Schema & Profile ✅ Done
 
 **Goal:** Migrations applied; RLS; profile on first sign-up.
 
@@ -130,7 +130,7 @@ Local Studio has **no** “URL Configuration” or “Providers” UI. Everythin
 
 ---
 
-### Phase 3: Session CRUD & Data Layer
+### Phase 3: Session CRUD & Data Layer ✅ Done
 
 **Goal:** Create/list/get/delete sessions; append transcript; save/load canvas. Pure lib + services returning Result; API routes.
 

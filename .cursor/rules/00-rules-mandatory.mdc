@@ -1,0 +1,21 @@
+---
+description: Cursor rules are mandatory — never optional; check before implementing
+alwaysApply: true
+---
+
+# Rules Are Mandatory (Meta-Rule)
+
+**All rules in `.cursor/rules/` are mandatory. They are not suggestions.**
+
+1. **Before writing implementation code** for a feature, task, or phase:
+   - Identify which rules apply (every `alwaysApply: true` rule + any rule whose globs match the files you are editing).
+   - Satisfy each one *before* or *as part of* your work. Do not implement first and defer or skip a rule.
+
+2. **TDD**: The TDD rule means *test first*. For any new or changed behaviour (pure functions, services, API routes, components):
+   - Write a **failing** test that defines the behaviour.
+   - Then write the **minimum** code to make it pass.
+   - Then refactor. Do not write production code for that behaviour without a failing test that justifies it.
+
+3. **If a rule conflicts with a user request**, follow the rule unless the user explicitly overrides it (e.g. "ignore TDD for this one task"). Do not silently skip a rule because it's inconvenient.
+
+4. **Starting a phase or feature**: Your first implementation step must be rule-compliant. For work that involves logic or behaviour, that usually means: add the failing test(s) first (TDD), then implement.

@@ -2,6 +2,8 @@
 
 System design interview practice: React Flow canvas (left) + AI interviewer chat (right). See [MVP_PLAN.md](./MVP_PLAN.md) for the implementation plan.
 
+**All coding rules in [`.cursor/rules/`](.cursor/rules/) are mandatory** — not optional. CI and pre-commit enforce lint, typecheck, and tests so the rules are followed.
+
 ## Stack
 
 Next.js (App Router), Supabase, AWS Bedrock (Anthropic), Vercel AI SDK, React Flow, Tailwind CSS, TypeScript, shadcn/ui, Zustand, neverthrow, ts-pattern. **Package manager:** pnpm only.
@@ -21,6 +23,13 @@ pnpm dev
 - `pnpm build` — production build
 - `pnpm start` — start production server
 - `pnpm lint` — run ESLint
+- `pnpm test` — run tests (Vitest)
+
+## Enforcement
+
+- **CI** (GitHub Actions): on push/PR to `main`, runs `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm test`, `pnpm build`. The build fails if any step fails.
+- **Pre-commit** (husky): before each commit, runs `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm test`. Commit is blocked if any step fails.
+- **lint-staged**: ESLint runs on staged `*.ts`/`*.tsx` when configured (e.g. for faster feedback).
 
 ## Environment
 
@@ -39,4 +48,4 @@ Copy `.env.example` to `.env.local` and fill in:
 - `services/` — Supabase client, API calls
 - `supabase/migrations/` — Supabase migrations (apply via CLI)
 
-Coding rules: see `.cursor/rules/`.
+Coding rules: see [`.cursor/rules/`](.cursor/rules/) — **mandatory** for all implementation.

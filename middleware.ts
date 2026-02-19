@@ -1,10 +1,26 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { CookieOptions, CookieToSet } from "@/lib/cookie.types";
 
 const protectedPathPrefixes = ["/dashboard", "/interview"];
 
 function isProtectedPath(pathname: string): boolean {
   return protectedPathPrefixes.some((prefix) => pathname.startsWith(prefix));
+}
+
+function adaptCookieOptions(
+  options: Record<string, string | number | boolean | undefined>
+): CookieOptions {
+  return {
+    path: typeof options.path === "string" ? options.path : undefined,
+    maxAge: typeof options.maxAge === "number" ? options.maxAge : undefined,
+    httpOnly: options.httpOnly === true,
+    secure: options.secure === true,
+    sameSite:
+      options.sameSite === "lax" || options.sameSite === "strict" || options.sameSite === "none"
+        ? options.sameSite
+        : undefined,
+  };
 }
 
 export async function middleware(request: NextRequest) {
@@ -25,11 +41,14 @@ export async function middleware(request: NextRequest) {
         cookiesToSet: Array<{
           name: string;
           value: string;
-          options: Record<string, string | number | boolean | undefined>;
+          options?: Record<string, string | number | boolean | undefined>;
         }>
       ): void {
         cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options as { path?: string; maxAge?: number; httpOnly?: boolean; secure?: boolean; sameSite?: "lax" | "strict" | "none" });
+          const opts: CookieToSet["options"] = options
+            ? adaptCookieOptions(options)
+            : undefined;
+          response.cookies.set(name, value, opts);
         });
       },
     },
