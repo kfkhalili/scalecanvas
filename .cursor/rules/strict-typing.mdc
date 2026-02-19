@@ -1,0 +1,13 @@
+---
+description: Strict typing — no any, no unknown, explicit types
+alwaysApply: true
+---
+
+# Strict Typing (Hard Rule)
+
+- No `any`. No `unknown`; use concrete types or unions/branded types.
+- Every function: explicit param and return types. Reuse types from `lib/types.ts`. No escape hatches (fix the type, don’t widen). `strict: true` in tsconfig; no loose generics or inline `object`.
+
+```ts
+// ✅ parse(data: string): ParsedSession   ❌ parse(data: any): unknown
+```

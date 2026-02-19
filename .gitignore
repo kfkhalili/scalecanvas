@@ -1,0 +1,24 @@
+# Dependencies and build
+node_modules
+.next
+out
+.pnpm-store
+
+# Env (secrets — commit .env.example only)
+.env
+.env.local
+.env*.local
+.env.prod
+.env.production
+
+# Debug / OS
+*.log
+.DS_Store
+*.tsbuildinfo
+
+# Vercel
+.vercel
+
+# Supabase CLI local state
+supabase/.temp
+supabase/.branches

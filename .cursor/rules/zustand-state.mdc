@@ -1,0 +1,8 @@
+---
+description: Zustand for client state; immutable updates only
+alwaysApply: true
+---
+
+# State — Zustand (Hard Rule)
+
+- Global/client state (session, canvas, transcript, UI): Zustand only; `create()`. Updates immutable: replace slices `set(s => ({ ...s, nodes: newNodes }))`; no nested mutation. Use selectors `useStore(s => s.sessionId)` to limit re-renders. No Redux or class-based state.

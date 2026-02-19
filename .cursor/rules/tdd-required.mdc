@@ -1,0 +1,8 @@
+---
+description: TDD — red, green, refactor; test first
+alwaysApply: true
+---
+
+# TDD (Hard Rule)
+
+- Red → green → refactor. Write a failing test first; then minimal code to pass; then refactor. No production code without a failing test that justifies it. Applies to pure functions, services, API routes, components; same for integration/E2E where practical. CI runs full suite; all pass.

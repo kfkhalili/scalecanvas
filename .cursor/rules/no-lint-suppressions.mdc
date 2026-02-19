@@ -1,0 +1,8 @@
+---
+description: No eslint-disable or ts-ignore — fix issues, zero suppressions in CI
+alwaysApply: true
+---
+
+# No Lint Suppressions (Hard Rule)
+
+- Do not use `eslint-disable`, `@ts-ignore`, or `@ts-expect-error`. Fix the root cause. CI: `eslint` and `tsc --noEmit` with zero suppressions. Rare exceptions: justify in comment and get review.

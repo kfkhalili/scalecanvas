@@ -1,0 +1,8 @@
+---
+description: pnpm only — no npm or yarn
+alwaysApply: true
+---
+
+# Package Manager — pnpm Only (Hard Rule)
+
+- Use only pnpm: `pnpm install`, `pnpm dev`, `pnpm build`, `pnpm lint`, `pnpm create next-app`. No npm/yarn in scripts or docs.

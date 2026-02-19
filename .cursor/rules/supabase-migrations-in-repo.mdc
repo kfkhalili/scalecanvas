@@ -1,0 +1,8 @@
+---
+description: Supabase schema in repo — supabase/migrations/, apply via CLI
+alwaysApply: true
+---
+
+# Supabase Migrations (Hard Rule)
+
+- Schema in repo only: migrations in `supabase/migrations/`, apply via CLI (`supabase db push` or `supabase migration up`). No one-off Dashboard SQL; migrations are source of truth. No schema change without a migration file.

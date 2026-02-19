@@ -1,0 +1,10 @@
+---
+description: BFF only — client never AWS; /api/chat streams; server-only env
+alwaysApply: true
+---
+
+# BFF & Bedrock (Hard Rule)
+
+- Client never calls AWS/Bedrock. All LLM via Next.js **`/api/chat`** only.
+- `/api/chat`: Supabase server client (`@supabase/ssr`), session from cookies. `!session` → 401 immediately; do not call Bedrock. Use `streamText` and `return stream.toDataStreamResponse()`. Accept canvas (nodes, edges) in body; pure `parseCanvasState(nodes, edges): string` for LLM context; no classes/mutation.
+- AWS/Bedrock env vars server-only (no `NEXT_PUBLIC_`); frontend must not see or send them.

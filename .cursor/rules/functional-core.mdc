@@ -1,0 +1,18 @@
+---
+description: Functional core — no classes, pure functions, immutability
+alwaysApply: true
+---
+
+# Functional Core (Hard Rule)
+
+- No `class`, `this`, or OOP. Pure functions and closures only.
+- Logic in `lib/` and `services/`; UI in `app/` and `components/` only renders and dispatches (no business decisions or side-effect orchestration in components).
+- Immutable: `Readonly<>`, no in-place mutation. Updates via spread or `structuredClone`. State setters replace state: `set(s => ({ ...s, newKey: value }))`; never mutate nested refs.
+
+```ts
+// ✅
+function mergeTranscript(prev: TranscriptEntry[], next: TranscriptEntry): TranscriptEntry[] {
+  return [...prev, next];
+}
+set(prev => ({ ...prev, nodes: [...prev.nodes, node] }));
+```

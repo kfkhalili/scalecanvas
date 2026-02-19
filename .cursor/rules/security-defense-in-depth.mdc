@@ -1,0 +1,12 @@
+---
+description: Defense in depth — auth, RLS, server-only keys, validation
+alwaysApply: true
+---
+
+# Security — Defense in Depth (Hard Rule)
+
+- Enforce auth, authorization, and data access at every tier; no single point of trust.
+- Protected routes: verify user (Supabase `getUser()` or session from cookies). No session → `NextResponse.json({ error: 'Unauthorized' }, { status: 401 })`. Never trust client-only checks.
+- RLS on all tables (`auth.uid()`); assume API can be bypassed.
+- Publishable key in client only; secrets and AWS/Bedrock keys server-only, never `NEXT_PUBLIC_` or in bundle/logs.
+- Validate/sanitize inputs at API boundaries (e.g. Zod); limit payload size and rate.
