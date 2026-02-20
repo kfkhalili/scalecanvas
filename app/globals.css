@@ -76,9 +76,9 @@
   }
 }
 
-/* React Flow: thicker edge strokes */
+/* React Flow: thicker edge strokes (framework default is 1; inline style may not reach path) */
 .react-flow__edge-path {
-  stroke-width: 2.5;
+  stroke-width: 4px;
 }
 
 /* Markdown in chat (Trainer responses) */

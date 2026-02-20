@@ -37,6 +37,9 @@ export type ReactFlowNode = {
 
 export type EdgeData = {
   label?: string;
+  /** Offset from default label position (flow coords) for movable label */
+  labelOffsetX?: number;
+  labelOffsetY?: number;
 };
 
 export type ReactFlowEdge = {

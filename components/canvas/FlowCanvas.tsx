@@ -5,6 +5,7 @@ import {
   ReactFlow,
   Background,
   addEdge,
+  MarkerType,
   type Viewport as RfViewport,
   type Node,
   type Edge,
@@ -91,6 +92,26 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
     [setEdges]
   );
 
+  const updateEdgeLabelPosition = useCallback(
+    (edgeId: string, offsetX: number, offsetY: number) => {
+      setEdges((prev) =>
+        prev.map((e) =>
+          e.id === edgeId
+            ? {
+                ...e,
+                data: {
+                  ...e.data,
+                  labelOffsetX: offsetX,
+                  labelOffsetY: offsetY,
+                },
+              }
+            : e
+        )
+      );
+    },
+    [setEdges]
+  );
+
   const onDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -138,7 +159,10 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
   );
 
   return (
-    <EdgeLabelProvider updateEdgeLabel={updateEdgeLabel}>
+    <EdgeLabelProvider
+        updateEdgeLabel={updateEdgeLabel}
+        updateEdgeLabelPosition={updateEdgeLabelPosition}
+      >
       <ReactFlow
         key={sessionId ?? "no-session"}
         nodes={nodes}
@@ -152,6 +176,7 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
         defaultViewport={defaultViewport}
         defaultEdgeOptions={{
           style: { strokeWidth: 2.5 },
+          markerEnd: { type: MarkerType.ArrowClosed },
           data: { label: "" },
         }}
         edgeTypes={edgeTypes}
