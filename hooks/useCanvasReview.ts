@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import type { Message } from "ai";
 
-const REVIEW_DEBOUNCE_MS = 8_000;
+const REVIEW_DEBOUNCE_MS = 10_000;
 const MIN_NODES_FOR_REVIEW = 1;
 
 /**

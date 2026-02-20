@@ -9,6 +9,7 @@ Current architecture diagram (from the candidate's canvas):
 ---
 ${canvasContext}
 ---
+Edge labels describe the relationship; use them when referring to connections. Treat diagram updates (including label or position changes) as the current state.
 
 Guidelines:
 - Ask one question or give one piece of feedback at a time.

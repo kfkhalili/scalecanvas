@@ -53,6 +53,6 @@ describe("parseCanvasState", () => {
       { id: "e1", source: "n1", target: "n2", data: { label: "requests" } },
     ];
     const result = parseCanvasState([], edges);
-    expect(result).toContain("label: \"requests\"");
+    expect(result).toContain('relationship: "requests"');
   });
 });

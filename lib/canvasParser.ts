@@ -16,8 +16,10 @@ export function parseCanvasState(
     return `- ${n.id}: ${label} (type: ${n.type ?? "default"}) at (${n.position.x}, ${n.position.y})`;
   });
   const edgeLines = edges.map((e) => {
-    const labelPart = e.data?.label ? ` label: "${e.data.label}"` : "";
-    return `- ${e.source} → ${e.target}${e.id ? ` (id: ${e.id})` : ""}${labelPart}`;
+    const labelPart = e.data?.label
+      ? ` [relationship: "${e.data.label}"]`
+      : "";
+    return `- ${e.source} → ${e.target}${labelPart}${e.id ? ` (id: ${e.id})` : ""}`;
   });
   const parts: string[] = [];
   if (nodeLines.length > 0) {

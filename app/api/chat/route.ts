@@ -11,7 +11,12 @@ type ParsedNode = {
   position: { x: number; y: number };
   data?: { label?: string };
 };
-type ParsedEdge = { id: string; source: string; target: string };
+type ParsedEdge = {
+  id: string;
+  source: string;
+  target: string;
+  data?: { label?: string };
+};
 
 function extractContent(content: unknown): string {
   if (typeof content === "string") return content;
@@ -92,7 +97,11 @@ function parseEdgeArray(v: unknown): ParsedEdge[] {
       typeof x.target !== "string"
     )
       continue;
-    out.push({ id: x.id, source: x.source, target: x.target });
+    const data =
+      x.data && typeof x.data === "object" && "label" in x.data
+        ? { label: (x.data as { label?: string }).label }
+        : undefined;
+    out.push({ id: x.id, source: x.source, target: x.target, data });
   }
   return out;
 }
