@@ -1,5 +1,8 @@
 "use client";
 
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { cn } from "@/lib/utils";
 
 export type DisplayMessage = {
@@ -14,6 +17,8 @@ type MessageBubbleProps = {
 
 export function MessageBubble({ message }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === "user";
+  const isAssistant = message.role === "assistant";
+
   return (
     <div
       className={cn(
@@ -26,8 +31,19 @@ export function MessageBubble({ message }: MessageBubbleProps): React.ReactEleme
       <div className="font-medium opacity-80">
         {isUser ? "You" : "Trainer"}
       </div>
-      <div className="mt-0.5 whitespace-pre-wrap break-words">
-        {message.content}
+      <div
+        className={cn(
+          "mt-0.5 break-words",
+          isAssistant ? "chat-markdown" : "whitespace-pre-wrap"
+        )}
+      >
+        {isAssistant ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks] as never[]}>
+            {message.content}
+          </ReactMarkdown>
+        ) : (
+          message.content
+        )}
       </div>
     </div>
   );
