@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import { Menu, SquarePen, Settings, Monitor, Sun, Moon, Check, LogIn, LogOut, X } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -186,11 +187,14 @@ export function CollapsibleSidebar({
                 {(() => {
                   const avatarUrl = getAvatarUrl(user);
                   return avatarUrl ? (
-                    <img
+                    <Image
                       src={avatarUrl}
                       alt=""
+                      width={20}
+                      height={20}
                       className="h-full w-full object-cover"
                       referrerPolicy="no-referrer"
+                      unoptimized
                     />
                   ) : (
                     <span className="flex h-full w-full items-center justify-center bg-blue-600 text-[10px] font-semibold text-white">
