@@ -24,7 +24,7 @@ export function MessageBubble({ message }: MessageBubbleProps): React.ReactEleme
       )}
     >
       <div className="font-medium opacity-80">
-        {isUser ? "You" : "Assistant"}
+        {isUser ? "You" : "Trainer"}
       </div>
       <div className="mt-0.5 whitespace-pre-wrap break-words">
         {message.content}

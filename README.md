@@ -39,6 +39,34 @@ Copy `.env.example` to `.env.local` and fill in:
 - **Server (optional):** `SUPABASE_SECRET_KEY`
 - **Server-only (BFF /api/chat):** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `BEDROCK_MODEL_ID` — never use `NEXT_PUBLIC_` for these.
 
+### IAM for Bedrock (inference profile)
+
+The IAM user used by `/api/chat` must allow both the **inference profile** and the **foundation model** (e.g. for Claude Sonnet 4.6). When using cross-region inference, the foundation model is evaluated as a region-agnostic resource (`arn:aws:bedrock:::foundation-model/...`), so the foundation-model ARN in the policy must use a region wildcard:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+    "Resource": [
+      "arn:aws:bedrock:us-east-1:ACCOUNT_ID:inference-profile/global.anthropic.claude-sonnet-4-6",
+      "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6"
+    ]
+  }]
+}
+```
+
+Replace `ACCOUNT_ID` with your AWS account ID.
+
+### Chat latency
+
+Responses should stream and show the first tokens within a few seconds. If you see a long delay (e.g. 60–90s) before any output:
+
+- **Try production:** `pnpm build && pnpm start` and test again (dev/Turbopack can behave differently).
+- **Verify streaming:** The route sends `Cache-Control: no-store` and `X-Accel-Buffering: no` so the response isn’t buffered.
+- **Inference profile:** A **geographic** profile in your region (e.g. `us.anthropic.claude-sonnet-4-6` from US) can be faster than the global one; see AWS Bedrock inference profiles docs.
+
 ## Folder structure
 
 - `app/` — routes, layouts, pages; API under `app/api/`

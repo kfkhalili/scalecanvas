@@ -166,7 +166,7 @@ Local Studio has **no** “URL Configuration” or “Providers” UI. Everythin
 
 ---
 
-### Phase 6: BFF /api/chat (Streaming, Bedrock)
+### Phase 6: BFF /api/chat (Streaming, Bedrock) ✅ Done
 
 **Goal:** /api/chat: auth (Supabase server client, cookies) → 401 if !session; parse body (messages, nodes, edges); pure parseCanvasState(nodes, edges); streamText (Bedrock) → toDataStreamResponse(). Model: Cross-Region Inference `anthropic.claude-sonnet-4-6`.
 
