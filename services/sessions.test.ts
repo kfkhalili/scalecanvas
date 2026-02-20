@@ -4,9 +4,11 @@ import {
   listSessions,
   getSession,
   deleteSession,
+  getSessionSettings,
+  saveSessionSettings,
 } from "./sessions";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
-import type { DbInterviewSession } from "@/lib/database.types";
+import type { DbInterviewSession, DbSessionSettings } from "@/lib/database.types";
 
 type PostgresError = { message: string };
 type MockInsertSingle = {
@@ -19,12 +21,19 @@ type MockSelectSingle = {
   error: PostgresError | null;
 };
 type MockDelete = { error: PostgresError | null };
+type MockMaybeSingle = {
+  data: DbSessionSettings | null;
+  error: PostgresError | null;
+};
+type MockUpsert = { error: PostgresError | null };
 
 function mockSupabaseClient(overrides: {
   insertSingle?: MockInsertSingle;
   selectEqOrder?: MockSelectOrder;
   selectEqSingle?: MockSelectSingle;
   deleteEq?: MockDelete;
+  sessionSettingsSelect?: MockMaybeSingle;
+  sessionSettingsUpsert?: MockUpsert;
 } = {}): ServerSupabaseClient {
   const insertSingle: MockInsertSingle =
     overrides.insertSingle ?? { data: null, error: null };
@@ -32,6 +41,10 @@ function mockSupabaseClient(overrides: {
     overrides.selectEqOrder ?? { data: [], error: null };
   const selectEqSingle: MockSelectSingle =
     overrides.selectEqSingle ?? { data: null, error: null };
+  const sessionSettingsSelect: MockMaybeSingle =
+    overrides.sessionSettingsSelect ?? { data: null, error: null };
+  const sessionSettingsUpsert: MockUpsert =
+    overrides.sessionSettingsUpsert ?? { error: null };
   const chain = {
     insert: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
@@ -42,13 +55,25 @@ function mockSupabaseClient(overrides: {
       eq: vi.fn().mockReturnValue({
         order: vi.fn().mockResolvedValue(selectEqOrder),
         single: vi.fn().mockResolvedValue(selectEqSingle),
+        maybeSingle: vi.fn().mockResolvedValue(sessionSettingsSelect),
       }),
     }),
     delete: vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue(overrides.deleteEq ?? { error: null }),
     }),
   };
-  const from = vi.fn().mockReturnValue(chain);
+  const sessionSettingsChain = {
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue(sessionSettingsSelect),
+      }),
+    }),
+    upsert: vi.fn().mockResolvedValue(sessionSettingsUpsert),
+  };
+  const from = vi.fn().mockImplementation((table: string) => {
+    if (table === "session_settings") return sessionSettingsChain;
+    return chain;
+  });
   return asServerSupabaseClient({ from });
 }
 
@@ -149,5 +174,72 @@ describe("deleteSession", () => {
     });
     const result = await deleteSession(client, "sess-1");
     expect(result.isOk()).toBe(true);
+  });
+});
+
+describe("getSessionSettings", () => {
+  it("returns default settings when no row exists", async () => {
+    const client = mockSupabaseClient({
+      sessionSettingsSelect: { data: null, error: null },
+    });
+    const result = await getSessionSettings(client, "sess-1");
+    expect(result.isOk()).toBe(true);
+    result.match(
+      (s) => {
+        expect(s.autoReviewEnabled).toBe(false);
+      },
+      () => {}
+    );
+  });
+
+  it("returns saved settings when row exists", async () => {
+    const client = mockSupabaseClient({
+      sessionSettingsSelect: {
+        data: {
+          session_id: "sess-1",
+          auto_review_enabled: true,
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+        error: null,
+      },
+    });
+    const result = await getSessionSettings(client, "sess-1");
+    expect(result.isOk()).toBe(true);
+    result.match(
+      (s) => {
+        expect(s.autoReviewEnabled).toBe(true);
+      },
+      () => {}
+    );
+  });
+
+  it("returns err when select fails", async () => {
+    const client = mockSupabaseClient({
+      sessionSettingsSelect: { data: null, error: { message: "DB error" } },
+    });
+    const result = await getSessionSettings(client, "sess-1");
+    expect(result.isErr()).toBe(true);
+  });
+});
+
+describe("saveSessionSettings", () => {
+  it("returns ok(undefined) when upsert succeeds", async () => {
+    const client = mockSupabaseClient({
+      sessionSettingsUpsert: { error: null },
+    });
+    const result = await saveSessionSettings(client, "sess-1", {
+      autoReviewEnabled: true,
+    });
+    expect(result.isOk()).toBe(true);
+  });
+
+  it("returns err when upsert fails", async () => {
+    const client = mockSupabaseClient({
+      sessionSettingsUpsert: { error: { message: "DB error" } },
+    });
+    const result = await saveSessionSettings(client, "sess-1", {
+      autoReviewEnabled: false,
+    });
+    expect(result.isErr()).toBe(true);
   });
 });

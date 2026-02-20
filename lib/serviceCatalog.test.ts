@@ -25,6 +25,13 @@ describe("SERVICE_CATALOG", () => {
       expect(ordered.has(s.category)).toBe(true);
     }
   });
+
+  it("has a text entry in notes category for canvas text nodes", () => {
+    const textEntry = SERVICE_CATALOG.find((s) => s.type === "text");
+    expect(textEntry).toBeDefined();
+    expect(textEntry!.category).toBe("notes");
+    expect(textEntry!.label).toBe("Text");
+  });
 });
 
 describe("getServicesByCategory", () => {
