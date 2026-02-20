@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, type DragEvent } from "react";
 import {
   ReactFlow,
   Background,
@@ -17,6 +17,8 @@ import {
 import "reactflow/dist/style.css";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { awsNodeTypes } from "./nodeTypes";
+import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
+import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
 import { saveCanvasApi } from "@/services/sessionsClient";
 import { getSampleCanvasState } from "@/lib/canvas";
 
@@ -63,7 +65,24 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((prev) => addEdge(connection, prev));
+      setEdges((prev) => {
+        const next = addEdge(connection, prev);
+        const prevIds = new Set(prev.map((e) => e.id));
+        return next.map((e) =>
+          prevIds.has(e.id) ? e : { ...e, data: { ...e.data, label: "" } }
+        );
+      });
+    },
+    [setEdges]
+  );
+
+  const updateEdgeLabel = useCallback(
+    (edgeId: string, label: string) => {
+      setEdges((prev) =>
+        prev.map((e) =>
+          e.id === edgeId ? { ...e, data: { ...e.data, label } } : e
+        )
+      );
     },
     [setEdges]
   );
@@ -109,25 +128,37 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
       ? { x: viewport.x, y: viewport.y, zoom: viewport.zoom }
       : { x: 0, y: 0, zoom: 1 };
 
+  const edgeTypes = useMemo(
+    () => ({ default: LabeledEdge }),
+    []
+  );
+
   return (
-    <ReactFlow
-      key={sessionId ?? "no-session"}
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      onMoveEnd={onMoveEnd}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      defaultViewport={defaultViewport}
-      nodeTypes={awsNodeTypes}
-      fitView
-      fitViewOptions={{ padding: 0.2, maxZoom: 1.5 }}
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background />
-    </ReactFlow>
+    <EdgeLabelProvider updateEdgeLabel={updateEdgeLabel}>
+      <ReactFlow
+        key={sessionId ?? "no-session"}
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onMoveEnd={onMoveEnd}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        defaultViewport={defaultViewport}
+        defaultEdgeOptions={{
+          style: { strokeWidth: 2.5 },
+          data: { label: "" },
+        }}
+        edgeTypes={edgeTypes}
+        nodeTypes={awsNodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2, maxZoom: 1.5 }}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background />
+      </ReactFlow>
+    </EdgeLabelProvider>
   );
 }
 

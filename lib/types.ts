@@ -35,12 +35,17 @@ export type ReactFlowNode = {
   data: NodeData;
 };
 
+export type EdgeData = {
+  label?: string;
+};
+
 export type ReactFlowEdge = {
   id: string;
   source: string;
   target: string;
   sourceHandle?: string | null;
   targetHandle?: string | null;
+  data?: EdgeData;
 };
 
 export type Viewport = {

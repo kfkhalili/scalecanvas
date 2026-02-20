@@ -47,4 +47,12 @@ describe("parseCanvasState", () => {
     expect(result).toContain("a");
     expect(result).toContain("b");
   });
+
+  it("includes edge label when present", () => {
+    const edges: ReactFlowEdge[] = [
+      { id: "e1", source: "n1", target: "n2", data: { label: "requests" } },
+    ];
+    const result = parseCanvasState([], edges);
+    expect(result).toContain("label: \"requests\"");
+  });
 });

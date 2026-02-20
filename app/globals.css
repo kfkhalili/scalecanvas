@@ -75,3 +75,8 @@
     text-decoration: underline;
   }
 }
+
+/* React Flow: thicker edge strokes */
+.react-flow__edge-path {
+  stroke-width: 2.5;
+}
