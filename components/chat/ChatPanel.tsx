@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useChat } from "ai/react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
+import { useCanvasReview } from "@/hooks/useCanvasReview";
 import { appendTranscriptApi } from "@/services/sessionsClient";
 import { Button } from "@/components/ui/button";
 import { TranscriptView } from "./TranscriptView";
@@ -97,6 +98,8 @@ export function ChatPanel({
         ]);
       },
     });
+
+  useCanvasReview({ sessionId, messages, setMessages, isLoading });
 
   useEffect(() => {
     if (initialEntries.length > 0 && !didSetInitial.current) {

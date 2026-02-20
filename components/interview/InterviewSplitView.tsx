@@ -5,6 +5,7 @@ import { SplitScreen } from "@/components/layout/SplitScreen";
 import { CollapsibleSidebar } from "@/components/layout/CollapsibleSidebar";
 import { AuthBar } from "@/components/layout/AuthBar";
 import { FlowCanvas } from "@/components/canvas/FlowCanvas";
+import { NodeLibrary } from "@/components/canvas/NodeLibrary";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -65,7 +66,14 @@ export function InterviewSplitView({
       <div className="relative min-h-0 min-w-0 flex-1">
         <AuthBar isAnonymous={isAnonymous} />
         <SplitScreen
-          left={<FlowCanvas sessionId={sessionId ?? "ephemeral"} />}
+          left={
+            <div className="flex h-full">
+              <NodeLibrary className="w-52 shrink-0 border-r border-foreground/5 bg-background" />
+              <div className="min-w-0 flex-1">
+                <FlowCanvas sessionId={sessionId ?? "ephemeral"} />
+              </div>
+            </div>
+          }
           right={
             <div className="flex h-full flex-col p-2">
               <ChatPanel sessionId={sessionId} initialEntries={entries} />
