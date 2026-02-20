@@ -6,7 +6,8 @@ export type ServiceCategory =
   | "integration"
   | "security"
   | "containers"
-  | "analytics";
+  | "analytics"
+  | "notes";
 
 export type ServiceEntry = {
   readonly type: string;
@@ -53,6 +54,9 @@ export const SERVICE_CATALOG: readonly ServiceEntry[] = [
   // Analytics
   { type: "kinesis", label: "Kinesis", description: "Real-time data streaming", category: "analytics" },
   { type: "redshift", label: "Redshift", description: "Data warehouse", category: "analytics" },
+
+  // Notes (text box for requirements, traffic, etc.)
+  { type: "text", label: "Text", description: "Notes, requirements, traffic", category: "notes" },
 ] as const;
 
 export const CATEGORY_LABELS: Record<ServiceCategory, string> = {
@@ -64,9 +68,11 @@ export const CATEGORY_LABELS: Record<ServiceCategory, string> = {
   security: "Security",
   containers: "Containers",
   analytics: "Analytics",
+  notes: "Notes",
 };
 
 export const CATEGORY_ORDER: readonly ServiceCategory[] = [
+  "notes",
   "compute",
   "networking",
   "storage",

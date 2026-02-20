@@ -70,6 +70,9 @@ export function useCanvasReview({
 }: UseCanvasReviewOpts): void {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const canvasReviewScheduledEnabled = useCanvasStore(
+    (s) => s.canvasReviewScheduledEnabled
+  );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastReviewedRef = useRef<string>("");
   const lastScheduledSnapshotRef = useRef<string | null>(null);
@@ -130,6 +133,7 @@ export function useCanvasReview({
   }, [setMessages]);
 
   useEffect(() => {
+    if (!canvasReviewScheduledEnabled) return;
     if (isLoading || isReviewingRef.current) return;
     if (nodes.length < MIN_NODES_FOR_REVIEW) return;
 
@@ -150,5 +154,5 @@ export function useCanvasReview({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [nodes, edges, isLoading, doReview]);
+  }, [canvasReviewScheduledEnabled, nodes, edges, isLoading, doReview]);
 }

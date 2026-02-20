@@ -19,6 +19,7 @@ const CATEGORY_COLORS: Record<ServiceCategory | "default", { border: string; bg:
   integration: { border: "border-pink-500",   bg: "bg-pink-950" },
   security:    { border: "border-red-500",    bg: "bg-red-950" },
   analytics:   { border: "border-amber-500",  bg: "bg-amber-950" },
+  notes:       { border: "border-amber-500",  bg: "bg-amber-950" },
   default:     { border: "border-gray-500",   bg: "bg-gray-900" },
 };
 

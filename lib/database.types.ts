@@ -95,6 +95,23 @@ export type DbCanvasStateUpdate = {
   updated_at?: string;
 };
 
+export type DbSessionSettings = {
+  session_id: string;
+  auto_review_enabled: boolean;
+  updated_at: string;
+};
+
+export type DbSessionSettingsInsert = {
+  session_id: string;
+  auto_review_enabled?: boolean;
+  updated_at?: string;
+};
+
+export type DbSessionSettingsUpdate = {
+  auto_review_enabled?: boolean;
+  updated_at?: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -117,6 +134,11 @@ export type Database = {
         Row: DbCanvasState;
         Insert: DbCanvasStateInsert;
         Update: DbCanvasStateUpdate;
+      };
+      session_settings: {
+        Row: DbSessionSettings;
+        Insert: DbSessionSettingsInsert;
+        Update: DbSessionSettingsUpdate;
       };
     };
     Views: Record<string, never>;

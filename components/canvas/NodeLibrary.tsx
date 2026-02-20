@@ -2,7 +2,7 @@
 
 import { useState, type DragEvent } from "react";
 import Image from "next/image";
-import { Search, ChevronRight, GripVertical } from "lucide-react";
+import { Search, ChevronRight, GripVertical, StickyNote } from "lucide-react";
 import {
   CATEGORY_ORDER,
   CATEGORY_LABELS,
@@ -20,7 +20,7 @@ function onDragStart(e: DragEvent, entry: ServiceEntry): void {
 }
 
 function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
-  const iconUrl = getAwsIconUrl(entry.type);
+  const iconUrl = entry.type === "text" ? null : getAwsIconUrl(entry.type);
   return (
     <div
       draggable
@@ -29,7 +29,9 @@ function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
       title={entry.description}
     >
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-foreground/20 group-hover:text-foreground/40" />
-      {iconUrl ? (
+      {entry.type === "text" ? (
+        <StickyNote className="h-5 w-5 shrink-0 text-foreground/80" />
+      ) : iconUrl ? (
         <Image
           src={iconUrl}
           alt=""

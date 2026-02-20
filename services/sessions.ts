@@ -1,6 +1,11 @@
 import { ok, err, type Result } from "neverthrow";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
-import type { Session, TranscriptEntry, CanvasState } from "@/lib/types";
+import type {
+  Session,
+  TranscriptEntry,
+  CanvasState,
+  SessionSettings,
+} from "@/lib/types";
 import { sessionToPublic } from "@/lib/session";
 import { transcriptToPublic } from "@/lib/transcript";
 import { canvasFromDb } from "@/lib/canvas";
@@ -10,6 +15,9 @@ import type {
   DbSessionTranscript,
   DbSessionTranscriptInsert,
   DbCanvasState,
+  DbSessionSettings,
+  DbSessionSettingsInsert,
+  DbSessionSettingsUpdate,
 } from "@/lib/database.types";
 
 type SessionError = { message: string };
@@ -161,4 +169,45 @@ export async function getCanvasState(
     return ok({ nodes: [], edges: [] });
   }
   return ok(canvasFromDb(data as DbCanvasState));
+}
+
+function sessionSettingsFromDb(row: DbSessionSettings): SessionSettings {
+  return {
+    autoReviewEnabled: row.auto_review_enabled,
+  };
+}
+
+const DEFAULT_SESSION_SETTINGS: SessionSettings = {
+  autoReviewEnabled: false,
+};
+
+export async function getSessionSettings(
+  client: ServerSupabaseClient,
+  sessionId: string
+): Promise<Result<SessionSettings, SessionError>> {
+  const { data, error } = await client
+    .from("session_settings")
+    .select()
+    .eq("session_id", sessionId)
+    .maybeSingle();
+  if (error) return err({ message: error.message });
+  if (!data) return ok(DEFAULT_SESSION_SETTINGS);
+  return ok(sessionSettingsFromDb(data as DbSessionSettings));
+}
+
+export async function saveSessionSettings(
+  client: ServerSupabaseClient,
+  sessionId: string,
+  settings: SessionSettings
+): Promise<Result<undefined, SessionError>> {
+  const row: DbSessionSettingsInsert & DbSessionSettingsUpdate = {
+    session_id: sessionId,
+    auto_review_enabled: settings.autoReviewEnabled,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await client
+    .from("session_settings")
+    .upsert(row as never, { onConflict: "session_id" });
+  if (error) return err({ message: error.message });
+  return ok(undefined);
 }

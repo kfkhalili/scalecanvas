@@ -24,6 +24,11 @@ export type CanvasState = {
   viewport?: Viewport;
 };
 
+/** Per-session settings (persisted in Supabase). */
+export type SessionSettings = {
+  autoReviewEnabled: boolean;
+};
+
 export type NodeData = {
   label?: string;
 };

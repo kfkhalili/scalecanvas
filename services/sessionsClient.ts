@@ -1,5 +1,10 @@
 import { ok, err, type Result } from "neverthrow";
-import type { Session, TranscriptEntry, CanvasState } from "@/lib/types";
+import type {
+  Session,
+  TranscriptEntry,
+  CanvasState,
+  SessionSettings,
+} from "@/lib/types";
 import type { ApiErrorResponse, SessionApiPostBody } from "@/lib/api.types";
 
 type ApiError = { message: string };
@@ -137,4 +142,33 @@ export async function saveCanvasApi(
   state: CanvasState
 ): Promise<Result<undefined, ApiError>> {
   return apiPut(`${sessionsPath()}/${sessionId}/canvas`, state);
+}
+
+export async function fetchSessionSettings(
+  sessionId: string
+): Promise<Result<SessionSettings, ApiError>> {
+  return apiGet<SessionSettings>(
+    `${sessionsPath()}/${sessionId}/settings`
+  );
+}
+
+export async function saveSessionSettingsApi(
+  sessionId: string,
+  settings: SessionSettings
+): Promise<Result<SessionSettings, ApiError>> {
+  const res = await fetch(
+    `${sessionsPath()}/${sessionId}/settings`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+      credentials: "include",
+    }
+  );
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as ApiErrorResponse;
+    return err({ message: data.error ?? res.statusText });
+  }
+  const data = (await res.json()) as SessionSettings;
+  return ok(data);
 }

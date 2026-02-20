@@ -10,7 +10,12 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
-import { fetchCanvas, fetchTranscript, saveCanvasApi } from "@/services/sessionsClient";
+import {
+  fetchCanvas,
+  fetchTranscript,
+  fetchSessionSettings,
+  saveCanvasApi,
+} from "@/services/sessionsClient";
 import { isSessionContentReady } from "@/lib/sessionLoading";
 import type { TranscriptEntry } from "@/lib/types";
 
@@ -30,6 +35,9 @@ export function InterviewSplitView({
 }: InterviewSplitViewProps): React.ReactElement {
   const setCanvasState = useCanvasStore((s) => s.setCanvasState);
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
+  const setCanvasReviewScheduledEnabled = useCanvasStore(
+    (s) => s.setCanvasReviewScheduledEnabled
+  );
   const setCurrentSessionId = useSessionStore((s) => s.setCurrentSessionId);
   const setEntries = useTranscriptStore((s) => s.setEntries);
   const entries = useTranscriptStore((s) => s.entries);
@@ -56,6 +64,7 @@ export function InterviewSplitView({
 
     if (!sessionId) {
       setCanvasState(empty);
+      setCanvasReviewScheduledEnabled(false);
       setCanvasReady(true);
       return;
     }
@@ -68,15 +77,27 @@ export function InterviewSplitView({
     loadingSessionIdRef.current = sessionId;
     setCanvasReady(false);
 
-    fetchCanvas(sessionId).then((result) => {
+    Promise.all([
+      fetchCanvas(sessionId),
+      fetchSessionSettings(sessionId),
+    ]).then(([canvasResult, settingsResult]) => {
       if (loadingSessionIdRef.current !== sessionId) return;
-      result.match(
+      canvasResult.match(
         (state) => setCanvasState(state.nodes.length > 0 ? state : empty),
         () => setCanvasState(empty)
       );
+      settingsResult.match(
+        (settings) => setCanvasReviewScheduledEnabled(settings.autoReviewEnabled),
+        () => setCanvasReviewScheduledEnabled(false)
+      );
       setCanvasReady(true);
     });
-  }, [sessionId, setCanvasState, getCanvasState]);
+  }, [
+    sessionId,
+    setCanvasState,
+    setCanvasReviewScheduledEnabled,
+    getCanvasState,
+  ]);
 
   useEffect(() => {
     if (!sessionId) {

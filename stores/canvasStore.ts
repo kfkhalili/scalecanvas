@@ -11,10 +11,13 @@ type CanvasStore = {
   nodes: ReadonlyArray<ReactFlowNode>;
   edges: ReadonlyArray<ReactFlowEdge>;
   viewport: Viewport | undefined;
+  /** When true, canvas changes trigger a debounced Bedrock review. */
+  canvasReviewScheduledEnabled: boolean;
   setNodes: (nodes: ReadonlyArray<ReactFlowNode>) => void;
   setEdges: (edges: ReadonlyArray<ReactFlowEdge>) => void;
   setViewport: (viewport: Viewport | undefined) => void;
   setCanvasState: (state: CanvasState) => void;
+  setCanvasReviewScheduledEnabled: (enabled: boolean) => void;
   getCanvasState: () => CanvasState;
 };
 
@@ -24,6 +27,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodes: initial.nodes,
   edges: initial.edges,
   viewport: initial.viewport,
+  canvasReviewScheduledEnabled: false,
   setNodes: (nodes) =>
     set((state) => ({
       nodes,
@@ -41,6 +45,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       nodes: state.nodes,
       edges: state.edges,
       viewport,
+    })),
+  setCanvasReviewScheduledEnabled: (enabled) =>
+    set((state) => ({
+      ...state,
+      canvasReviewScheduledEnabled: enabled,
     })),
   setCanvasState: (state) =>
     set({

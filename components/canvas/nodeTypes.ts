@@ -1,8 +1,10 @@
 import type { NodeTypes } from "reactflow";
 import { AwsNode } from "./nodes/AwsNode";
+import { TextBoxNode } from "./nodes/TextBoxNode";
 import { SERVICE_CATALOG } from "@/lib/serviceCatalog";
 
 export const awsNodeTypes: NodeTypes = Object.fromEntries([
   ["default", AwsNode],
-  ...SERVICE_CATALOG.map((s) => [s.type, AwsNode]),
+  ["text", TextBoxNode],
+  ...SERVICE_CATALOG.filter((s) => s.type !== "text").map((s) => [s.type, AwsNode]),
 ]);
