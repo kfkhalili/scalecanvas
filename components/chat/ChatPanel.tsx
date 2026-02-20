@@ -53,7 +53,6 @@ export function ChatPanel({
 }: ChatPanelProps): React.ReactElement {
   const appendEntry = useTranscriptStore((s) => s.appendEntry);
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
-  const didSetInitial = useRef(false);
 
   const { messages, setMessages, input, setInput, handleSubmit, isLoading } =
     useChat({
@@ -102,12 +101,8 @@ export function ChatPanel({
   useCanvasReview({ sessionId, messages, setMessages, isLoading });
 
   useEffect(() => {
-    if (initialEntries.length > 0 && !didSetInitial.current) {
-      setMessages(initialEntries.map(toMessage));
-      didSetInitial.current = true;
-    }
-    if (initialEntries.length === 0) didSetInitial.current = false;
-  }, [initialEntries, setMessages]);
+    if (initialEntries.length === 0) setMessages([]);
+  }, [initialEntries.length, setMessages]);
 
   const formRef = useRef<HTMLFormElement>(null);
 

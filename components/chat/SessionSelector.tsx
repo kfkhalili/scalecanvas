@@ -102,8 +102,18 @@ export function SessionSelector({
   } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const handleDelete = (sessionId: string): void => {
-    setMenuSessionId(null);
+  /* ---- delete confirmation dialog ---- */
+  const [deleteConfirmSessionId, setDeleteConfirmSessionId] =
+    useState<string | null>(null);
+  const deleteConfirmSession =
+    deleteConfirmSessionId != null
+      ? sessions.find((s) => s.id === deleteConfirmSessionId)
+      : null;
+
+  const confirmDelete = (): void => {
+    if (deleteConfirmSessionId == null) return;
+    const sessionId = deleteConfirmSessionId;
+    setDeleteConfirmSessionId(null);
     deleteSessionApi(sessionId).then(() => {
       fetchSessions().then((r) =>
         r.match(
@@ -126,6 +136,11 @@ export function SessionSelector({
     });
   };
 
+  const openDeleteConfirm = (sessionId: string): void => {
+    setMenuSessionId(null);
+    setDeleteConfirmSessionId(sessionId);
+  };
+
   const openMenu = (sessionId: string, el: HTMLButtonElement): void => {
     const rect = el.getBoundingClientRect();
     setMenuPosition({ top: rect.bottom + 4, left: rect.right - 160 });
@@ -144,6 +159,15 @@ export function SessionSelector({
     document.addEventListener("click", close, true);
     return () => document.removeEventListener("click", close, true);
   }, [menuSessionId]);
+
+  useEffect(() => {
+    if (deleteConfirmSessionId == null) return;
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") setDeleteConfirmSessionId(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [deleteConfirmSessionId]);
 
   const menuSession =
     menuSessionId != null
@@ -281,12 +305,64 @@ export function SessionSelector({
             <button
               type="button"
               role="menuitem"
-              onClick={() => handleDelete(menuSession.id)}
+              onClick={() => openDeleteConfirm(menuSession.id)}
               className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted focus:outline-none"
             >
               <Trash2 className="h-4 w-4 shrink-0" />
               Delete
             </button>
+          </div>,
+          document.body
+        )}
+
+      {/* Delete confirmation dialog (Gemini-style) */}
+      {deleteConfirmSession != null &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
+            aria-describedby="delete-dialog-description"
+            className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh]"
+          >
+            <div
+              className="absolute inset-0 bg-black/50"
+              aria-hidden
+              onClick={() => setDeleteConfirmSessionId(null)}
+            />
+            <div className="relative z-10 w-full max-w-md rounded-xl border bg-popover p-6 shadow-xl">
+              <h2
+                id="delete-dialog-title"
+                className="text-lg font-semibold text-foreground"
+              >
+                Delete session?
+              </h2>
+              <p
+                id="delete-dialog-description"
+                className="mt-2 text-sm text-muted-foreground"
+              >
+                This will permanently delete this session, including the
+                conversation, your architecture diagram, and any feedback from
+                the Trainer. This cannot be undone.
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmSessionId(null)}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-muted focus:outline-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 focus:outline-none"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>,
           document.body
         )}
