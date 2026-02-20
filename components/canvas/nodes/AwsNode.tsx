@@ -1,9 +1,11 @@
 "use client";
 
 import { memo } from "react";
+import Image from "next/image";
 import { Handle, type NodeProps, Position } from "reactflow";
 import type { NodeData } from "@/lib/types";
 import type { ServiceCategory } from "@/lib/serviceCatalog";
+import { getAwsIconUrl } from "@/lib/awsNodeIcons";
 
 type OurNode = { id: string; type?: string; data: NodeData };
 type AwsNodeProps = NodeProps<OurNode>;
@@ -55,11 +57,24 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
     data && "label" in data && typeof data.label === "string"
       ? data.label
       : type ?? "Node";
+  const iconUrl = type ? getAwsIconUrl(type) : null;
 
   return (
-    <div className={`rounded border-2 ${colors.border} ${colors.bg} px-3 py-2 text-sm text-white shadow min-w-[100px] text-center`}>
+    <div
+      className={`flex items-center gap-2 rounded border-2 ${colors.border} ${colors.bg} pl-2 pr-3 py-1.5 text-sm text-white shadow min-w-[100px]`}
+    >
       <Handle type="target" position={Position.Top} className="!bg-gray-500" />
-      <div className="font-medium">{label}</div>
+      {iconUrl ? (
+        <Image
+          src={iconUrl}
+          alt=""
+          width={28}
+          height={28}
+          className="h-7 w-7 shrink-0 object-contain"
+          unoptimized
+        />
+      ) : null}
+      <div className="min-w-0 flex-1 font-medium break-words text-left">{label}</div>
       <Handle type="source" position={Position.Bottom} className="!bg-gray-500" />
     </div>
   );

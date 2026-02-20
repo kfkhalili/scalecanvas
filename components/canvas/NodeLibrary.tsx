@@ -1,26 +1,17 @@
 "use client";
 
 import { useState, type DragEvent } from "react";
+import Image from "next/image";
 import { Search, ChevronRight, GripVertical } from "lucide-react";
 import {
   CATEGORY_ORDER,
   CATEGORY_LABELS,
   getServicesByCategory,
   searchServices,
-  type ServiceEntry,
   type ServiceCategory,
+  type ServiceEntry,
 } from "@/lib/serviceCatalog";
-
-const CATEGORY_DOT: Record<ServiceCategory, string> = {
-  compute: "bg-orange-500",
-  networking: "bg-blue-500",
-  storage: "bg-green-500",
-  database: "bg-purple-500",
-  containers: "bg-cyan-500",
-  integration: "bg-pink-500",
-  security: "bg-red-500",
-  analytics: "bg-amber-500",
-};
+import { getAwsIconUrl } from "@/lib/awsNodeIcons";
 
 function onDragStart(e: DragEvent, entry: ServiceEntry): void {
   e.dataTransfer.setData("application/reactflow-type", entry.type);
@@ -29,6 +20,7 @@ function onDragStart(e: DragEvent, entry: ServiceEntry): void {
 }
 
 function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
+  const iconUrl = getAwsIconUrl(entry.type);
   return (
     <div
       draggable
@@ -37,7 +29,18 @@ function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
       title={entry.description}
     >
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-foreground/20 group-hover:text-foreground/40" />
-      <div className={`h-2 w-2 shrink-0 rounded-full ${CATEGORY_DOT[entry.category]}`} />
+      {iconUrl ? (
+        <Image
+          src={iconUrl}
+          alt=""
+          width={20}
+          height={20}
+          className="h-5 w-5 shrink-0 object-contain"
+          unoptimized
+        />
+      ) : (
+        <div className="h-5 w-5 shrink-0" />
+      )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm text-foreground/80">{entry.label}</div>
       </div>
