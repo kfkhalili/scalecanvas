@@ -11,7 +11,6 @@ import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
 import { fetchCanvas, fetchTranscript } from "@/services/sessionsClient";
-import { getSampleCanvasState } from "@/lib/canvas";
 
 type InterviewSplitViewProps = {
   sessionId?: string;
@@ -36,15 +35,15 @@ export function InterviewSplitView({
   }, [sessionId, setCurrentSessionId]);
 
   useEffect(() => {
-    const sample = getSampleCanvasState();
+    const empty = { nodes: [], edges: [], viewport: undefined };
     if (!sessionId) {
-      setCanvasState(sample);
+      setCanvasState(empty);
       return;
     }
     fetchCanvas(sessionId).then((result) => {
       result.match(
-        (state) => setCanvasState(state.nodes.length > 0 ? state : sample),
-        () => setCanvasState(sample)
+        (state) => setCanvasState(state.nodes.length > 0 ? state : empty),
+        () => setCanvasState(empty)
       );
     });
   }, [sessionId, setCanvasState]);

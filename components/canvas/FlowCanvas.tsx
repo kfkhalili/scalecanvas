@@ -20,7 +20,6 @@ import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
 import { saveCanvasApi } from "@/services/sessionsClient";
-import { getSampleCanvasState } from "@/lib/canvas";
 
 const SAVE_DEBOUNCE_MS = 800;
 
@@ -42,9 +41,8 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
   const setViewport = useCanvasStore((s) => s.setViewport);
 
-  const sample = getSampleCanvasState();
-  const initialNodes = (storeNodes.length > 0 ? storeNodes : sample.nodes) as Node[];
-  const initialEdges = (storeEdges.length > 0 ? storeEdges : sample.edges) as Edge[];
+  const initialNodes = storeNodes as Node[];
+  const initialEdges = storeEdges as Edge[];
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);

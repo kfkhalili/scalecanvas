@@ -4,19 +4,18 @@ import { getSampleCanvasState } from "@/lib/canvas";
 import type { ReactFlowNode, ReactFlowEdge } from "@/lib/types";
 
 beforeEach(() => {
-  const sample = getSampleCanvasState();
   useCanvasStore.setState({
-    nodes: sample.nodes,
-    edges: sample.edges,
+    nodes: [],
+    edges: [],
     viewport: undefined,
   });
 });
 
 describe("canvasStore", () => {
-  it("initial state has sample nodes and edges", () => {
+  it("initial state has no nodes and no edges", () => {
     const state = useCanvasStore.getState();
-    expect(state.nodes.length).toBeGreaterThanOrEqual(5);
-    expect(state.edges.length).toBeGreaterThanOrEqual(4);
+    expect(state.nodes).toHaveLength(0);
+    expect(state.edges).toHaveLength(0);
   });
 
   it("setCanvasState replaces nodes and edges", () => {

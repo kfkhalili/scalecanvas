@@ -5,7 +5,7 @@ import type {
   Viewport,
   CanvasState,
 } from "@/lib/types";
-import { replaceCanvasState, getSampleCanvasState } from "@/lib/canvas";
+import { replaceCanvasState } from "@/lib/canvas";
 
 type CanvasStore = {
   nodes: ReadonlyArray<ReactFlowNode>;
@@ -18,7 +18,7 @@ type CanvasStore = {
   getCanvasState: () => CanvasState;
 };
 
-const initial = getSampleCanvasState();
+const initial: CanvasState = { nodes: [], edges: [], viewport: undefined };
 
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodes: initial.nodes,
