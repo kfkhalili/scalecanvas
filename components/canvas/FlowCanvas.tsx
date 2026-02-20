@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
-  Controls,
   type NodeChange,
   type EdgeChange,
   type Viewport as RfViewport,
@@ -122,7 +121,6 @@ export function FlowCanvas({ sessionId }: FlowCanvasProps): React.ReactElement {
         proOptions={{ hideAttribution: true }}
       >
         <Background />
-        <Controls />
       </ReactFlow>
     </div>
   );
