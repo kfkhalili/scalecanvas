@@ -164,12 +164,6 @@ export function SessionSelector({
           <p className="mt-1 text-sm leading-relaxed text-foreground/50">
             Once you&apos;re signed in, you can access your recent sessions here.
           </p>
-          <Link
-            href="/login"
-            className="mt-4 inline-flex items-center justify-center rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 focus:outline-none"
-          >
-            Sign in
-          </Link>
         </div>
       </div>
     );
