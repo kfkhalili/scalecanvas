@@ -2,10 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { CookieOptions, CookieToSet } from "@/lib/cookie.types";
 
-const protectedPathPrefixes = ["/dashboard", "/interview"];
+const UUID_SEGMENT = /^\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isProtectedPath(pathname: string): boolean {
-  return protectedPathPrefixes.some((prefix) => pathname.startsWith(prefix));
+  return UUID_SEGMENT.test(pathname);
 }
 
 function adaptCookieOptions(

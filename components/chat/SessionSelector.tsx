@@ -1,10 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createPortal } from "react-dom";
-import { MoreVertical, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useSessionStore } from "@/stores/sessionStore";
-import { fetchSessions, deleteSessionApi } from "@/services/sessionsClient";
+import {
+  fetchSessions,
+  deleteSessionApi,
+  renameSessionApi,
+} from "@/services/sessionsClient";
 import { useEffect, useCallback, useState, useRef } from "react";
 
 function SkeletonRows(): React.ReactElement {
@@ -22,13 +27,20 @@ function SkeletonRows(): React.ReactElement {
   );
 }
 
-export function SessionSelector(): React.ReactElement {
+type SessionSelectorProps = {
+  isAnonymous?: boolean;
+};
+
+export function SessionSelector({
+  isAnonymous = false,
+}: SessionSelectorProps): React.ReactElement {
   const router = useRouter();
   const { currentSessionId, sessions, setCurrentSessionId, setSessions } =
     useSessionStore();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isAnonymous);
 
   const loadSessions = useCallback(() => {
+    if (isAnonymous) return;
     fetchSessions().then((result) => {
       result.match(
         (list) => setSessions(list),
@@ -36,7 +48,7 @@ export function SessionSelector(): React.ReactElement {
       );
       setLoading(false);
     });
-  }, [setSessions]);
+  }, [isAnonymous, setSessions]);
 
   useEffect(() => {
     loadSessions();
@@ -44,7 +56,43 @@ export function SessionSelector(): React.ReactElement {
 
   const handleSelect = (sessionId: string): void => {
     setCurrentSessionId(sessionId);
-    router.push(`/interview/${sessionId}`);
+    router.push(`/${sessionId}`);
+  };
+
+  /* ---- inline rename state ---- */
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const startRename = (sessionId: string, currentTitle: string): void => {
+    setMenuSessionId(null);
+    setRenamingId(sessionId);
+    setRenameValue(currentTitle);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  };
+
+  const commitRename = (): void => {
+    if (!renamingId) return;
+    const trimmed = renameValue.trim();
+    const id = renamingId;
+    setRenamingId(null);
+    if (!trimmed) return;
+    renameSessionApi(id, trimmed).then((r) =>
+      r.match(
+        () =>
+          fetchSessions().then((fr) =>
+            fr.match(
+              (list) => setSessions(list),
+              () => {}
+            )
+          ),
+        () => {}
+      )
+    );
+  };
+
+  const cancelRename = (): void => {
+    setRenamingId(null);
   };
 
   /* ---- three-dot menu state ---- */
@@ -66,10 +114,10 @@ export function SessionSelector(): React.ReactElement {
               const next = list[0];
               if (next) {
                 setCurrentSessionId(next.id);
-                router.push(`/interview/${next.id}`);
+                router.push(`/${next.id}`);
               } else {
                 setCurrentSessionId(null);
-                router.push("/interview");
+                router.push("/");
               }
             }
           },
@@ -102,6 +150,30 @@ export function SessionSelector(): React.ReactElement {
     menuSessionId != null
       ? sessions.find((s) => s.id === menuSessionId)
       : null;
+
+  if (isAnonymous) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col px-2.5">
+        <h3 className="shrink-0 whitespace-nowrap px-2.5 pb-1 text-sm font-semibold text-foreground/60">
+          Sessions
+        </h3>
+        <div className="px-2.5 py-3">
+          <p className="text-sm leading-relaxed text-foreground/50">
+            Sign in to start saving your sessions.
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-foreground/50">
+            Once you&apos;re signed in, you can access your recent sessions here.
+          </p>
+          <Link
+            href="/login"
+            className="mt-4 inline-flex items-center justify-center rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 focus:outline-none"
+          >
+            Sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-2.5">
@@ -141,30 +213,49 @@ export function SessionSelector(): React.ReactElement {
                       : "text-foreground/80 hover:bg-muted/60"
                   }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(s.id)}
-                    className="min-w-0 flex-1 truncate whitespace-nowrap px-2.5 py-2.5 text-left text-sm focus:outline-none"
-                  >
-                    {s.title ?? "Untitled"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (menuOpen) {
-                        setMenuSessionId(null);
-                      } else {
-                        openMenu(s.id, e.currentTarget);
-                      }
-                    }}
-                    aria-label="Session options"
-                    aria-expanded={menuOpen}
-                    className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground/40 opacity-0 transition-all hover:bg-muted-foreground/10 hover:text-foreground focus:outline-none group-hover:opacity-100 group-data-[current]:opacity-100 data-[visible]:opacity-100"
-                    data-visible={menuOpen || undefined}
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
+                  {renamingId === s.id ? (
+                    <input
+                      ref={renameInputRef}
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRename();
+                        if (e.key === "Escape") cancelRename();
+                      }}
+                      className="min-w-0 flex-1 rounded bg-transparent px-2.5 py-2 text-sm text-foreground outline-none ring-1 ring-foreground/20 focus:ring-foreground/40"
+                      // eslint-disable-next-line jsx-a11y/no-autofocus
+                      autoFocus
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(s.id)}
+                      className="min-w-0 flex-1 truncate whitespace-nowrap px-2.5 py-2.5 text-left text-sm focus:outline-none"
+                    >
+                      {s.title ?? "Untitled"}
+                    </button>
+                  )}
+                  {renamingId !== s.id && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (menuOpen) {
+                          setMenuSessionId(null);
+                        } else {
+                          openMenu(s.id, e.currentTarget);
+                        }
+                      }}
+                      aria-label="Session options"
+                      aria-expanded={menuOpen}
+                      className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground/40 opacity-0 transition-all hover:bg-muted-foreground/10 hover:text-foreground focus:outline-none group-hover:opacity-100 group-data-[current]:opacity-100 data-[visible]:opacity-100"
+                      data-visible={menuOpen || undefined}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </li>
             );
@@ -183,6 +274,17 @@ export function SessionSelector(): React.ReactElement {
             role="menu"
             style={{ top: menuPosition.top, left: menuPosition.left }}
           >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() =>
+                startRename(menuSession.id, menuSession.title ?? "Untitled")
+              }
+              className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted focus:outline-none"
+            >
+              <Pencil className="h-4 w-4 shrink-0" />
+              Rename
+            </button>
             <button
               type="button"
               role="menuitem"

@@ -61,6 +61,22 @@ export async function getSession(
   return ok(sessionToPublic(data as DbInterviewSession));
 }
 
+export async function updateSession(
+  client: ServerSupabaseClient,
+  sessionId: string,
+  fields: { title?: string | null }
+): Promise<Result<Session, SessionError>> {
+  const { data, error } = await client
+    .from("interview_sessions")
+    .update(fields as never)
+    .eq("id", sessionId)
+    .select()
+    .single();
+  if (error) return err({ message: error.message });
+  if (!data) return err({ message: "Not found" });
+  return ok(sessionToPublic(data as DbInterviewSession));
+}
+
 export async function deleteSession(
   client: ServerSupabaseClient,
   sessionId: string

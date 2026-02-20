@@ -14,7 +14,7 @@ function getCallbackUrl(nextPath: string): string {
 
 function LoginContent() {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const redirect = searchParams.get("redirect") ?? "/";
   const error = searchParams.get("error");
   const supabase = createBrowserClientInstance();
 

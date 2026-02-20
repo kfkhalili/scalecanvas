@@ -32,7 +32,7 @@ function fetchWithTimeout(
 }
 
 type ChatPanelProps = {
-  sessionId: string;
+  sessionId?: string;
   initialEntries: ReadonlyArray<TranscriptEntry>;
 };
 
@@ -64,7 +64,7 @@ export function ChatPanel({
         return { nodes: state.nodes, edges: state.edges };
       })(),
       onFinish: (message) => {
-        if (message.role === "assistant" && message.content) {
+        if (message.role === "assistant" && message.content && sessionId) {
           appendTranscriptApi(sessionId, "assistant", message.content).then(
             (r) => r.match((entry) => appendEntry(entry), () => {})
           );
@@ -82,9 +82,11 @@ export function ChatPanel({
         const message = isTimeout
           ? "The request took too long. The first request can be slow—please try again; the next one is usually faster."
           : rawMessage || fallback;
-        appendTranscriptApi(sessionId, "assistant", message).then((r) =>
-          r.match((entry) => appendEntry(entry), () => {})
-        );
+        if (sessionId) {
+          appendTranscriptApi(sessionId, "assistant", message).then((r) =>
+            r.match((entry) => appendEntry(entry), () => {})
+          );
+        }
         setMessages((prev) => [
           ...prev,
           {
@@ -110,9 +112,11 @@ export function ChatPanel({
     e.preventDefault();
     const content = input.trim();
     if (!content || isLoading) return;
-    appendTranscriptApi(sessionId, "user", content).then((r) =>
-      r.match((entry) => appendEntry(entry), () => {})
-    );
+    if (sessionId) {
+      appendTranscriptApi(sessionId, "user", content).then((r) =>
+        r.match((entry) => appendEntry(entry), () => {})
+      );
+    }
     handleSubmit(e);
   };
 

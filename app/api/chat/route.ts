@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createServerClientInstance } from "@/lib/supabase/server";
 import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
 import { streamText, convertToCoreMessages } from "ai";
 import { parseCanvasState } from "@/lib/canvasParser";
@@ -101,14 +100,8 @@ function parseEdgeArray(v: unknown): ParsedEdge[] {
 export async function POST(
   request: Request
 ): Promise<NextResponse | Response> {
-  const supabase = await createServerClientInstance();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    console.error("[chat] 401 Unauthorized");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Anonymous users are allowed — chat works but transcript is not saved.
+  // Auth check removed; Bedrock credentials gate access.
 
   let modelId = process.env.BEDROCK_MODEL_ID?.trim();
   const region = process.env.AWS_REGION;

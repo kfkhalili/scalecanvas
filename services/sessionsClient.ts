@@ -83,6 +83,24 @@ export async function fetchSession(
   return apiGet<Session>(`${sessionsPath()}/${sessionId}`);
 }
 
+export async function renameSessionApi(
+  sessionId: string,
+  title: string
+): Promise<Result<Session, ApiError>> {
+  const res = await fetch(`${sessionsPath()}/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as ApiErrorResponse;
+    return err({ message: parseErrorResponse(data) || res.statusText });
+  }
+  const data = (await res.json()) as Session;
+  return ok(data);
+}
+
 export async function deleteSessionApi(
   sessionId: string
 ): Promise<Result<undefined, ApiError>> {

@@ -11,7 +11,13 @@ import { SessionSelector } from "@/components/chat/SessionSelector";
 const SIDEBAR_OPEN = 260;
 const SIDEBAR_CLOSED = 52;
 
-export function CollapsibleSidebar(): React.ReactElement {
+type CollapsibleSidebarProps = {
+  isAnonymous?: boolean;
+};
+
+export function CollapsibleSidebar({
+  isAnonymous = false,
+}: CollapsibleSidebarProps): React.ReactElement {
   const router = useRouter();
   const { open, toggle, hydrate } = useSidebarStore();
   const { setCurrentSessionId, setSessions } = useSessionStore();
@@ -21,11 +27,15 @@ export function CollapsibleSidebar(): React.ReactElement {
   }, [hydrate]);
 
   const handleNewSession = (): void => {
+    if (isAnonymous) {
+      router.push("/");
+      return;
+    }
     createSessionApi(null).then((result) => {
       result.match(
         (session) => {
           setCurrentSessionId(session.id);
-          router.push(`/interview/${session.id}`);
+          router.push(`/${session.id}`);
           fetchSessions().then((r) =>
             r.match((list) => setSessions(list), () => {})
           );
@@ -40,7 +50,6 @@ export function CollapsibleSidebar(): React.ReactElement {
       className="flex h-full shrink-0 flex-col overflow-hidden bg-background transition-[width] duration-200 ease-out"
       style={{ width: open ? SIDEBAR_OPEN : SIDEBAR_CLOSED }}
     >
-      {/* Top row: hamburger — icon centered in the 52px collapsed column */}
       <div className="flex shrink-0 items-center pl-1.5 pr-2.5 pt-3 pb-1">
         <button
           type="button"
@@ -52,7 +61,6 @@ export function CollapsibleSidebar(): React.ReactElement {
         </button>
       </div>
 
-      {/* New session row — icon aligned with hamburger */}
       <div className="shrink-0 pl-1.5 pr-2.5 py-1">
         <button
           type="button"
@@ -64,13 +72,12 @@ export function CollapsibleSidebar(): React.ReactElement {
         </button>
       </div>
 
-      {/* Session list: fills remaining height, fades out when collapsed */}
       <div
         className={`mt-4 flex min-h-0 flex-1 flex-col overflow-hidden transition-opacity duration-150 ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        <SessionSelector />
+        <SessionSelector isAnonymous={isAnonymous} />
       </div>
     </nav>
   );

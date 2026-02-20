@@ -1,26 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { POST } from "./route";
 
-vi.mock("@/lib/supabase/server", () => ({
-  createServerClientInstance: vi.fn(),
-}));
-
-const createServerClientInstance = await import(
-  "@/lib/supabase/server"
-).then((m) => m.createServerClientInstance);
-
 describe("POST /api/chat", () => {
-  beforeEach(() => {
-    vi.mocked(createServerClientInstance).mockReset();
-  });
-
-  it("returns 401 when not authenticated", async () => {
-    vi.mocked(createServerClientInstance).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as never);
-
+  it("returns 503 when Bedrock env vars are missing", async () => {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -32,8 +14,8 @@ describe("POST /api/chat", () => {
     });
 
     const res = await POST(req);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(503);
     const json = await res.json();
-    expect(json).toEqual({ error: "Unauthorized" });
+    expect(json.error).toContain("BEDROCK_MODEL_ID");
   });
 });
