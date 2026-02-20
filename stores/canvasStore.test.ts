@@ -1,0 +1,63 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { useCanvasStore } from "./canvasStore";
+import { getSampleCanvasState } from "@/lib/canvas";
+import type { ReactFlowNode, ReactFlowEdge } from "@/lib/types";
+
+beforeEach(() => {
+  const sample = getSampleCanvasState();
+  useCanvasStore.setState({
+    nodes: sample.nodes,
+    edges: sample.edges,
+    viewport: undefined,
+  });
+});
+
+describe("canvasStore", () => {
+  it("initial state has sample nodes and edges", () => {
+    const state = useCanvasStore.getState();
+    expect(state.nodes.length).toBeGreaterThanOrEqual(5);
+    expect(state.edges.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("setCanvasState replaces nodes and edges", () => {
+    const newNodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 0 }, data: { label: "A" } },
+    ];
+    const newEdges: ReactFlowEdge[] = [
+      { id: "e1", source: "a", target: "b" },
+    ];
+    useCanvasStore.getState().setCanvasState({ nodes: newNodes, edges: newEdges });
+    expect(useCanvasStore.getState().nodes).toHaveLength(1);
+    expect(useCanvasStore.getState().edges).toHaveLength(1);
+    expect(useCanvasStore.getState().nodes[0].id).toBe("a");
+  });
+
+  it("setNodes updates only nodes", () => {
+    const initialEdges = useCanvasStore.getState().edges;
+    useCanvasStore.getState().setNodes([]);
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+    expect(useCanvasStore.getState().edges).toBe(initialEdges);
+  });
+
+  it("setEdges updates only edges", () => {
+    const initialNodes = useCanvasStore.getState().nodes;
+    useCanvasStore.getState().setEdges([]);
+    expect(useCanvasStore.getState().edges).toHaveLength(0);
+    expect(useCanvasStore.getState().nodes).toBe(initialNodes);
+  });
+
+  it("setViewport updates viewport", () => {
+    useCanvasStore.getState().setViewport({ x: 10, y: 20, zoom: 1.5 });
+    expect(useCanvasStore.getState().viewport).toEqual({ x: 10, y: 20, zoom: 1.5 });
+  });
+
+  it("getCanvasState returns current nodes, edges, viewport", () => {
+    const sample = getSampleCanvasState();
+    useCanvasStore.getState().setCanvasState(sample);
+    useCanvasStore.getState().setViewport({ x: 1, y: 2, zoom: 1 });
+    const state = useCanvasStore.getState().getCanvasState();
+    expect(state.nodes).toEqual(useCanvasStore.getState().nodes);
+    expect(state.edges).toEqual(useCanvasStore.getState().edges);
+    expect(state.viewport).toEqual({ x: 1, y: 2, zoom: 1 });
+  });
+});

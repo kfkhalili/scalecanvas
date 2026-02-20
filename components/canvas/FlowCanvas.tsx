@@ -4,40 +4,21 @@ import { useCallback, useEffect, useRef, type DragEvent } from "react";
 import {
   ReactFlow,
   Background,
-  type NodeChange,
-  type EdgeChange,
+  addEdge,
   type Viewport as RfViewport,
-  applyNodeChanges,
-  applyEdgeChanges,
   type Node,
   type Edge,
+  type Connection,
   useReactFlow,
   ReactFlowProvider,
+  useNodesState,
+  useEdgesState,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { awsNodeTypes } from "./nodeTypes";
-import type { ReactFlowNode, ReactFlowEdge, Viewport } from "@/lib/types";
 import { saveCanvasApi } from "@/services/sessionsClient";
-
-function toStoreNode(n: Node): ReactFlowNode {
-  return {
-    id: n.id,
-    type: n.type ?? undefined,
-    position: n.position,
-    data: n.data as ReactFlowNode["data"],
-  };
-}
-
-function toStoreEdge(e: Edge): ReactFlowEdge {
-  return {
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    sourceHandle: e.sourceHandle ?? null,
-    targetHandle: e.targetHandle ?? null,
-  };
-}
+import { getSampleCanvasState } from "@/lib/canvas";
 
 const SAVE_DEBOUNCE_MS = 800;
 
@@ -52,45 +33,39 @@ type FlowCanvasInnerProps = {
 };
 
 function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElement {
-  const {
-    nodes,
-    edges,
-    viewport,
-    setNodes,
-    setEdges,
-    setViewport,
-    getCanvasState,
-  } = useCanvasStore();
+  const storeNodes = useCanvasStore((s) => s.nodes);
+  const storeEdges = useCanvasStore((s) => s.edges);
+  const viewport = useCanvasStore((s) => s.viewport);
+  const setCanvasState = useCanvasStore((s) => s.setCanvasState);
+  const getCanvasState = useCanvasStore((s) => s.getCanvasState);
+  const setViewport = useCanvasStore((s) => s.setViewport);
+
+  const sample = getSampleCanvasState();
+  const initialNodes = (storeNodes.length > 0 ? storeNodes : sample.nodes) as Node[];
+  const initialEdges = (storeEdges.length > 0 ? storeEdges : sample.edges) as Edge[];
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactFlowInstance = useReactFlow();
 
-  const nodesArray: Node[] = nodes as Node[];
-  const edgesArray: Edge[] = edges as Edge[];
-
-  const onNodesChange = useCallback(
-    (changes: NodeChange[]) => {
-      const current = useCanvasStore.getState().nodes;
-      const next = applyNodeChanges(changes, current as Node[]);
-      setNodes(next.map(toStoreNode));
-    },
-    [setNodes]
-  );
-
-  const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
-      const current = useCanvasStore.getState().edges;
-      const next = applyEdgeChanges(changes, current as Edge[]);
-      setEdges(next.map(toStoreEdge));
-    },
-    [setEdges]
-  );
+  useEffect(() => {
+    setCanvasState({ nodes, edges, viewport });
+  }, [nodes, edges, viewport, setCanvasState]);
 
   const onMoveEnd = useCallback(
     (_ev: MouseEvent | TouchEvent | null, vp: RfViewport) => {
-      const v: Viewport = { x: vp.x, y: vp.y, zoom: vp.zoom };
-      setViewport(v);
+      setViewport({ x: vp.x, y: vp.y, zoom: vp.zoom });
     },
     [setViewport]
+  );
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      setEdges((prev) => addEdge(connection, prev));
+    },
+    [setEdges]
   );
 
   const onDragOver = useCallback((e: DragEvent) => {
@@ -104,27 +79,20 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
       const type = e.dataTransfer.getData("application/reactflow-type");
       if (!type) return;
       const label = e.dataTransfer.getData("application/reactflow-label") || type;
-
       const position = reactFlowInstance.screenToFlowPosition({
         x: e.clientX,
         y: e.clientY,
       });
-
-      const newNode: ReactFlowNode = {
-        id: nextNodeId(),
-        type,
-        position,
-        data: { label },
-      };
-
-      const current = useCanvasStore.getState().nodes;
-      setNodes([...current, newNode]);
+      setNodes((prev) => [
+        ...prev,
+        { id: nextNodeId(), type, position, data: { label } } as Node,
+      ]);
     },
     [reactFlowInstance, setNodes]
   );
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || sessionId === "ephemeral") return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
@@ -144,16 +112,18 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
   return (
     <ReactFlow
       key={sessionId ?? "no-session"}
-      nodes={nodesArray}
-      edges={edgesArray}
+      nodes={nodes}
+      edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
       onMoveEnd={onMoveEnd}
       onDragOver={onDragOver}
       onDrop={onDrop}
       defaultViewport={defaultViewport}
       nodeTypes={awsNodeTypes}
       fitView
+      fitViewOptions={{ padding: 0.2, maxZoom: 1.5 }}
       proOptions={{ hideAttribution: true }}
     >
       <Background />
@@ -167,7 +137,7 @@ type FlowCanvasProps = {
 
 export function FlowCanvas({ sessionId }: FlowCanvasProps): React.ReactElement {
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" style={{ minHeight: 400, minWidth: 300 }}>
       <ReactFlowProvider>
         <FlowCanvasInner sessionId={sessionId} />
       </ReactFlowProvider>

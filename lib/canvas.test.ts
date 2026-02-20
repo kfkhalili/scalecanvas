@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canvasFromDb, replaceCanvasState } from "./canvas";
+import { canvasFromDb, replaceCanvasState, getSampleCanvasState } from "./canvas";
 import type { DbCanvasState } from "@/lib/database.types";
 import type { CanvasState, ReactFlowNode, ReactFlowEdge, Viewport } from "@/lib/types";
 
@@ -62,5 +62,44 @@ describe("replaceCanvasState", () => {
     const current: CanvasState = { nodes: [], edges: [] };
     const result = replaceCanvasState(current, [], []);
     expect(result.viewport).toBeUndefined();
+  });
+});
+
+describe("getSampleCanvasState", () => {
+  it("returns 5 nodes with expected ids and types", () => {
+    const state = getSampleCanvasState();
+    expect(state.nodes).toHaveLength(5);
+    const ids = state.nodes.map((n) => n.id);
+    expect(ids).toContain("sample-client");
+    expect(ids).toContain("sample-api");
+    expect(ids).toContain("sample-lambda");
+    expect(ids).toContain("sample-db");
+    expect(ids).toContain("sample-s3");
+    expect(state.nodes.find((n) => n.id === "sample-client")?.type).toBe("vpc");
+    expect(state.nodes.find((n) => n.id === "sample-api")?.type).toBe("apiGateway");
+  });
+
+  it("returns 4 edges connecting the sample nodes", () => {
+    const state = getSampleCanvasState();
+    expect(state.edges).toHaveLength(4);
+    const sources = state.edges.map((e) => e.source);
+    const targets = state.edges.map((e) => e.target);
+    expect(sources).toContain("sample-client");
+    expect(targets).toContain("sample-api");
+    expect(targets).toContain("sample-db");
+    expect(targets).toContain("sample-s3");
+  });
+
+  it("returns no viewport (undefined)", () => {
+    const state = getSampleCanvasState();
+    expect(state.viewport).toBeUndefined();
+  });
+
+  it("each node has position and data", () => {
+    const state = getSampleCanvasState();
+    for (const n of state.nodes) {
+      expect(n.position).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
+      expect(n.data).toBeDefined();
+    }
   });
 });

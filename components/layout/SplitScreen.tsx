@@ -67,7 +67,7 @@ export function SplitScreen({
   return (
     <div ref={containerRef} className="flex h-full w-full">
       <div
-        className={cn(leftClassName, "shrink-0 overflow-hidden")}
+        className={cn(leftClassName, "flex h-full shrink-0 flex-col overflow-hidden")}
         style={{
           width: `${leftRatio * 100}%`,
           minWidth: MIN_PANEL_PX,

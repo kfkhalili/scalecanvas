@@ -11,6 +11,7 @@ import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
 import { fetchCanvas, fetchTranscript } from "@/services/sessionsClient";
+import { getSampleCanvasState } from "@/lib/canvas";
 
 type InterviewSplitViewProps = {
   sessionId?: string;
@@ -35,14 +36,15 @@ export function InterviewSplitView({
   }, [sessionId, setCurrentSessionId]);
 
   useEffect(() => {
+    const sample = getSampleCanvasState();
     if (!sessionId) {
-      setCanvasState({ nodes: [], edges: [] });
+      setCanvasState(sample);
       return;
     }
     fetchCanvas(sessionId).then((result) => {
       result.match(
-        (state) => setCanvasState(state),
-        () => setCanvasState({ nodes: [], edges: [] })
+        (state) => setCanvasState(state.nodes.length > 0 ? state : sample),
+        () => setCanvasState(sample)
       );
     });
   }, [sessionId, setCanvasState]);
@@ -67,9 +69,9 @@ export function InterviewSplitView({
         <AuthBar isAnonymous={isAnonymous} />
         <SplitScreen
           left={
-            <div className="flex h-full">
+            <div className="flex h-full min-w-0">
               <NodeLibrary className="w-52 shrink-0 border-r border-foreground/5 bg-background" />
-              <div className="min-w-0 flex-1">
+              <div className="min-h-0 min-w-[200px] flex-1">
                 <FlowCanvas sessionId={sessionId ?? "ephemeral"} />
               </div>
             </div>
