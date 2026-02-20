@@ -7,6 +7,27 @@ import type { Message } from "ai";
 const REVIEW_DEBOUNCE_MS = 8_000;
 const MIN_NODES_FOR_REVIEW = 1;
 
+/**
+ * Pure logic: should we schedule a debounced review for this canvas snapshot?
+ * - First run (lastScheduled === null): do not schedule; record snapshot only.
+ * - Unchanged canvas (snapshot === lastScheduled): do not schedule.
+ * - Canvas changed: schedule and record new snapshot.
+ */
+export function getCanvasReviewScheduleDecision(
+  snapshot: string,
+  lastScheduled: string | null
+):
+  | { schedule: false; nextLastScheduled: string | null }
+  | { schedule: true; nextLastScheduled: string } {
+  if (lastScheduled === null) {
+    return { schedule: false, nextLastScheduled: snapshot };
+  }
+  if (snapshot === lastScheduled) {
+    return { schedule: false, nextLastScheduled: lastScheduled };
+  }
+  return { schedule: true, nextLastScheduled: snapshot };
+}
+
 async function readStreamText(response: Response): Promise<string> {
   const reader = response.body?.getReader();
   if (!reader) return "";
@@ -37,8 +58,9 @@ type UseCanvasReviewOpts = {
 };
 
 /**
- * Watches canvas changes and triggers a debounced Bedrock review.
- * The review appears as a Trainer message in the chat.
+ * Triggers a debounced Bedrock review only when the canvas (nodes or edges) changes.
+ * Does not trigger on initial load or when only chat messages change (e.g. after a review).
+ * User messages go through normal chat and already include the diagram in the request.
  */
 export function useCanvasReview({
   sessionId,
@@ -50,7 +72,10 @@ export function useCanvasReview({
   const edges = useCanvasStore((s) => s.edges);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastReviewedRef = useRef<string>("");
+  const lastScheduledSnapshotRef = useRef<string | null>(null);
   const isReviewingRef = useRef(false);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const doReview = useCallback(async () => {
     if (isReviewingRef.current) return;
@@ -65,11 +90,12 @@ export function useCanvasReview({
     try {
       const reviewPrompt =
         "I've updated my architecture diagram. Please briefly review the current state and give me constructive feedback or a follow-up question.";
+      const recentMessages = messagesRef.current
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .slice(-6)
+        .map((m) => ({ role: m.role, content: m.content }));
       const chatMessages = [
-        ...messages
-          .filter((m) => m.role === "user" || m.role === "assistant")
-          .slice(-6)
-          .map((m) => ({ role: m.role, content: m.content })),
+        ...recentMessages,
         { role: "user" as const, content: reviewPrompt },
       ];
 
@@ -101,11 +127,19 @@ export function useCanvasReview({
     } finally {
       isReviewingRef.current = false;
     }
-  }, [messages, setMessages]);
+  }, [setMessages]);
 
   useEffect(() => {
     if (isLoading || isReviewingRef.current) return;
     if (nodes.length < MIN_NODES_FOR_REVIEW) return;
+
+    const snapshot = JSON.stringify({ nodes, edges });
+    const decision = getCanvasReviewScheduleDecision(
+      snapshot,
+      lastScheduledSnapshotRef.current
+    );
+    lastScheduledSnapshotRef.current = decision.nextLastScheduled;
+    if (!decision.schedule) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
