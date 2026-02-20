@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { SplitScreen } from "@/components/layout/SplitScreen";
+import { CollapsibleSidebar } from "@/components/layout/CollapsibleSidebar";
 import { FlowCanvas } from "@/components/canvas/FlowCanvas";
-import { SessionSelector } from "@/components/chat/SessionSelector";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -44,18 +44,18 @@ export function InterviewSplitView({
   }, [sessionId, setEntries]);
 
   return (
-    <SplitScreen
-      left={<FlowCanvas sessionId={sessionId} />}
-      right={
-        <div className="flex h-full flex-col border-l">
-          <div className="shrink-0 border-b p-2">
-            <SessionSelector />
-          </div>
-          <div className="min-h-0 flex-1 p-2">
-            <ChatPanel sessionId={sessionId} initialEntries={entries} />
-          </div>
-        </div>
-      }
-    />
+    <div className="flex h-full w-full">
+      <CollapsibleSidebar />
+      <div className="min-h-0 min-w-0 flex-1">
+        <SplitScreen
+          left={<FlowCanvas sessionId={sessionId} />}
+          right={
+            <div className="flex h-full flex-col p-2">
+              <ChatPanel sessionId={sessionId} initialEntries={entries} />
+            </div>
+          }
+        />
+      </div>
+    </div>
   );
 }
