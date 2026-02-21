@@ -11,6 +11,8 @@ import { useSidebarStore } from "@/stores/sidebarStore";
 import { SessionSelector } from "@/components/chat/SessionSelector";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { getAvatarUrl, getDisplayName, getInitials } from "@/lib/userProfile";
+import { TokenBalance } from "@/components/billing/TokenBalance";
+import { BuyTokensButton } from "@/components/billing/BuyTokensButton";
 
 const SIDEBAR_OPEN = 260;
 const SIDEBAR_CLOSED = 52;
@@ -142,6 +144,13 @@ export function CollapsibleSidebar({
       >
         <SessionSelector isAnonymous={isAnonymous} />
       </div>
+
+      {!isAnonymous && user && open && (
+        <div className="shrink-0 border-t border-foreground/5 px-3 py-2">
+          <TokenBalance />
+          <BuyTokensButton className="mt-1.5" />
+        </div>
+      )}
 
       <div className="shrink-0 pl-1.5 pr-2.5 py-1">
         {isAnonymous ? (

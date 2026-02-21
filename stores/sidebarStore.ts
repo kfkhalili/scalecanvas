@@ -1,4 +1,4 @@
-const SIDEBAR_STORAGE_KEY = "faang-trainer-sidebar-open";
+const SIDEBAR_STORAGE_KEY = "scalecanvas-sidebar-open";
 
 function getStored(): boolean {
   if (typeof window === "undefined") return false;

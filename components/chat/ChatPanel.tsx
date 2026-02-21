@@ -29,42 +29,7 @@ const CHAT_INPUT_EXPANDED_MAX_HEIGHT_PX = 320; // ~13 lines in full-screen
 const ANONYMOUS_PLACEHOLDER =
   "Start drawing and click Evaluate to get FAANG-level feedback.";
 
-/** Fail fast; show retry message. Slow first response is usually Bedrock cold start—retry is often quick. */
-const CHAT_REQUEST_TIMEOUT_MS = 60_000;
-
-function fetchWithTimeout(
-  url: RequestInfo | URL,
-  init?: RequestInit
-): Promise<Response> {
-  const ac = new AbortController();
-  const timeoutId = setTimeout(() => ac.abort(), CHAT_REQUEST_TIMEOUT_MS);
-  const originalSignal = init?.signal;
-  if (originalSignal) {
-    originalSignal.addEventListener("abort", () => {
-      clearTimeout(timeoutId);
-      ac.abort();
-    });
-  }
-  return fetch(url, { ...init, signal: ac.signal }).finally(() =>
-    clearTimeout(timeoutId)
-  );
-}
-
-/** Reject on 401/403 so onError can show the right toast and lock the session. */
-function fetchWithGuardrail(
-  url: RequestInfo | URL,
-  init?: RequestInit
-): Promise<Response> {
-  return fetchWithTimeout(url, init).then(async (res) => {
-    if (res.status === 401 || res.status === 403) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      const err = new Error(data?.error ?? (res.status === 403 ? "Interview time has expired." : "Unauthorized.")) as Error & { statusCode: number };
-      err.statusCode = res.status;
-      throw err;
-    }
-    return res;
-  });
-}
+import { fetchWithGuardrail, transcriptEntryToMessage } from "@/lib/chatHelpers";
 
 type ChatPanelProps = {
   sessionId?: string;
@@ -72,15 +37,7 @@ type ChatPanelProps = {
   isAnonymous?: boolean;
 };
 
-function toMessage(
-  entry: TranscriptEntry
-): { id: string; role: "user" | "assistant" | "system"; content: string } {
-  return {
-    id: entry.id,
-    role: entry.role,
-    content: entry.content,
-  };
-}
+const toMessage = transcriptEntryToMessage;
 
 export function ChatPanel({
   sessionId,

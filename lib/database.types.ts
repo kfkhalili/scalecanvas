@@ -116,6 +116,36 @@ export type DbSessionSettingsUpdate = {
   updated_at?: string;
 };
 
+export type DbStripeCustomer = {
+  user_id: string;
+  stripe_customer_id: string;
+  created_at: string;
+};
+
+export type DbStripeCustomerInsert = {
+  user_id: string;
+  stripe_customer_id: string;
+  created_at?: string;
+};
+
+export type DbTokenPurchase = {
+  id: string;
+  user_id: string;
+  stripe_session_id: string;
+  pack_id: string;
+  tokens_credited: number;
+  created_at: string;
+};
+
+export type DbTokenPurchaseInsert = {
+  id?: string;
+  user_id: string;
+  stripe_session_id: string;
+  pack_id: string;
+  tokens_credited: number;
+  created_at?: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -144,9 +174,33 @@ export type Database = {
         Insert: DbSessionSettingsInsert;
         Update: DbSessionSettingsUpdate;
       };
+      stripe_customers: {
+        Row: DbStripeCustomer;
+        Insert: DbStripeCustomerInsert;
+        Update: never;
+      };
+      token_purchases: {
+        Row: DbTokenPurchase;
+        Insert: DbTokenPurchaseInsert;
+        Update: never;
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      deduct_token_and_create_session: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      credit_tokens_for_purchase: {
+        Args: {
+          p_user_id: string;
+          p_stripe_session_id: string;
+          p_pack_id: string;
+          p_tokens: number;
+        };
+        Returns: number;
+      };
+    };
     Enums: Record<string, never>;
   };
 };

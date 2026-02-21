@@ -242,8 +242,6 @@ export function SessionSelector({
                         if (e.key === "Escape") cancelRename();
                       }}
                       className="min-w-0 flex-1 rounded bg-transparent px-2.5 py-2 text-sm text-foreground outline-none ring-1 ring-foreground/20 focus:ring-foreground/40"
-                      // eslint-disable-next-line jsx-a11y/no-autofocus
-                      autoFocus
                     />
                   ) : (
                     <button

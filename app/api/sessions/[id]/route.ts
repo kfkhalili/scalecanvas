@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getSession, updateSession, deleteSession } from "@/services/sessions";
+import { UpdateSessionBodySchema } from "@/lib/api.schemas";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -33,19 +34,17 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  let body: { title?: string | null };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (typeof body.title !== "string" && body.title !== null) {
-    return NextResponse.json(
-      { error: "title must be a string or null" },
-      { status: 400 }
-    );
+  const parsed = UpdateSessionBodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
-  const result = await updateSession(supabase, id, { title: body.title });
+  const result = await updateSession(supabase, id, { title: parsed.data.title });
   return result.match(
     (session) => NextResponse.json(session),
     (e) =>

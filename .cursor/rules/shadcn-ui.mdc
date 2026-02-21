@@ -1,8 +1,0 @@
----
-description: shadcn/ui primitives in components/ui/
-alwaysApply: true
----
-
-# UI — shadcn/ui (Hard Rule)
-
-- Primitives (Button, Input, Textarea, Card, Dialog): shadcn only; add with `npx shadcn@latest add <component>`. Live in `components/ui/`; compose in `components/chat/`, `components/layout/`. Tailwind for style; presentational only. No other UI lib for buttons/inputs/cards.

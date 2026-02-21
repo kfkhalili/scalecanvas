@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSidebarStore } from "./sidebarStore";
 
-const STORAGE_KEY = "faang-trainer-sidebar-open";
+const STORAGE_KEY = "scalecanvas-sidebar-open";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};

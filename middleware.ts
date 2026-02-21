@@ -23,13 +23,39 @@ function adaptCookieOptions(
   };
 }
 
+const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const WEBHOOK_PATHS = ["/api/webhooks/"];
+
+function requiresOriginCheck(pathname: string, method: string): boolean {
+  if (!MUTATION_METHODS.has(method)) return false;
+  if (!pathname.startsWith("/api/")) return false;
+  return !WEBHOOK_PATHS.some((wp) => pathname.startsWith(wp));
+}
+
+function originMatchesHost(origin: string | null, host: string | null): boolean {
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  const response = NextResponse.next({ request });
+
+  if (requiresOriginCheck(request.nextUrl.pathname, request.method)) {
+    const origin = request.headers.get("origin");
+    const host = request.headers.get("host");
+    if (!originMatchesHost(origin, host)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
   if (!url || !key) {
-    return response;
+    return new NextResponse("Server misconfiguration", { status: 500 });
   }
 
   const supabase = createServerClient(url, key, {

@@ -82,7 +82,7 @@ export const useCanvasStore = create<CanvasStore>()(
       },
     }),
     {
-      name: "faang-canvas",
+      name: "scalecanvas-canvas",
       storage: persistStorage,
       partialize: (state) => ({
         nodes: state.nodes,

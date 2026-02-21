@@ -1,4 +1,4 @@
-# FAANG-Trainer — MVP Implementation Plan
+# ScaleCanvas — MVP Implementation Plan
 
 **Stack:** Next.js (App Router), Supabase, AWS Bedrock, Vercel AI SDK (`ai`), `@ai-sdk/amazon-bedrock`, React Flow, Tailwind CSS, TypeScript, shadcn/ui, Zustand, neverthrow, ts-pattern. **Package manager:** pnpm only.
 

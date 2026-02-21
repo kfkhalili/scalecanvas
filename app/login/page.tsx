@@ -11,7 +11,7 @@ function LoginContent() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-2xl font-bold">FAANG-Trainer</h1>
+      <h1 className="text-2xl font-bold">ScaleCanvas</h1>
       <p className="text-muted-foreground">Sign in to continue</p>
       {error === "auth_callback_error" && (
         <p className="text-destructive text-sm" role="alert">

@@ -1,4 +1,4 @@
--- FAANG-Trainer: profiles, interview_sessions, session_transcripts, canvas_states + RLS + profile trigger
+-- ScaleCanvas: profiles, interview_sessions, session_transcripts, canvas_states + RLS + profile trigger
 
 -- Profiles (one per auth user)
 create table public.profiles (

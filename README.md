@@ -1,4 +1,4 @@
-# FAANG-Trainer
+# ScaleCanvas
 
 System design interview practice: React Flow canvas (left) + AI interviewer chat (right). See [MVP_PLAN.md](./MVP_PLAN.md) for the implementation plan.
 

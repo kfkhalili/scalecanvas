@@ -1,5 +1,5 @@
 {
-  "name": "faang-trainer",
+  "name": "scalecanvas",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -31,6 +31,7 @@
     "remark-breaks": "^3.0.0",
     "remark-gfm": "^4.0.0",
     "sonner": "^1.7.0",
+    "stripe": "^20.3.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-pattern": "^5.4.0",

@@ -6,6 +6,7 @@ export function sessionToPublic(db: DbInterviewSession): Session {
     id: db.id,
     userId: db.user_id,
     title: db.title,
+    status: db.status,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };

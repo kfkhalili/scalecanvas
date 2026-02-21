@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getCanvasState, saveCanvasState } from "@/services/sessions";
-import type { CanvasState } from "@/lib/types";
+import { CanvasBodySchema } from "@/lib/api.schemas";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -30,24 +30,21 @@ export async function PUT(request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  let body: CanvasState;
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (!Array.isArray(body.nodes) || !Array.isArray(body.edges)) {
-    return NextResponse.json(
-      { error: "nodes and edges must be arrays" },
-      { status: 400 }
-    );
+  const parsed = CanvasBodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
-  const state: CanvasState = {
-    nodes: body.nodes,
-    edges: body.edges,
-    viewport: body.viewport,
-  };
-  const result = await saveCanvasState(supabase, id, state);
+  const result = await saveCanvasState(supabase, id, {
+    nodes: parsed.data.nodes.map((n) => ({ ...n, data: n.data ?? {} })),
+    edges: parsed.data.edges,
+    viewport: parsed.data.viewport,
+  });
   return result.match(
     () => new NextResponse(null, { status: 204 }),
     (e) => NextResponse.json({ error: e.message }, { status: 500 })

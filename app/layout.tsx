@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FAANG-Trainer",
+  title: "ScaleCanvas",
   description: "System design interview practice with AI interviewer",
 };
 

@@ -1,8 +1,7 @@
 ---
 description: BFF only — client never AWS; /api/chat streams; server-only env
-alwaysApply: true
+alwaysApply: false
 ---
-
 # BFF & Bedrock (Hard Rule)
 
 - Client never calls AWS/Bedrock. All LLM via Next.js **`/api/chat`** only.

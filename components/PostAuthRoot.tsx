@@ -8,6 +8,7 @@ import { useAuthHandoffStore, rehydrateAuthHandoffStore } from "@/stores/authHan
 import { deductTokenAndCreateSession } from "@/services/tokensClient";
 import { createSessionApi, renameSessionApi } from "@/services/sessionsClient";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
+import { CheckoutFeedback } from "@/components/billing/CheckoutFeedback";
 
 /**
  * Renders the workspace at / when the user is logged in. After rehydrating
@@ -87,6 +88,7 @@ export function PostAuthRoot(): React.ReactElement {
 
   return (
     <main className="flex h-screen flex-col">
+      <CheckoutFeedback />
       <div className="min-h-0 flex-1">
         <InterviewSplitView isAnonymous={false} />
       </div>

@@ -6,6 +6,7 @@ export type Session = {
   id: string;
   userId: string;
   title: string | null;
+  status: string;
   createdAt: string;
   updatedAt: string;
 };

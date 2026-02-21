@@ -1,8 +1,0 @@
----
-description: Prefer latest package versions whenever possible
-alwaysApply: true
----
-
-# Latest Packages (Hard Rule)
-
-- Prefer the **latest** versions of dependencies whenever possible. When adding or updating packages, use current/latest versions (e.g. `pnpm add <pkg>@latest` or check npm for latest and pin that). Prefer upgrading to resolve issues before working around with older pins, unless there is a documented incompatibility or breaking change that blocks the stack.
