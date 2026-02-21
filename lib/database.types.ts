@@ -12,6 +12,7 @@ export type DbProfile = {
   full_name: string | null;
   avatar_url: string | null;
   tokens: number;
+  trial_claimed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -22,6 +23,7 @@ export type DbProfileInsert = {
   full_name?: string | null;
   avatar_url?: string | null;
   tokens?: number;
+  trial_claimed_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -188,6 +190,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      claim_trial_and_create_session: {
+        Args: { p_title: string | null };
+        Returns: string;
+      };
       deduct_token_and_create_session: {
         Args: Record<string, never>;
         Returns: string;
