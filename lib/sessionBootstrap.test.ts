@@ -31,7 +31,6 @@ function mockSession(id: string): Session {
 
 function mockDeps(overrides: Partial<BootstrapDeps> = {}): BootstrapDeps {
   return {
-    createSession: vi.fn().mockResolvedValue(ok(mockSession("new-1"))),
     fetchSessions: vi.fn().mockResolvedValue(ok([])),
     deductTokenAndCreateSession: vi.fn().mockResolvedValue(ok("deducted-1")),
     renameSession: vi.fn().mockResolvedValue(undefined),
@@ -51,22 +50,16 @@ describe("decideBootstrapAction", () => {
     expect(decideBootstrapAction(true, ctx()).type).toBe("resume_or_idle");
   });
 
-  it("returns deduct_and_handoff when eval was attempted", () => {
+  it("returns deduct_and_handoff when anonymous chat (with or without eval)", () => {
     expect(
       decideBootstrapAction(
         true,
         ctx({ hasAnonymousChat: true, hasAttemptedEval: true })
       ).type
     ).toBe("deduct_and_handoff");
-  });
-
-  it("returns create_with_title_and_handoff when anonymous chat but no eval", () => {
     expect(
-      decideBootstrapAction(
-        true,
-        ctx({ hasAnonymousChat: true })
-      ).type
-    ).toBe("create_with_title_and_handoff");
+      decideBootstrapAction(true, ctx({ hasAnonymousChat: true })).type
+    ).toBe("deduct_and_handoff");
   });
 });
 
@@ -125,23 +118,6 @@ describe("executeBootstrapAction", () => {
     const c = ctx({ hasAnonymousChat: true, hasAttemptedEval: true });
     await executeBootstrapAction({ type: "deduct_and_handoff" }, c, deps);
     expect(deps.setHasAttemptedEval).toHaveBeenCalledWith(false);
-    expect(deps.setPendingAuthHandoff).not.toHaveBeenCalled();
-  });
-
-  it("create_with_title_and_handoff: creates session with title and hands off", async () => {
-    const deps = mockDeps();
-    const c = ctx({ hasAnonymousChat: true, questionTitle: "Design Y" });
-    await executeBootstrapAction({ type: "create_with_title_and_handoff" }, c, deps);
-    expect(deps.createSession).toHaveBeenCalledWith("Design Y");
-    expect(deps.setPendingAuthHandoff).toHaveBeenCalledWith("new-1");
-  });
-
-  it("create_with_title_and_handoff: does nothing on create error", async () => {
-    const deps = mockDeps({
-      createSession: vi.fn().mockResolvedValue(err({ message: "fail" })),
-    });
-    const c = ctx({ hasAnonymousChat: true });
-    await executeBootstrapAction({ type: "create_with_title_and_handoff" }, c, deps);
     expect(deps.setPendingAuthHandoff).not.toHaveBeenCalled();
   });
 });

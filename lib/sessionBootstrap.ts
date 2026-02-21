@@ -10,12 +10,11 @@ export type BootstrapContext = {
 export type BootstrapAction =
   | { type: "redirect_login" }
   | { type: "resume_or_idle" }
-  | { type: "deduct_and_handoff" }
-  | { type: "create_with_title_and_handoff" };
+  | { type: "deduct_and_handoff" };
 
 /**
  * Pure decision function: given the bootstrap context, returns the action
- * PostAuthRoot should take. Keeps business logic out of the component.
+ * PostAuthRoot should take. Anonymous handoff always deducts one token (one trial = one session).
  */
 export function decideBootstrapAction(
   hasSession: boolean,
@@ -27,14 +26,10 @@ export function decideBootstrapAction(
   if (!ctx.hasAnonymousChat) {
     return { type: "resume_or_idle" };
   }
-  if (ctx.hasAttemptedEval) {
-    return { type: "deduct_and_handoff" };
-  }
-  return { type: "create_with_title_and_handoff" };
+  return { type: "deduct_and_handoff" };
 }
 
 export type BootstrapDeps = {
-  createSession: (title?: string | null) => Promise<Result<Session, { message: string }>>;
   fetchSessions: () => Promise<Result<ReadonlyArray<Session>, { message: string }>>;
   deductTokenAndCreateSession: () => Promise<Result<string, { message: string }>>;
   renameSession: (id: string, title: string) => Promise<void>;
@@ -67,12 +62,6 @@ export async function executeBootstrapAction(
           if (ctx.questionTitle) deps.renameSession(sessionId, ctx.questionTitle);
           deps.setPendingAuthHandoff(sessionId);
         },
-        () => {}
-      );
-      return;
-    case "create_with_title_and_handoff":
-      (await deps.createSession(ctx.questionTitle)).match(
-        (s) => deps.setPendingAuthHandoff(s.id),
         () => {}
       );
       return;

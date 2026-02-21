@@ -12,6 +12,8 @@ import { SessionSelector } from "@/components/chat/SessionSelector";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { getAvatarUrl, getDisplayName, getInitials } from "@/lib/userProfile";
 import { NewSessionButton } from "@/components/billing/NewSessionButton";
+import { useAuthHandoffStore } from "@/stores/authHandoffStore";
+import { useCanvasStore } from "@/stores/canvasStore";
 
 const SIDEBAR_OPEN = 260;
 const SIDEBAR_CLOSED = 52;
@@ -102,6 +104,9 @@ export function CollapsibleSidebar({
   };
 
   const handleSignOut = async (): Promise<void> => {
+    useAuthHandoffStore.getState().setAnonymousMessages([]);
+    useAuthHandoffStore.getState().setQuestionTitle(null);
+    useCanvasStore.getState().setHasAttemptedEval(false);
     const supabase = createBrowserClientInstance();
     await supabase.auth.signOut();
     window.location.href = "/";
