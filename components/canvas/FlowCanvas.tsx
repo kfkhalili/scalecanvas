@@ -17,7 +17,6 @@ import {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useCanvasStore } from "@/stores/canvasStore";
-import { saveSessionSettingsApi } from "@/services/sessionsClient";
 import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
@@ -197,22 +196,7 @@ type FlowCanvasProps = {
 };
 
 export function FlowCanvas({ sessionId }: FlowCanvasProps): React.ReactElement {
-  const canvasReviewScheduledEnabled = useCanvasStore(
-    (s) => s.canvasReviewScheduledEnabled
-  );
-  const setCanvasReviewScheduledEnabled = useCanvasStore(
-    (s) => s.setCanvasReviewScheduledEnabled
-  );
-
-  const handleToggleAutoReview = (): void => {
-    const next = !canvasReviewScheduledEnabled;
-    setCanvasReviewScheduledEnabled(next);
-    if (sessionId && sessionId !== "ephemeral") {
-      saveSessionSettingsApi(sessionId, {
-        autoReviewEnabled: next,
-      }).then(() => {});
-    }
-  };
+  const evaluateAction = useCanvasStore((s) => s.evaluateAction);
 
   return (
     <div
@@ -222,20 +206,23 @@ export function FlowCanvas({ sessionId }: FlowCanvasProps): React.ReactElement {
       <ReactFlowProvider>
         <FlowCanvasInner sessionId={sessionId} />
       </ReactFlowProvider>
-      <div className="absolute bottom-2 right-2 z-10">
-        <button
-          type="button"
-          onClick={handleToggleAutoReview}
-          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring"
-          title={
-            canvasReviewScheduledEnabled
-              ? "Auto review on: diagram changes trigger trainer feedback. Click to turn off."
-              : "Auto review off. Click to turn on."
-          }
-        >
-          Auto review: {canvasReviewScheduledEnabled ? "On" : "Off"}
-        </button>
-      </div>
+      {evaluateAction && (
+        <div className="absolute bottom-2 right-2 z-10">
+          <button
+            type="button"
+            onClick={evaluateAction.evaluate}
+            disabled={!evaluateAction.canEvaluate || evaluateAction.isEvaluating}
+            className="rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              evaluateAction.canEvaluate
+                ? "Request feedback on the current diagram"
+                : "Add or change diagram content to enable"
+            }
+          >
+            {evaluateAction.isEvaluating ? "Evaluating…" : "Evaluate"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

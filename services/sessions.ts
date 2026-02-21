@@ -171,15 +171,11 @@ export async function getCanvasState(
   return ok(canvasFromDb(data as DbCanvasState));
 }
 
-function sessionSettingsFromDb(row: DbSessionSettings): SessionSettings {
-  return {
-    autoReviewEnabled: row.auto_review_enabled,
-  };
+function sessionSettingsFromDb(_row: DbSessionSettings): SessionSettings {
+  return {};
 }
 
-const DEFAULT_SESSION_SETTINGS: SessionSettings = {
-  autoReviewEnabled: false,
-};
+const DEFAULT_SESSION_SETTINGS: SessionSettings = {};
 
 export async function getSessionSettings(
   client: ServerSupabaseClient,
@@ -202,7 +198,7 @@ export async function saveSessionSettings(
 ): Promise<Result<undefined, SessionError>> {
   const row: DbSessionSettingsInsert & DbSessionSettingsUpdate = {
     session_id: sessionId,
-    auto_review_enabled: settings.autoReviewEnabled,
+    auto_review_enabled: false,
     updated_at: new Date().toISOString(),
   };
   const { error } = await client

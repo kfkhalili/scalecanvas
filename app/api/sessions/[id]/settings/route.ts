@@ -33,9 +33,8 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  let body: Partial<SessionSettings>;
   try {
-    body = await request.json();
+    await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -46,13 +45,7 @@ export async function PATCH(request: Request, { params }: Params) {
       { status: 500 }
     );
   }
-  const current = result.value;
-  const settings: SessionSettings = {
-    autoReviewEnabled:
-      typeof body.autoReviewEnabled === "boolean"
-        ? body.autoReviewEnabled
-        : current.autoReviewEnabled,
-  };
+  const settings: SessionSettings = {};
   const saveResult = await saveSessionSettings(supabase, id, settings);
   return saveResult.match(
     () => NextResponse.json(settings),

@@ -8,6 +8,7 @@ beforeEach(() => {
     nodes: [],
     edges: [],
     viewport: undefined,
+    evaluateAction: null,
   });
 });
 
@@ -58,5 +59,35 @@ describe("canvasStore", () => {
     expect(state.nodes).toEqual(useCanvasStore.getState().nodes);
     expect(state.edges).toEqual(useCanvasStore.getState().edges);
     expect(state.viewport).toEqual({ x: 1, y: 2, zoom: 1 });
+  });
+
+  describe("evaluateAction", () => {
+    it("initial state has null evaluateAction", () => {
+      expect(useCanvasStore.getState().evaluateAction).toBeNull();
+    });
+
+    it("setEvaluateAction sets action for FlowCanvas Evaluate button", () => {
+      const noop = () => {};
+      useCanvasStore.getState().setEvaluateAction({
+        evaluate: noop,
+        canEvaluate: true,
+        isEvaluating: false,
+      });
+      const action = useCanvasStore.getState().evaluateAction;
+      expect(action).not.toBeNull();
+      expect(action!.evaluate).toBe(noop);
+      expect(action!.canEvaluate).toBe(true);
+      expect(action!.isEvaluating).toBe(false);
+    });
+
+    it("setEvaluateAction(null) clears action", () => {
+      useCanvasStore.getState().setEvaluateAction({
+        evaluate: () => {},
+        canEvaluate: false,
+        isEvaluating: false,
+      });
+      useCanvasStore.getState().setEvaluateAction(null);
+      expect(useCanvasStore.getState().evaluateAction).toBeNull();
+    });
   });
 });

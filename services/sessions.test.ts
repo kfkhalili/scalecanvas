@@ -178,7 +178,7 @@ describe("deleteSession", () => {
 });
 
 describe("getSessionSettings", () => {
-  it("returns default settings when no row exists", async () => {
+  it("returns empty settings when no row exists", async () => {
     const client = mockSupabaseClient({
       sessionSettingsSelect: { data: null, error: null },
     });
@@ -186,13 +186,13 @@ describe("getSessionSettings", () => {
     expect(result.isOk()).toBe(true);
     result.match(
       (s) => {
-        expect(s.autoReviewEnabled).toBe(false);
+        expect(s).toEqual({});
       },
       () => {}
     );
   });
 
-  it("returns saved settings when row exists", async () => {
+  it("returns empty settings when row exists", async () => {
     const client = mockSupabaseClient({
       sessionSettingsSelect: {
         data: {
@@ -207,7 +207,7 @@ describe("getSessionSettings", () => {
     expect(result.isOk()).toBe(true);
     result.match(
       (s) => {
-        expect(s.autoReviewEnabled).toBe(true);
+        expect(s).toEqual({});
       },
       () => {}
     );
@@ -227,9 +227,7 @@ describe("saveSessionSettings", () => {
     const client = mockSupabaseClient({
       sessionSettingsUpsert: { error: null },
     });
-    const result = await saveSessionSettings(client, "sess-1", {
-      autoReviewEnabled: true,
-    });
+    const result = await saveSessionSettings(client, "sess-1", {});
     expect(result.isOk()).toBe(true);
   });
 
@@ -237,9 +235,7 @@ describe("saveSessionSettings", () => {
     const client = mockSupabaseClient({
       sessionSettingsUpsert: { error: { message: "DB error" } },
     });
-    const result = await saveSessionSettings(client, "sess-1", {
-      autoReviewEnabled: false,
-    });
+    const result = await saveSessionSettings(client, "sess-1", {});
     expect(result.isErr()).toBe(true);
   });
 });

@@ -1,32 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { parseCanvasState } from "@/lib/canvasParser";
 import type { Message } from "ai";
 
-const REVIEW_DEBOUNCE_MS = 10_000;
 const MIN_NODES_FOR_REVIEW = 1;
 
 /**
- * Pure logic: should we schedule a debounced review for this canvas snapshot?
- * - First run (lastScheduled === null): do not schedule; record snapshot only.
- * - Unchanged canvas (snapshot === lastScheduled): do not schedule.
- * - Canvas changed: schedule and record new snapshot.
+ * Pure: should the Evaluate button be enabled?
+ * Enabled when there are enough nodes, semantic canvas changed since last evaluation, and not loading/evaluating.
  */
-export function getCanvasReviewScheduleDecision(
-  snapshot: string,
-  lastScheduled: string | null
-):
-  | { schedule: false; nextLastScheduled: string | null }
-  | { schedule: true; nextLastScheduled: string } {
-  if (lastScheduled === null) {
-    return { schedule: false, nextLastScheduled: snapshot };
-  }
-  if (snapshot === lastScheduled) {
-    return { schedule: false, nextLastScheduled: lastScheduled };
-  }
-  return { schedule: true, nextLastScheduled: snapshot };
+export function canEvaluateFromSnapshot(
+  currentSnapshot: string,
+  lastEvaluatedSnapshot: string | null,
+  hasEnoughNodes: boolean,
+  isEvaluating: boolean,
+  isLoading: boolean
+): boolean {
+  if (!hasEnoughNodes || isEvaluating || isLoading) return false;
+  if (lastEvaluatedSnapshot === null) return true;
+  return currentSnapshot !== lastEvaluatedSnapshot;
 }
 
 async function readStreamText(response: Response): Promise<string> {
@@ -52,44 +46,50 @@ async function readStreamText(response: Response): Promise<string> {
 }
 
 type UseCanvasReviewOpts = {
-  sessionId?: string;
   messages: Message[];
   setMessages: (fn: (prev: Message[]) => Message[]) => void;
   isLoading: boolean;
 };
 
 /**
- * Triggers a debounced Bedrock review only when the canvas (nodes or edges) changes.
- * Does not trigger on initial load or when only chat messages change (e.g. after a review).
- * User messages go through normal chat and already include the diagram in the request.
+ * Manual canvas evaluation: user clicks "Evaluate" to request feedback on the diagram.
+ * Returns evaluate(), canEvaluate (true when semantic canvas changed since last evaluation),
+ * and isEvaluating. Node/edge IDs and coordinates do not affect canEvaluate.
  */
 export function useCanvasReview({
-  sessionId,
   messages,
   setMessages,
   isLoading,
-}: UseCanvasReviewOpts): void {
+}: UseCanvasReviewOpts): {
+  evaluate: () => void;
+  canEvaluate: boolean;
+  isEvaluating: boolean;
+} {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
-  const canvasReviewScheduledEnabled = useCanvasStore(
-    (s) => s.canvasReviewScheduledEnabled
-  );
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastReviewedRef = useRef<string>("");
-  const lastScheduledSnapshotRef = useRef<string | null>(null);
-  const isReviewingRef = useRef(false);
+  const lastEvaluatedSnapshotRef = useRef<string | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
-  const doReview = useCallback(async () => {
-    if (isReviewingRef.current) return;
+  const currentSnapshot = parseCanvasState(nodes, edges);
+  const hasEnoughNodes = nodes.length >= MIN_NODES_FOR_REVIEW;
+  const canEvaluate = canEvaluateFromSnapshot(
+    currentSnapshot,
+    lastEvaluatedSnapshotRef.current,
+    hasEnoughNodes,
+    isEvaluating,
+    isLoading
+  );
+
+  const evaluate = useCallback(async () => {
+    if (isEvaluating || isLoading) return;
     const state = useCanvasStore.getState();
     const snapshot = parseCanvasState(state.nodes, state.edges);
-    if (snapshot === lastReviewedRef.current) return;
+    if (snapshot === lastEvaluatedSnapshotRef.current) return;
     if (state.nodes.length < MIN_NODES_FOR_REVIEW) return;
 
-    isReviewingRef.current = true;
-    lastReviewedRef.current = snapshot;
+    setIsEvaluating(true);
 
     try {
       const reviewPrompt =
@@ -113,47 +113,29 @@ export function useCanvasReview({
         }),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        setIsEvaluating(false);
+        return;
+      }
 
       const text = await readStreamText(res);
-      if (!text.trim()) return;
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `review-${Date.now()}`,
-          role: "assistant",
-          content: text.trim(),
-        },
-      ]);
+      if (text.trim()) {
+        lastEvaluatedSnapshotRef.current = snapshot;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `review-${Date.now()}`,
+            role: "assistant",
+            content: text.trim(),
+          },
+        ]);
+      }
     } catch {
       // silently ignore review failures
     } finally {
-      isReviewingRef.current = false;
+      setIsEvaluating(false);
     }
-  }, [setMessages]);
+  }, [setMessages, isLoading, isEvaluating]);
 
-  useEffect(() => {
-    if (!canvasReviewScheduledEnabled) return;
-    if (isLoading || isReviewingRef.current) return;
-    if (nodes.length < MIN_NODES_FOR_REVIEW) return;
-
-    const snapshot = parseCanvasState(nodes, edges);
-    const decision = getCanvasReviewScheduleDecision(
-      snapshot,
-      lastScheduledSnapshotRef.current
-    );
-    lastScheduledSnapshotRef.current = decision.nextLastScheduled;
-    if (!decision.schedule) return;
-
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      doReview();
-    }, REVIEW_DEBOUNCE_MS);
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [canvasReviewScheduledEnabled, nodes, edges, isLoading, doReview]);
+  return { evaluate, canEvaluate, isEvaluating };
 }

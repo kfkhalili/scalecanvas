@@ -98,7 +98,17 @@ export function ChatPanel({
       },
     });
 
-  useCanvasReview({ sessionId, messages, setMessages, isLoading });
+  const { evaluate, canEvaluate, isEvaluating } = useCanvasReview({
+    messages,
+    setMessages,
+    isLoading,
+  });
+  const setEvaluateAction = useCanvasStore((s) => s.setEvaluateAction);
+
+  useEffect(() => {
+    setEvaluateAction({ evaluate, canEvaluate, isEvaluating });
+    return () => setEvaluateAction(null);
+  }, [evaluate, canEvaluate, isEvaluating, setEvaluateAction]);
 
   useEffect(() => {
     if (initialEntries.length === 0) setMessages([]);

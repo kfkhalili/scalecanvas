@@ -7,17 +7,23 @@ import type {
 } from "@/lib/types";
 import { replaceCanvasState } from "@/lib/canvas";
 
+export type EvaluateAction = {
+  evaluate: () => void;
+  canEvaluate: boolean;
+  isEvaluating: boolean;
+};
+
 type CanvasStore = {
   nodes: ReadonlyArray<ReactFlowNode>;
   edges: ReadonlyArray<ReactFlowEdge>;
   viewport: Viewport | undefined;
-  /** When true, canvas changes trigger a debounced Bedrock review. */
-  canvasReviewScheduledEnabled: boolean;
+  /** Set by ChatPanel so FlowCanvas can show the Evaluate button. */
+  evaluateAction: EvaluateAction | null;
   setNodes: (nodes: ReadonlyArray<ReactFlowNode>) => void;
   setEdges: (edges: ReadonlyArray<ReactFlowEdge>) => void;
   setViewport: (viewport: Viewport | undefined) => void;
   setCanvasState: (state: CanvasState) => void;
-  setCanvasReviewScheduledEnabled: (enabled: boolean) => void;
+  setEvaluateAction: (action: EvaluateAction | null) => void;
   getCanvasState: () => CanvasState;
 };
 
@@ -27,7 +33,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodes: initial.nodes,
   edges: initial.edges,
   viewport: initial.viewport,
-  canvasReviewScheduledEnabled: false,
+  evaluateAction: null,
   setNodes: (nodes) =>
     set((state) => ({
       nodes,
@@ -46,11 +52,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       edges: state.edges,
       viewport,
     })),
-  setCanvasReviewScheduledEnabled: (enabled) =>
-    set((state) => ({
-      ...state,
-      canvasReviewScheduledEnabled: enabled,
-    })),
+  setEvaluateAction: (evaluateAction) => set({ evaluateAction }),
   setCanvasState: (state) =>
     set({
       nodes: state.nodes,
