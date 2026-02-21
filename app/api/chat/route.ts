@@ -34,7 +34,7 @@ function extractContent(content: unknown): string {
 
 function parseChatBody(
   raw: unknown
-): { messages: ParsedMessage[]; nodes: ParsedNode[]; edges: ParsedEdge[] } | null {
+): { messages: ParsedMessage[]; nodes: ParsedNode[]; edges: ParsedEdge[]; session_id?: string } | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   const rawMessages = Array.isArray(o.messages)
@@ -54,7 +54,11 @@ function parseChatBody(
   }
   const nodes = parseNodeArray(o.nodes);
   const edges = parseEdgeArray(o.edges);
-  return { messages, nodes, edges };
+  const session_id =
+    typeof o.session_id === "string" && o.session_id.length > 0
+      ? o.session_id
+      : undefined;
+  return { messages, nodes, edges, session_id };
 }
 
 function parseNodeArray(v: unknown): ParsedNode[] {

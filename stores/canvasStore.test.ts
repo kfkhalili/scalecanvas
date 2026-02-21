@@ -9,6 +9,7 @@ beforeEach(() => {
     edges: [],
     viewport: undefined,
     evaluateAction: null,
+    hasAttemptedEval: false,
   });
 });
 
@@ -88,6 +89,19 @@ describe("canvasStore", () => {
       });
       useCanvasStore.getState().setEvaluateAction(null);
       expect(useCanvasStore.getState().evaluateAction).toBeNull();
+    });
+  });
+
+  describe("hasAttemptedEval (PLG)", () => {
+    it("initial state has hasAttemptedEval false", () => {
+      expect(useCanvasStore.getState().hasAttemptedEval).toBe(false);
+    });
+
+    it("setHasAttemptedEval sets flag for anonymous eval handoff", () => {
+      useCanvasStore.getState().setHasAttemptedEval(true);
+      expect(useCanvasStore.getState().hasAttemptedEval).toBe(true);
+      useCanvasStore.getState().setHasAttemptedEval(false);
+      expect(useCanvasStore.getState().hasAttemptedEval).toBe(false);
     });
   });
 });

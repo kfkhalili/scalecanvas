@@ -1,7 +1,6 @@
 import { createServerClientInstance } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { createSession } from "@/services/sessions";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
+import { PostAuthRoot } from "@/components/PostAuthRoot";
 
 export default async function RootPage() {
   const supabase = await createServerClientInstance();
@@ -10,11 +9,7 @@ export default async function RootPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    const result = await createSession(supabase, user.id);
-    return result.match(
-      (session) => redirect(`/${session.id}`),
-      () => redirect("/login")
-    );
+    return <PostAuthRoot />;
   }
 
   return (

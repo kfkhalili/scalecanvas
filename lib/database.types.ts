@@ -11,6 +11,7 @@ export type DbProfile = {
   email: string | null;
   full_name: string | null;
   avatar_url: string | null;
+  tokens: number;
   created_at: string;
   updated_at: string;
 };
@@ -20,6 +21,7 @@ export type DbProfileInsert = {
   email?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
+  tokens?: number;
   created_at?: string;
   updated_at?: string;
 };

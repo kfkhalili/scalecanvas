@@ -15,6 +15,7 @@ import {
   fetchTranscript,
   saveCanvasApi,
 } from "@/services/sessionsClient";
+import { rehydrateCanvasStore } from "@/stores/canvasStore";
 import { isSessionContentReady } from "@/lib/sessionLoading";
 import type { TranscriptEntry } from "@/lib/types";
 
@@ -46,6 +47,10 @@ export function InterviewSplitView({
   >(sessionId ? null : []);
 
   useEffect(() => {
+    rehydrateCanvasStore();
+  }, []);
+
+  useEffect(() => {
     if (sessionId) {
       setCurrentSessionId(sessionId);
       return () => setCurrentSessionId(null);
@@ -59,7 +64,7 @@ export function InterviewSplitView({
     previousSessionIdRef.current = sessionId ?? null;
 
     if (!sessionId) {
-      setCanvasState(empty);
+      if (!isAnonymous) setCanvasState(empty);
       setCanvasReady(true);
       return;
     }
@@ -80,7 +85,7 @@ export function InterviewSplitView({
       );
       setCanvasReady(true);
     });
-  }, [sessionId, setCanvasState, getCanvasState]);
+  }, [sessionId, isAnonymous, setCanvasState, getCanvasState]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -140,6 +145,7 @@ export function InterviewSplitView({
                   key={sessionId ?? "anon"}
                   sessionId={sessionId}
                   initialEntries={initialEntries}
+                  isAnonymous={isAnonymous}
                 />
               ) : (
                 <div className="min-h-0 flex-1 bg-muted/30" />
