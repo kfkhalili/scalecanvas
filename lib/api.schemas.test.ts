@@ -6,6 +6,7 @@ import {
   CanvasBodySchema,
   ChatBodySchema,
   CheckoutBodySchema,
+  HandoffBodySchema,
   MAX_NODES,
   MAX_EDGES,
   MAX_MESSAGES,
@@ -154,5 +155,19 @@ describe("CheckoutBodySchema", () => {
 
   it("rejects missing pack_id", () => {
     expect(CheckoutBodySchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("HandoffBodySchema", () => {
+  it("accepts empty object", () => {
+    expect(HandoffBodySchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepts question_title string", () => {
+    expect(HandoffBodySchema.safeParse({ question_title: "URL Shortener" }).success).toBe(true);
+  });
+
+  it("accepts question_title null", () => {
+    expect(HandoffBodySchema.safeParse({ question_title: null }).success).toBe(true);
   });
 });

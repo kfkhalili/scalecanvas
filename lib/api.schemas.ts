@@ -82,9 +82,18 @@ export const CheckoutBodySchema = z.object({
   pack_id: z.string().min(1),
 });
 
+export const HandoffBodySchema = z.object({
+  question_title: z.string().nullable().optional(),
+});
+
+export type HandoffSuccessResponse = { created: true; session_id: string };
+export type HandoffNotCreatedResponse = { created: false };
+export type HandoffResponse = HandoffSuccessResponse | HandoffNotCreatedResponse;
+
 export type CreateSessionBody = z.infer<typeof CreateSessionBodySchema>;
 export type UpdateSessionBody = z.infer<typeof UpdateSessionBodySchema>;
 export type AppendTranscriptBody = z.infer<typeof AppendTranscriptBodySchema>;
 export type CanvasBody = z.infer<typeof CanvasBodySchema>;
 export type ChatBody = z.infer<typeof ChatBodySchema>;
 export type CheckoutBody = z.infer<typeof CheckoutBodySchema>;
+export type HandoffBody = z.infer<typeof HandoffBodySchema>;
