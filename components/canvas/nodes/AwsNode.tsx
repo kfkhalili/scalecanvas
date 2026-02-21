@@ -60,11 +60,15 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
       : type ?? "Node";
   const iconUrl = type ? getAwsIconUrl(type) : null;
 
+  const handleClass = "!bg-gray-500";
   return (
     <div
       className={`flex items-center gap-2 rounded border-2 ${colors.border} ${colors.bg} pl-2 pr-3 py-1.5 text-sm text-white shadow min-w-[100px]`}
     >
-      <Handle type="target" position={Position.Top} className="!bg-gray-500" />
+      <Handle type="target" position={Position.Top} id="top" className={handleClass} />
+      <Handle type="source" position={Position.Top} id="top-out" className={handleClass} />
+      <Handle type="target" position={Position.Left} id="left" className={handleClass} />
+      <Handle type="source" position={Position.Left} id="left-out" className={handleClass} />
       {iconUrl ? (
         <Image
           src={iconUrl}
@@ -76,7 +80,10 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
         />
       ) : null}
       <div className="min-w-0 flex-1 font-medium break-words text-left">{label}</div>
-      <Handle type="source" position={Position.Bottom} className="!bg-gray-500" />
+      <Handle type="target" position={Position.Right} id="right" className={handleClass} />
+      <Handle type="source" position={Position.Right} id="right-out" className={handleClass} />
+      <Handle type="target" position={Position.Bottom} id="bottom" className={handleClass} />
+      <Handle type="source" position={Position.Bottom} id="bottom-out" className={handleClass} />
     </div>
   );
 }
