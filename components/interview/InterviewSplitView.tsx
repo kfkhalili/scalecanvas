@@ -10,6 +10,7 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
+import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import {
   fetchCanvas,
   fetchTranscript,
@@ -38,6 +39,7 @@ export function InterviewSplitView({
   const setCurrentSessionId = useSessionStore((s) => s.setCurrentSessionId);
   const setEntries = useTranscriptStore((s) => s.setEntries);
   const entries = useTranscriptStore((s) => s.entries);
+  const setHandoffTranscript = useAuthHandoffStore((s) => s.setHandoffTranscript);
   const previousSessionIdRef = useRef<string | null>(null);
   const loadingSessionIdRef = useRef<string | null>(null);
 
@@ -93,6 +95,15 @@ export function InterviewSplitView({
       setEntries([]);
       return;
     }
+    const handoff = useAuthHandoffStore.getState().handoffTranscript;
+    if (handoff?.sessionId === sessionId) {
+      setTranscriptForSession(handoff.entries);
+      setEntries(handoff.entries);
+      // Clear handoff after a tick so a second effect run (e.g. Strict Mode) still sees it
+      // and sets transcript again instead of overwriting with null + fetch
+      const t = setTimeout(() => setHandoffTranscript(null), 0);
+      return () => clearTimeout(t);
+    }
     loadingSessionIdRef.current = sessionId;
     setTranscriptForSession(null);
     fetchTranscript(sessionId).then((result) => {
@@ -108,7 +119,7 @@ export function InterviewSplitView({
         }
       );
     });
-  }, [sessionId, setEntries]);
+  }, [sessionId, setEntries, setHandoffTranscript]);
 
   const sessionReady = isSessionContentReady(
     sessionId,

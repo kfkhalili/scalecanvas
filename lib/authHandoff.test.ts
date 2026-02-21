@@ -15,7 +15,7 @@ describe("runBffHandoff", () => {
     { id: "plg-teaser-1", role: "assistant" as const, content: PLG_TEASER_MESSAGE },
   ];
 
-  it("calls saveCanvasApi first with sessionId and state, then setMessages with teaser filtered, then reload", () => {
+  it("filters teaser, persists transcript, sets messages, then calls onHandoffComplete", async () => {
     const callOrder: string[] = [];
     const saveCanvasApi = vi.fn().mockImplementation(() => {
       callOrder.push("save");
@@ -28,59 +28,78 @@ describe("runBffHandoff", () => {
       expect(filtered[0].id).toBe("user-1");
       expect(filtered[0].content).toBe("Hello");
     });
-    const reload = vi.fn(() => callOrder.push("reload"));
+    const persistTranscript = vi.fn().mockImplementation(async () => {
+      callOrder.push("persistTranscript");
+    });
+    const onHandoffComplete = vi.fn((sid: string, filteredMsgs: { id: string; content?: string }[]) => {
+      callOrder.push("onHandoffComplete");
+      expect(sid).toBe(sessionId);
+      expect(filteredMsgs).toHaveLength(1);
+      expect(filteredMsgs[0].content).toBe("Hello");
+    });
     const getCanvasState = vi.fn(() => canvasState);
     const onCanvasSaveError = vi.fn();
 
-    runBffHandoff({
+    await runBffHandoff({
       sessionId,
+      messages: messagesWithTeaser,
       getCanvasState,
       saveCanvasApi,
       setMessages,
-      reload,
+      persistTranscript,
       onCanvasSaveError,
+      onHandoffComplete,
     });
 
     expect(saveCanvasApi).toHaveBeenCalledWith(sessionId, canvasState);
+    expect(persistTranscript).toHaveBeenCalledWith(sessionId, [
+      { role: "user", content: "Hello" },
+    ]);
     expect(setMessages).toHaveBeenCalled();
-    expect(reload).toHaveBeenCalled();
-    expect(callOrder).toEqual(["save", "setMessages", "reload"]);
+    expect(onHandoffComplete).toHaveBeenCalledWith(sessionId, expect.any(Array));
+    expect(callOrder).toEqual(["save", "persistTranscript", "setMessages", "onHandoffComplete"]);
     expect(onCanvasSaveError).not.toHaveBeenCalled();
   });
 
   it("calls onCanvasSaveError when saveCanvasApi returns err", async () => {
     const saveCanvasApi = vi.fn().mockResolvedValue(err({ message: "Network error" }));
     const setMessages = vi.fn();
-    const reload = vi.fn();
+    const persistTranscript = vi.fn().mockResolvedValue(undefined);
+    const onHandoffComplete = vi.fn();
     const onCanvasSaveError = vi.fn();
 
-    runBffHandoff({
+    await runBffHandoff({
       sessionId,
+      messages: messagesWithTeaser,
       getCanvasState: () => canvasState,
       saveCanvasApi,
       setMessages,
-      reload,
+      persistTranscript,
       onCanvasSaveError,
+      onHandoffComplete,
     });
 
     await vi.waitFor(() => {
       expect(onCanvasSaveError).toHaveBeenCalledTimes(1);
     });
     expect(setMessages).toHaveBeenCalled();
-    expect(reload).toHaveBeenCalled();
+    expect(persistTranscript).toHaveBeenCalled();
+    expect(onHandoffComplete).toHaveBeenCalledWith(sessionId, expect.any(Array));
   });
 
   it("does not call onCanvasSaveError when saveCanvasApi returns ok", async () => {
     const saveCanvasApi = vi.fn().mockResolvedValue(ok(undefined));
     const onCanvasSaveError = vi.fn();
 
-    runBffHandoff({
+    await runBffHandoff({
       sessionId,
+      messages: [],
       getCanvasState: () => canvasState,
       saveCanvasApi,
       setMessages: vi.fn(),
-      reload: vi.fn(),
+      persistTranscript: vi.fn().mockResolvedValue(undefined),
       onCanvasSaveError,
+      onHandoffComplete: vi.fn(),
     });
 
     await new Promise((r) => setTimeout(r, 50));

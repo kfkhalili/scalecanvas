@@ -94,6 +94,9 @@ export function ChatPanel({
   const hasAttemptedEval = useCanvasStore((s) => s.hasAttemptedEval);
   const pendingSessionId = useAuthHandoffStore((s) => s.pendingSessionId);
   const setPendingAuthHandoff = useAuthHandoffStore((s) => s.setPendingAuthHandoff);
+  const setHandoffTranscript = useAuthHandoffStore((s) => s.setHandoffTranscript);
+  const setAnonymousMessages = useAuthHandoffStore((s) => s.setAnonymousMessages);
+  const setQuestionTitle = useAuthHandoffStore((s) => s.setQuestionTitle);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
   const setSessionActive = useSessionStore((s) => s.setSessionActive);
   const activeQuestion = useQuestionStore((s) => s.activeQuestion);
@@ -109,7 +112,7 @@ export function ChatPanel({
     return body;
   }, [getCanvasState, sessionId, pendingSessionId]);
 
-  const { messages, setMessages, input, setInput, handleSubmit, isLoading, reload } =
+  const { messages, setMessages, input, setInput, handleSubmit, isLoading } =
     useChat({
       api: "/api/chat",
       fetch: fetchWithGuardrail,
@@ -193,8 +196,13 @@ export function ChatPanel({
 
   useEffect(() => {
     if (messages.length === 0 && !activeQuestion) {
+      if (!isAnonymous) {
+        const stored = useAuthHandoffStore.getState().anonymousMessages;
+        if (stored.length > 0) return;
+      }
       const question = getRandomQuestion();
       setInitialQuestion(question);
+      setQuestionTitle(question.title);
       setMessages([
         {
           id: generateId(),
@@ -203,11 +211,23 @@ export function ChatPanel({
         },
       ]);
     }
-  }, [messages.length, activeQuestion, setInitialQuestion, setMessages]);
+  }, [messages.length, activeQuestion, isAnonymous, setInitialQuestion, setQuestionTitle, setMessages]);
 
   useEffect(() => {
     if (sessionId) setSessionActive(true);
   }, [sessionId, setSessionActive]);
+
+  useEffect(() => {
+    if (isAnonymous && messages.length > 0) {
+      setAnonymousMessages(
+        messages.map((m) => ({
+          id: m.id,
+          role: typeof m.role === "string" ? m.role : "assistant",
+          content: typeof m.content === "string" ? m.content : "",
+        }))
+      );
+    }
+  }, [isAnonymous, messages, setAnonymousMessages]);
 
   const terminateHandledRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -229,20 +249,50 @@ export function ChatPanel({
 
   const handoffDoneRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!pendingSessionId || !reload || pendingSessionId === handoffDoneRef.current) return;
+    if (!pendingSessionId || pendingSessionId === handoffDoneRef.current) return;
     handoffDoneRef.current = pendingSessionId;
+    const sessionIdForHandoff = pendingSessionId;
+    const currentFromChat = messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: typeof m.content === "string" ? m.content : "",
+    }));
+    const messagesToUse =
+      currentFromChat.length > 0
+        ? currentFromChat
+        : useAuthHandoffStore.getState().anonymousMessages;
     runBffHandoff({
-      sessionId: pendingSessionId,
+      sessionId: sessionIdForHandoff,
+      messages: messagesToUse,
       getCanvasState,
       saveCanvasApi,
       setMessages: setMessages as unknown as RunBffHandoffParams["setMessages"],
-      reload,
+      persistTranscript: async (sid, entries) => {
+        for (const { role, content } of entries) {
+          await appendTranscriptApi(sid, role, content);
+        }
+      },
       onCanvasSaveError: () =>
         toast.error(
           "Your diagram couldn't be saved. You can keep working; try refreshing later to see if it's there."
         ),
+      onHandoffComplete: (sid, filteredMsgs) => {
+        const now = new Date().toISOString();
+        const entries: TranscriptEntry[] = filteredMsgs.map((m) => ({
+          id: m.id,
+          sessionId: sid,
+          role: (m.role === "user" || m.role === "assistant" ? m.role : "assistant") as "user" | "assistant",
+          content: typeof m.content === "string" ? m.content : "",
+          createdAt: now,
+        }));
+        setHandoffTranscript({ sessionId: sid, entries });
+        setPendingAuthHandoff(null);
+        setAnonymousMessages([]);
+        setQuestionTitle(null);
+        router.replace(`/${sid}`);
+      },
     });
-  }, [pendingSessionId, getCanvasState, setMessages, reload]);
+  }, [pendingSessionId, messages, getCanvasState, setMessages, router, setPendingAuthHandoff, setHandoffTranscript, setAnonymousMessages, setQuestionTitle]);
 
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
