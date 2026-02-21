@@ -157,6 +157,8 @@ export async function POST(
     data: n.data ?? {},
   }));
   const canvasContext = parseCanvasState(nodesForParser, edges);
+  // Debug: log canvas data sent to Bedrock (system prompt context)
+  console.log("[chat] canvas → Bedrock:", { nodes: nodes.length, edges: edges.length, canvasContext });
   const systemPrompt = getSystemPrompt(canvasContext);
 
   const coreMessages = convertToCoreMessages(

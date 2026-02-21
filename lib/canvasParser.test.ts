@@ -7,7 +7,7 @@ describe("parseCanvasState", () => {
     expect(parseCanvasState([], [])).toBe("The diagram is empty.");
   });
 
-  it("serializes nodes with id, type, label, position", () => {
+  it("serializes nodes as label and type only (no id or position)", () => {
     const nodes: ReactFlowNode[] = [
       {
         id: "n1",
@@ -18,27 +18,33 @@ describe("parseCanvasState", () => {
     ];
     const result = parseCanvasState(nodes, []);
     expect(result).toContain("Nodes:");
-    expect(result).toContain("n1");
     expect(result).toContain("My Bucket");
     expect(result).toContain("s3");
-    expect(result).toContain("100");
-    expect(result).toContain("200");
+    expect(result).not.toContain("n1");
+    expect(result).not.toContain("100");
+    expect(result).not.toContain("200");
   });
 
-  it("serializes edges with source and target", () => {
+  it("serializes edges by label when nodes present (no edge id)", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "n1", type: "lambda", position: { x: 0, y: 0 }, data: { label: "API" } },
+      { id: "n2", type: "s3", position: { x: 0, y: 0 }, data: { label: "Bucket" } },
+    ];
     const edges: ReactFlowEdge[] = [
       { id: "e1", source: "n1", target: "n2" },
     ];
-    const result = parseCanvasState([], edges);
+    const result = parseCanvasState(nodes, edges);
     expect(result).toContain("Edges:");
-    expect(result).toContain("n1");
-    expect(result).toContain("n2");
-    expect(result).toContain("e1");
+    expect(result).toContain("API");
+    expect(result).toContain("Bucket");
+    expect(result).toContain("API → Bucket");
+    expect(result).not.toContain("e1");
+    expect(result).not.toContain("n1");
   });
 
   it("includes both nodes and edges when present", () => {
     const nodes: ReactFlowNode[] = [
-      { id: "a", position: { x: 0, y: 0 }, data: {} },
+      { id: "a", type: "default", position: { x: 0, y: 0 }, data: {} },
     ];
     const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "b" }];
     const result = parseCanvasState(nodes, edges);
@@ -46,13 +52,18 @@ describe("parseCanvasState", () => {
     expect(result).toContain("Edges:");
     expect(result).toContain("a");
     expect(result).toContain("b");
+    expect(result).not.toContain("e1");
   });
 
-  it("includes edge label when present", () => {
+  it("includes edge relationship when present", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "n1", type: "a", position: { x: 0, y: 0 }, data: {} },
+      { id: "n2", type: "b", position: { x: 0, y: 0 }, data: {} },
+    ];
     const edges: ReactFlowEdge[] = [
       { id: "e1", source: "n1", target: "n2", data: { label: "requests" } },
     ];
-    const result = parseCanvasState([], edges);
-    expect(result).toContain('relationship: "requests"');
+    const result = parseCanvasState(nodes, edges);
+    expect(result).toContain("[requests]");
   });
 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useCanvasStore } from "@/stores/canvasStore";
+import { parseCanvasState } from "@/lib/canvasParser";
 import type { Message } from "ai";
 
 const REVIEW_DEBOUNCE_MS = 10_000;
@@ -83,7 +84,7 @@ export function useCanvasReview({
   const doReview = useCallback(async () => {
     if (isReviewingRef.current) return;
     const state = useCanvasStore.getState();
-    const snapshot = JSON.stringify({ nodes: state.nodes, edges: state.edges });
+    const snapshot = parseCanvasState(state.nodes, state.edges);
     if (snapshot === lastReviewedRef.current) return;
     if (state.nodes.length < MIN_NODES_FOR_REVIEW) return;
 
@@ -137,7 +138,7 @@ export function useCanvasReview({
     if (isLoading || isReviewingRef.current) return;
     if (nodes.length < MIN_NODES_FOR_REVIEW) return;
 
-    const snapshot = JSON.stringify({ nodes, edges });
+    const snapshot = parseCanvasState(nodes, edges);
     const decision = getCanvasReviewScheduleDecision(
       snapshot,
       lastScheduledSnapshotRef.current

@@ -1,8 +1,8 @@
 import type { ReactFlowNode, ReactFlowEdge } from "@/lib/types";
 
 /**
- * Pure function: serialize canvas nodes and edges into a string for LLM context.
- * No side effects, no I/O.
+ * Pure function: serialize canvas into a compact string for LLM context and change detection.
+ * Omits node IDs, coordinates, and edge IDs to reduce tokens and avoid triggering on noise.
  */
 export function parseCanvasState(
   nodes: ReadonlyArray<ReactFlowNode>,
@@ -11,15 +11,20 @@ export function parseCanvasState(
   if (nodes.length === 0 && edges.length === 0) {
     return "The diagram is empty.";
   }
-  const nodeLines = nodes.map((n) => {
+  const idToLabel = new Map<string, string>();
+  for (const n of nodes) {
     const label = n.data?.label ?? n.type ?? n.id;
-    return `- ${n.id}: ${label} (type: ${n.type ?? "default"}) at (${n.position.x}, ${n.position.y})`;
-  });
+    idToLabel.set(n.id, label);
+  }
+  const type = (n: ReactFlowNode) => n.type ?? "default";
+  const nodeLines = nodes.map(
+    (n) => `- ${idToLabel.get(n.id)!} (${type(n)})`
+  );
   const edgeLines = edges.map((e) => {
-    const labelPart = e.data?.label
-      ? ` [relationship: "${e.data.label}"]`
-      : "";
-    return `- ${e.source} → ${e.target}${labelPart}${e.id ? ` (id: ${e.id})` : ""}`;
+    const src = idToLabel.get(e.source) ?? e.source;
+    const tgt = idToLabel.get(e.target) ?? e.target;
+    const rel = e.data?.label ? ` [${e.data.label}]` : "";
+    return `- ${src} → ${tgt}${rel}`;
   });
   const parts: string[] = [];
   if (nodeLines.length > 0) {
