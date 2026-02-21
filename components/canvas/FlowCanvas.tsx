@@ -50,14 +50,22 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactFlowInstance = useReactFlow();
+  /** Skip store→local sync when we just wrote to the store to avoid update loop. */
+  const storeUpdatedFromLocalRef = useRef(false);
 
-  // Sync store -> local state when store updates (e.g. after fetchCanvas on load or session switch)
+  // Sync store -> local only when store was updated externally (e.g. fetchCanvas, session switch)
   useEffect(() => {
+    if (storeUpdatedFromLocalRef.current) {
+      storeUpdatedFromLocalRef.current = false;
+      return;
+    }
     setNodes(storeNodes as Node[]);
     setEdges(storeEdges as Edge[]);
   }, [storeNodes, storeEdges, setNodes, setEdges]);
 
+  // Push local state to store (for save, Evaluate, getCanvasState)
   useEffect(() => {
+    storeUpdatedFromLocalRef.current = true;
     setCanvasState({ nodes, edges, viewport });
   }, [nodes, edges, viewport, setCanvasState]);
 
