@@ -145,7 +145,7 @@ describe("ChatBodySchema", () => {
 
 describe("CheckoutBodySchema", () => {
   it("accepts valid pack_id", () => {
-    expect(CheckoutBodySchema.safeParse({ pack_id: "pack_5" }).success).toBe(true);
+    expect(CheckoutBodySchema.safeParse({ pack_id: "pack_3" }).success).toBe(true);
   });
 
   it("rejects empty pack_id", () => {

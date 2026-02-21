@@ -42,7 +42,7 @@ describe("initiateCheckout", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await initiateCheckout("pack_5");
+    const result = await initiateCheckout("pack_3");
     expect(result.isOk()).toBe(true);
     if (result.isOk()) expect(result.value).toBe("https://checkout.stripe.com/test");
   });
@@ -67,11 +67,11 @@ describe("initiateCheckout", () => {
       })
     );
     globalThis.fetch = mockFetch;
-    await initiateCheckout("pack_15");
+    await initiateCheckout("pack_10");
     expect(mockFetch).toHaveBeenCalledWith("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pack_id: "pack_15" }),
+      body: JSON.stringify({ pack_id: "pack_10" }),
     });
   });
 });

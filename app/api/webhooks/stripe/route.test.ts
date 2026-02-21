@@ -77,9 +77,9 @@ describe("POST /api/webhooks/stripe", () => {
         object: {
           id: "cs_test_123",
           metadata: {
-            pack_id: "pack_5",
+            pack_id: "pack_3",
             user_id: "user-1",
-            tokens: "5",
+            tokens: "3",
           },
         },
       },
@@ -107,8 +107,8 @@ describe("POST /api/webhooks/stripe", () => {
       expect.anything(),
       "user-1",
       "cs_test_123",
-      "pack_5",
-      5
+      "pack_3",
+      3
     );
   });
 
@@ -140,7 +140,7 @@ describe("POST /api/webhooks/stripe", () => {
       data: {
         object: {
           id: "cs_test_bad_tok",
-          metadata: { pack_id: "pack_5", user_id: "user-1", tokens: "not-a-number" },
+          metadata: { pack_id: "pack_3", user_id: "user-1", tokens: "not-a-number" },
         },
       },
     };
@@ -165,7 +165,7 @@ describe("POST /api/webhooks/stripe", () => {
       data: {
         object: {
           id: "cs_test_zero",
-          metadata: { pack_id: "pack_5", user_id: "user-1", tokens: "0" },
+          metadata: { pack_id: "pack_3", user_id: "user-1", tokens: "0" },
         },
       },
     };
@@ -190,7 +190,7 @@ describe("POST /api/webhooks/stripe", () => {
       data: {
         object: {
           id: "cs_test_fail",
-          metadata: { pack_id: "pack_5", user_id: "user-1", tokens: "5" },
+          metadata: { pack_id: "pack_3", user_id: "user-1", tokens: "3" },
         },
       },
     };

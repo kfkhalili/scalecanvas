@@ -29,7 +29,7 @@ const mockedGetStripeClient = vi.mocked(getStripeClient);
 const mockedGetCustomer = vi.mocked(getOrCreateStripeCustomerId);
 const mockedSaveCustomer = vi.mocked(saveStripeCustomerId);
 
-const PACK = { id: "pack_5", tokens: 5, label: "5", priceUsd: 49, priceEnvKey: "STRIPE_PRICE_ID_5" } as const;
+const PACK = { id: "pack_3", tokens: 3, label: "3 Interviews", priceUsd: 14, priceEnvKey: "STRIPE_PRICE_ID_3" } as const;
 
 function fakeSupabase(user: { id: string; email?: string } | null): ServerSupabaseClient {
   return {
@@ -62,7 +62,7 @@ describe("POST /api/checkout", () => {
 
   it("returns 401 when not authenticated", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase(null));
-    const res = await POST(makeRequest({ pack_id: "pack_5" }));
+    const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(401);
   });
 
@@ -79,7 +79,7 @@ describe("POST /api/checkout", () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
     mockedGetPack.mockReturnValue(PACK);
     mockedGetPrice.mockReturnValue(undefined);
-    const res = await POST(makeRequest({ pack_id: "pack_5" }));
+    const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(503);
   });
 
@@ -97,7 +97,7 @@ describe("POST /api/checkout", () => {
     const stripe = fakeStripe();
     mockedGetStripeClient.mockReturnValue(stripe as never);
 
-    const res = await POST(makeRequest({ pack_id: "pack_5" }));
+    const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.url).toBe("https://checkout.stripe.com/test");
@@ -119,7 +119,7 @@ describe("POST /api/checkout", () => {
     const stripe = fakeStripe();
     mockedGetStripeClient.mockReturnValue(stripe as never);
 
-    const res = await POST(makeRequest({ pack_id: "pack_5" }));
+    const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(200);
     expect(stripe.customers.create).toHaveBeenCalledWith(
       expect.objectContaining({ email: "a@b.com" })
@@ -134,7 +134,7 @@ describe("POST /api/checkout", () => {
     mockedGetCustomer.mockResolvedValue(err({ message: "DB error" }));
     mockedGetStripeClient.mockReturnValue(fakeStripe() as never);
 
-    const res = await POST(makeRequest({ pack_id: "pack_5" }));
+    const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(500);
     const json = await res.json();
     expect(json.error).toBe("DB error");
@@ -149,7 +149,7 @@ describe("POST /api/checkout", () => {
     const stripe = fakeStripe();
     mockedGetStripeClient.mockReturnValue(stripe as never);
 
-    const res = await POST(makeRequest({ pack_id: "pack_5" }));
+    const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(500);
     const json = await res.json();
     expect(json.error).toBe("save failed");
@@ -163,7 +163,7 @@ describe("POST /api/checkout", () => {
     const stripe = fakeStripe(null);
     mockedGetStripeClient.mockReturnValue(stripe as never);
 
-    const res = await POST(makeRequest({ pack_id: "pack_5" }));
+    const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(500);
     const json = await res.json();
     expect(json.error).toBe("Failed to create checkout session");

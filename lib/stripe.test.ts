@@ -7,10 +7,10 @@ describe("stripe token packs", () => {
   });
 
   it("getPackById returns correct pack", () => {
-    const pack = getPackById("pack_5");
+    const pack = getPackById("pack_3");
     expect(pack).toBeDefined();
-    expect(pack?.tokens).toBe(5);
-    expect(pack?.label).toBe("5 Interviews");
+    expect(pack?.tokens).toBe(3);
+    expect(pack?.label).toBe("3 Interviews");
   });
 
   it("getPackById returns undefined for unknown pack", () => {
@@ -48,15 +48,15 @@ describe("getStripePriceId", () => {
   });
 
   it("returns the env var value when set", () => {
-    vi.stubEnv("STRIPE_PRICE_ID_5", "price_test_123");
-    const pack = getPackById("pack_5");
+    vi.stubEnv("STRIPE_PRICE_ID_3", "price_test_123");
+    const pack = getPackById("pack_3");
     expect(pack).toBeDefined();
     expect(getStripePriceId(pack!)).toBe("price_test_123");
   });
 
   it("returns undefined when env var is not set", () => {
-    delete process.env.STRIPE_PRICE_ID_5;
-    const pack = getPackById("pack_5");
+    delete process.env.STRIPE_PRICE_ID_3;
+    const pack = getPackById("pack_3");
     expect(pack).toBeDefined();
     expect(getStripePriceId(pack!)).toBeUndefined();
   });

@@ -24,9 +24,9 @@ export type TokenPack = {
 };
 
 export const TOKEN_PACKS: readonly TokenPack[] = [
-  { id: "pack_5", tokens: 5, label: "5 Interviews", priceUsd: 49, priceEnvKey: "STRIPE_PRICE_ID_5" },
-  { id: "pack_15", tokens: 15, label: "15 Interviews", priceUsd: 99, priceEnvKey: "STRIPE_PRICE_ID_15" },
-  { id: "pack_50", tokens: 50, label: "50 Interviews", priceUsd: 249, priceEnvKey: "STRIPE_PRICE_ID_50" },
+  { id: "pack_3", tokens: 3, label: "3 Interviews", priceUsd: 14, priceEnvKey: "STRIPE_PRICE_ID_3" },
+  { id: "pack_10", tokens: 10, label: "10 Interviews", priceUsd: 29, priceEnvKey: "STRIPE_PRICE_ID_10" },
+  { id: "pack_25", tokens: 25, label: "25 Interviews", priceUsd: 49, priceEnvKey: "STRIPE_PRICE_ID_25" },
 ] as const;
 
 export function getPackById(packId: string): TokenPack | undefined {

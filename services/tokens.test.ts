@@ -135,8 +135,8 @@ describe("creditTokensForPurchase", () => {
       client,
       "user-1",
       "cs_test_123",
-      "pack_5",
-      5
+      "pack_3",
+      3
     );
     expect(result.isOk()).toBe(true);
     if (result.isOk()) expect(result.value).toBe(15);
@@ -150,8 +150,8 @@ describe("creditTokensForPurchase", () => {
       client,
       "user-1",
       "cs_test_123",
-      "pack_5",
-      5
+      "pack_3",
+      3
     );
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.message).toBe("RPC failed");
@@ -165,8 +165,8 @@ describe("creditTokensForPurchase", () => {
       client,
       "user-1",
       "cs_test_123",
-      "pack_5",
-      5
+      "pack_3",
+      3
     );
     expect(result.isErr()).toBe(true);
   });
