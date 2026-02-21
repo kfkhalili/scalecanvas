@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { getPackById, TOKEN_PACKS } from "./stripe";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { getPackById, getStripePriceId, TOKEN_PACKS } from "./stripe";
 
 describe("stripe token packs", () => {
   it("has 3 packs defined", () => {
@@ -26,5 +26,38 @@ describe("stripe token packs", () => {
     for (const pack of TOKEN_PACKS) {
       expect(pack.tokens).toBeGreaterThan(0);
     }
+  });
+
+  it("each pack has a positive USD price", () => {
+    for (const pack of TOKEN_PACKS) {
+      expect(pack.priceUsd).toBeGreaterThan(0);
+    }
+  });
+
+  it("per-session price decreases with volume", () => {
+    const perSession = TOKEN_PACKS.map((p) => p.priceUsd / p.tokens);
+    for (let i = 1; i < perSession.length; i++) {
+      expect(perSession[i]).toBeLessThan(perSession[i - 1]);
+    }
+  });
+});
+
+describe("getStripePriceId", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns the env var value when set", () => {
+    vi.stubEnv("STRIPE_PRICE_ID_5", "price_test_123");
+    const pack = getPackById("pack_5");
+    expect(pack).toBeDefined();
+    expect(getStripePriceId(pack!)).toBe("price_test_123");
+  });
+
+  it("returns undefined when env var is not set", () => {
+    delete process.env.STRIPE_PRICE_ID_5;
+    const pack = getPackById("pack_5");
+    expect(pack).toBeDefined();
+    expect(getStripePriceId(pack!)).toBeUndefined();
   });
 });

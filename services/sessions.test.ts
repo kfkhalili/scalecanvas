@@ -94,6 +94,7 @@ describe("createSession", () => {
       user_id: "user-1",
       title: "New",
       status: "active",
+      is_trial: false,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
     };
@@ -129,6 +130,7 @@ describe("listSessions", () => {
         user_id: "user-1",
         title: "A",
         status: "active",
+        is_trial: false,
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
       },
@@ -155,6 +157,7 @@ describe("getSession", () => {
       user_id: "user-1",
       title: "Get me",
       status: "active",
+      is_trial: false,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
     };

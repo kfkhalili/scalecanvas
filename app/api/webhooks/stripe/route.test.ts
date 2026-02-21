@@ -16,7 +16,7 @@ import { POST } from "./route";
 import { getStripeClient } from "@/lib/stripe";
 import { creditTokensForPurchase } from "@/services/tokens";
 import { createServerClientInstance } from "@/lib/supabase/server";
-import { ok } from "neverthrow";
+import { ok, err } from "neverthrow";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 import type Stripe from "stripe";
 
@@ -27,6 +27,7 @@ const mockedCreateClient = vi.mocked(createServerClientInstance);
 describe("POST /api/webhooks/stripe", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.clearAllMocks();
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
   });
 
@@ -112,23 +113,113 @@ describe("POST /api/webhooks/stripe", () => {
   });
 
   it("returns 200 even when metadata is missing (no crash)", async () => {
-    mockedCreditTokens.mockClear();
-    process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
+    const fakeEvent = {
+      type: "checkout.session.completed",
+      data: {
+        object: { id: "cs_test_456", metadata: {} },
+      },
+    };
 
+    mockedGetStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue(fakeEvent) },
+    } as unknown as Stripe);
+
+    const req = new Request("http://localhost/api/webhooks/stripe", {
+      method: "POST",
+      headers: { "stripe-signature": "sig_test" },
+      body: JSON.stringify(fakeEvent),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockedCreditTokens).not.toHaveBeenCalled();
+  });
+
+  it("skips crediting when tokens metadata is non-numeric", async () => {
     const fakeEvent = {
       type: "checkout.session.completed",
       data: {
         object: {
-          id: "cs_test_456",
-          metadata: {},
+          id: "cs_test_bad_tok",
+          metadata: { pack_id: "pack_5", user_id: "user-1", tokens: "not-a-number" },
         },
       },
     };
 
     mockedGetStripe.mockReturnValue({
-      webhooks: {
-        constructEvent: vi.fn().mockReturnValue(fakeEvent),
+      webhooks: { constructEvent: vi.fn().mockReturnValue(fakeEvent) },
+    } as unknown as Stripe);
+
+    const req = new Request("http://localhost/api/webhooks/stripe", {
+      method: "POST",
+      headers: { "stripe-signature": "sig_test" },
+      body: JSON.stringify(fakeEvent),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockedCreditTokens).not.toHaveBeenCalled();
+  });
+
+  it("skips crediting when tokens is zero", async () => {
+    const fakeEvent = {
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_zero",
+          metadata: { pack_id: "pack_5", user_id: "user-1", tokens: "0" },
+        },
       },
+    };
+
+    mockedGetStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue(fakeEvent) },
+    } as unknown as Stripe);
+
+    const req = new Request("http://localhost/api/webhooks/stripe", {
+      method: "POST",
+      headers: { "stripe-signature": "sig_test" },
+      body: JSON.stringify(fakeEvent),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockedCreditTokens).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 even when creditTokensForPurchase fails", async () => {
+    const fakeEvent = {
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_fail",
+          metadata: { pack_id: "pack_5", user_id: "user-1", tokens: "5" },
+        },
+      },
+    };
+
+    mockedGetStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue(fakeEvent) },
+    } as unknown as Stripe);
+
+    mockedCreateClient.mockResolvedValue({} as ServerSupabaseClient);
+    mockedCreditTokens.mockResolvedValue(err({ message: "DB error" }));
+
+    const req = new Request("http://localhost/api/webhooks/stripe", {
+      method: "POST",
+      headers: { "stripe-signature": "sig_test" },
+      body: JSON.stringify(fakeEvent),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockedCreditTokens).toHaveBeenCalled();
+  });
+
+  it("returns 200 for non-checkout event types", async () => {
+    const fakeEvent = {
+      type: "invoice.paid",
+      data: { object: { id: "inv_test" } },
+    };
+
+    mockedGetStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue(fakeEvent) },
     } as unknown as Stripe);
 
     const req = new Request("http://localhost/api/webhooks/stripe", {

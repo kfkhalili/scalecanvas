@@ -7,6 +7,7 @@ import { AuthBar } from "@/components/layout/AuthBar";
 import { FlowCanvas } from "@/components/canvas/FlowCanvas";
 import { NodeLibrary } from "@/components/canvas/NodeLibrary";
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { NoSessionPrompt } from "@/components/billing/NoSessionPrompt";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
@@ -151,7 +152,9 @@ export function InterviewSplitView({
           }
           right={
             <div className="flex h-full flex-col p-2">
-              {sessionReady ? (
+              {!sessionId && !isAnonymous ? (
+                <NoSessionPrompt />
+              ) : sessionReady ? (
                 <ChatPanel
                   key={sessionId ?? "anon"}
                   sessionId={sessionId}

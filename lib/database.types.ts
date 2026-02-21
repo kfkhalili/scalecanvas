@@ -38,6 +38,7 @@ export type DbInterviewSession = {
   user_id: string;
   title: string | null;
   status: string;
+  is_trial: boolean;
   created_at: string;
   updated_at: string;
 };

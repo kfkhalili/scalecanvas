@@ -7,6 +7,7 @@ const session = (id: string, title: string | null = null): Session => ({
   userId: "u1",
   title,
   status: "active",
+  isTrial: false,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 });

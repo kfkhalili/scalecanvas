@@ -7,6 +7,7 @@ export type Session = {
   userId: string;
   title: string | null;
   status: string;
+  isTrial: boolean;
   createdAt: string;
   updatedAt: string;
 };

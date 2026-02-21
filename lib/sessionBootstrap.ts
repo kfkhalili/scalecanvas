@@ -9,7 +9,7 @@ export type BootstrapContext = {
 
 export type BootstrapAction =
   | { type: "redirect_login" }
-  | { type: "create_and_redirect" }
+  | { type: "resume_or_idle" }
   | { type: "deduct_and_handoff" }
   | { type: "create_with_title_and_handoff" };
 
@@ -25,7 +25,7 @@ export function decideBootstrapAction(
     return { type: "redirect_login" };
   }
   if (!ctx.hasAnonymousChat) {
-    return { type: "create_and_redirect" };
+    return { type: "resume_or_idle" };
   }
   if (ctx.hasAttemptedEval) {
     return { type: "deduct_and_handoff" };
@@ -35,6 +35,7 @@ export function decideBootstrapAction(
 
 export type BootstrapDeps = {
   createSession: (title?: string | null) => Promise<Result<Session, { message: string }>>;
+  fetchSessions: () => Promise<Result<ReadonlyArray<Session>, { message: string }>>;
   deductTokenAndCreateSession: () => Promise<Result<string, { message: string }>>;
   renameSession: (id: string, title: string) => Promise<void>;
   setPendingAuthHandoff: (sessionId: string) => void;
@@ -51,10 +52,12 @@ export async function executeBootstrapAction(
     case "redirect_login":
       deps.redirectTo("/login");
       return;
-    case "create_and_redirect":
-      (await deps.createSession()).match(
-        (s) => deps.redirectTo(`/${s.id}`),
-        () => deps.redirectTo("/login")
+    case "resume_or_idle":
+      (await deps.fetchSessions()).match(
+        (list) => {
+          if (list.length > 0) deps.redirectTo(`/${list[0].id}`);
+        },
+        () => {}
       );
       return;
     case "deduct_and_handoff":
@@ -64,13 +67,13 @@ export async function executeBootstrapAction(
           if (ctx.questionTitle) deps.renameSession(sessionId, ctx.questionTitle);
           deps.setPendingAuthHandoff(sessionId);
         },
-        () => deps.redirectTo("/login")
+        () => {}
       );
       return;
     case "create_with_title_and_handoff":
       (await deps.createSession(ctx.questionTitle)).match(
         (s) => deps.setPendingAuthHandoff(s.id),
-        () => deps.redirectTo("/login")
+        () => {}
       );
       return;
   }

@@ -5,12 +5,7 @@ import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { initiateCheckout } from "@/services/checkoutClient";
 import { toast } from "sonner";
-
-const PACKS = [
-  { id: "pack_5", label: "5 Interviews", tokens: 5 },
-  { id: "pack_15", label: "15 Interviews", tokens: 15 },
-  { id: "pack_50", label: "50 Interviews", tokens: 50 },
-] as const;
+import { TOKEN_PACKS } from "@/lib/stripe";
 
 type BuyTokensButtonProps = {
   className?: string;
@@ -47,16 +42,17 @@ export function BuyTokensButton({ className }: BuyTokensButtonProps): React.Reac
       </Button>
       {open && (
         <div className="mt-2 flex flex-col gap-1.5 rounded-md border bg-popover p-2 shadow-md">
-          {PACKS.map((pack) => (
+          {TOKEN_PACKS.map((pack) => (
             <Button
               key={pack.id}
               variant="ghost"
               size="sm"
               disabled={loading !== null}
               onClick={() => handlePurchase(pack.id)}
-              className="justify-start"
+              className="justify-between"
             >
-              {loading === pack.id ? "Redirecting..." : pack.label}
+              <span>{loading === pack.id ? "Redirecting..." : pack.label}</span>
+              <span className="text-muted-foreground">${pack.priceUsd}</span>
             </Button>
           ))}
         </div>

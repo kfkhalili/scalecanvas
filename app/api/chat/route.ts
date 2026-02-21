@@ -9,8 +9,6 @@ import { parseCanvasState } from "@/lib/canvasParser";
 import { getSystemPrompt } from "@/lib/prompts";
 import { checkRateLimit, CHAT_RATE_LIMIT } from "@/lib/rateLimit";
 
-const INTERVIEW_TIME_LIMIT_MS = 900_000; // 15 minutes
-
 type ParsedMessage = { role: "user" | "assistant" | "system"; content: string };
 type ParsedNode = {
   id: string;
@@ -181,8 +179,7 @@ export async function POST(
   const guardrail = await getSessionIfWithinTimeLimit(
     (id) => getSession(supabaseAuth, id),
     body.session_id,
-    user.id,
-    INTERVIEW_TIME_LIMIT_MS
+    user.id
   );
   if (guardrail.isErr()) {
     return NextResponse.json(

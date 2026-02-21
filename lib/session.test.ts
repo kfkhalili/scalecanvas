@@ -9,6 +9,7 @@ describe("sessionToPublic", () => {
       user_id: "user-1",
       title: "My session",
       status: "active",
+      is_trial: false,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-02T00:00:00Z",
     };
@@ -17,6 +18,7 @@ describe("sessionToPublic", () => {
       userId: "user-1",
       title: "My session",
       status: "active",
+      isTrial: false,
       createdAt: "2026-01-01T00:00:00Z",
       updatedAt: "2026-01-02T00:00:00Z",
     });
@@ -28,6 +30,7 @@ describe("sessionToPublic", () => {
       user_id: "user-2",
       title: null,
       status: "active",
+      is_trial: true,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
     };

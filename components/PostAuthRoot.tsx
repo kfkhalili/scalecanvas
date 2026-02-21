@@ -6,7 +6,7 @@ import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { rehydrateCanvasStore, useCanvasStore } from "@/stores/canvasStore";
 import { useAuthHandoffStore, rehydrateAuthHandoffStore } from "@/stores/authHandoffStore";
 import { deductTokenAndCreateSession } from "@/services/tokensClient";
-import { createSessionApi, renameSessionApi } from "@/services/sessionsClient";
+import { createSessionApi, renameSessionApi, fetchSessions } from "@/services/sessionsClient";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
 import { CheckoutFeedback } from "@/components/billing/CheckoutFeedback";
 
@@ -16,7 +16,7 @@ import { CheckoutFeedback } from "@/components/billing/CheckoutFeedback";
  *
  *  1. Anonymous chat exists + Evaluate clicked  → deduct token, rename session, handoff
  *  2. Anonymous chat exists + no Evaluate       → create session with title, handoff
- *  3. No anonymous chat (fresh /login visit)    → create session, redirect to /:id
+ *  3. No anonymous chat (fresh /login visit)    → redirect to most recent session, or show empty workspace
  */
 export function PostAuthRoot(): React.ReactElement {
   const router = useRouter();
@@ -47,10 +47,14 @@ export function PostAuthRoot(): React.ReactElement {
       }
 
       if (!hasAnonymousChat) {
-        createSessionApi().then((r) =>
+        fetchSessions().then((r) =>
           r.match(
-            (s) => router.replace(`/${s.id}`),
-            () => router.replace("/login")
+            (list) => {
+              if (list.length > 0) {
+                router.replace(`/${list[0].id}`);
+              }
+            },
+            () => {}
           )
         );
         return;
@@ -64,14 +68,14 @@ export function PostAuthRoot(): React.ReactElement {
               if (questionTitle) renameSessionApi(sessionId, questionTitle);
               setPendingAuthHandoff(sessionId);
             },
-            () => router.replace("/login")
+            () => {}
           )
         );
       } else {
         createSessionApi(questionTitle).then((r) =>
           r.match(
             (s) => setPendingAuthHandoff(s.id),
-            () => router.replace("/login")
+            () => {}
           )
         );
       }
