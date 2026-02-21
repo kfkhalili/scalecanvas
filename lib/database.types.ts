@@ -37,6 +37,7 @@ export type DbInterviewSession = {
   id: string;
   user_id: string;
   title: string | null;
+  status: string;
   created_at: string;
   updated_at: string;
 };
@@ -51,6 +52,7 @@ export type DbInterviewSessionInsert = {
 
 export type DbInterviewSessionUpdate = {
   title?: string | null;
+  status?: string | null;
   updated_at?: string;
 };
 

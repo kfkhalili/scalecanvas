@@ -8,6 +8,7 @@ describe("sessionToPublic", () => {
       id: "sess-1",
       user_id: "user-1",
       title: "My session",
+      status: "active",
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-02T00:00:00Z",
     };
@@ -25,6 +26,7 @@ describe("sessionToPublic", () => {
       id: "sess-2",
       user_id: "user-2",
       title: null,
+      status: "active",
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
     };

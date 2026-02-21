@@ -72,7 +72,7 @@ export async function getSession(
 export async function updateSession(
   client: ServerSupabaseClient,
   sessionId: string,
-  fields: { title?: string | null }
+  fields: { title?: string | null; status?: string | null }
 ): Promise<Result<Session, SessionError>> {
   const { data, error } = await client
     .from("interview_sessions")

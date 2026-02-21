@@ -17,6 +17,7 @@ import {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useCanvasStore } from "@/stores/canvasStore";
+import { useSessionStore } from "@/stores/sessionStore";
 import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
@@ -205,6 +206,7 @@ type FlowCanvasProps = {
 
 export function FlowCanvas({ sessionId }: FlowCanvasProps): React.ReactElement {
   const evaluateAction = useCanvasStore((s) => s.evaluateAction);
+  const isSessionActive = useSessionStore((s) => s.isSessionActive);
 
   return (
     <div
@@ -219,12 +221,14 @@ export function FlowCanvas({ sessionId }: FlowCanvasProps): React.ReactElement {
           <button
             type="button"
             onClick={evaluateAction.evaluate}
-            disabled={!evaluateAction.canEvaluate || evaluateAction.isEvaluating}
+            disabled={!evaluateAction.canEvaluate || evaluateAction.isEvaluating || !isSessionActive}
             className="rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             title={
-              evaluateAction.canEvaluate
-                ? "Request feedback on the current diagram"
-                : "Add or change diagram content to enable"
+              !isSessionActive
+                ? "Interview ended"
+                : evaluateAction.canEvaluate
+                  ? "Request feedback on the current diagram"
+                  : "Add or change diagram content to enable"
             }
           >
             {evaluateAction.isEvaluating ? "Evaluating…" : "Evaluate"}

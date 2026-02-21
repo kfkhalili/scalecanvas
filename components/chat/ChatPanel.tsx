@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
+import { useSessionStore } from "@/stores/sessionStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasReview } from "@/hooks/useCanvasReview";
 import { appendTranscriptApi, saveCanvasApi } from "@/services/sessionsClient";
@@ -41,6 +42,22 @@ function fetchWithTimeout(
   );
 }
 
+/** Reject on 401/403 so onError can show the right toast and lock the session. */
+function fetchWithGuardrail(
+  url: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  return fetchWithTimeout(url, init).then(async (res) => {
+    if (res.status === 401 || res.status === 403) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const err = new Error(data?.error ?? (res.status === 403 ? "Interview time has expired." : "Unauthorized.")) as Error & { statusCode: number };
+      err.statusCode = res.status;
+      throw err;
+    }
+    return res;
+  });
+}
+
 type ChatPanelProps = {
   sessionId?: string;
   initialEntries: ReadonlyArray<TranscriptEntry>;
@@ -69,18 +86,21 @@ export function ChatPanel({
   const hasAttemptedEval = useCanvasStore((s) => s.hasAttemptedEval);
   const pendingSessionId = useAuthHandoffStore((s) => s.pendingSessionId);
   const setPendingAuthHandoff = useAuthHandoffStore((s) => s.setPendingAuthHandoff);
+  const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const setSessionActive = useSessionStore((s) => s.setSessionActive);
 
   const chatBody = useMemo(() => {
     const state = getCanvasState();
     const body: Record<string, unknown> = { nodes: state.nodes, edges: state.edges };
-    if (pendingSessionId) body.session_id = pendingSessionId;
+    const sid = sessionId ?? pendingSessionId;
+    if (sid) body.session_id = sid;
     return body;
-  }, [getCanvasState, pendingSessionId]);
+  }, [getCanvasState, sessionId, pendingSessionId]);
 
   const { messages, setMessages, input, setInput, handleSubmit, isLoading, reload } =
     useChat({
       api: "/api/chat",
-      fetch: fetchWithTimeout,
+      fetch: fetchWithGuardrail,
       initialMessages: initialEntries.map(toMessage),
       body: chatBody,
       onFinish: (message) => {
@@ -97,6 +117,17 @@ export function ChatPanel({
         }
       },
       onError: (err) => {
+        const statusCode = err && typeof err === "object" && "statusCode" in err ? (err as Error & { statusCode: number }).statusCode : undefined;
+        if (statusCode === 403) {
+          toast.error("Interview time has expired.");
+          setSessionActive(false);
+          return;
+        }
+        if (statusCode === 401) {
+          toast.error("Unauthorized.");
+          setSessionActive(false);
+          return;
+        }
         const fallback =
           "Sorry, the assistant couldn't respond. Check your connection and try again.";
         const rawMessage =
@@ -147,6 +178,28 @@ export function ChatPanel({
   useEffect(() => {
     if (initialEntries.length === 0) setMessages([]);
   }, [initialEntries.length, setMessages]);
+
+  useEffect(() => {
+    if (sessionId) setSessionActive(true);
+  }, [sessionId, setSessionActive]);
+
+  const terminateHandledRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const m of messages) {
+      const invs = (m as { toolInvocations?: Array<{ toolName?: string; args?: { reason?: string }; result?: unknown }> }).toolInvocations ?? [];
+      for (let i = 0; i < invs.length; i++) {
+        const inv = invs[i];
+        if (inv?.toolName === "terminate_interview") {
+          const key = `${m.id ?? ""}-${i}`;
+          if (terminateHandledRef.current.has(key)) continue;
+          terminateHandledRef.current.add(key);
+          const reason = typeof inv.args?.reason === "string" ? inv.args.reason : typeof inv.result === "string" ? inv.result : "Interview ended.";
+          toast.error(reason);
+          setSessionActive(false);
+        }
+      }
+    }
+  }, [messages, setSessionActive]);
 
   const handoffDoneRef = useRef<string | null>(null);
   useEffect(() => {
@@ -222,14 +275,14 @@ export function ChatPanel({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ask your Trainer"
+          placeholder={isSessionActive ? "Ask your Trainer" : "This interview has ended."}
           rows={2}
           className={cn(
             "flex min-h-9 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-base text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
           )}
-          disabled={isLoading}
+          disabled={isLoading || !isSessionActive}
         />
-        <Button type="submit" disabled={isLoading || !input.trim()}>
+        <Button type="submit" disabled={isLoading || !input.trim() || !isSessionActive}>
           {isLoading ? "Sending…" : "Send"}
         </Button>
       </form>

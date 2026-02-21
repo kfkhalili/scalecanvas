@@ -11,7 +11,7 @@ const session = (id: string, title: string | null = null): Session => ({
 });
 
 beforeEach(() => {
-  useSessionStore.setState({ currentSessionId: null, sessions: [] });
+  useSessionStore.setState({ currentSessionId: null, sessions: [], isSessionActive: true });
 });
 
 describe("sessionStore", () => {
