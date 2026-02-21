@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createPortal } from "react-dom";
@@ -9,8 +8,6 @@ import { Menu, SquarePen, Settings, Monitor, Sun, Moon, Check, LogIn, LogOut, X 
 import { useTheme } from "next-themes";
 import type { User } from "@supabase/supabase-js";
 import { useSidebarStore } from "@/stores/sidebarStore";
-import { useSessionStore } from "@/stores/sessionStore";
-import { createSessionApi, fetchSessions } from "@/services/sessionsClient";
 import { SessionSelector } from "@/components/chat/SessionSelector";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { getAvatarUrl, getDisplayName, getInitials } from "@/lib/userProfile";
@@ -31,9 +28,7 @@ const THEME_OPTIONS = [
 export function CollapsibleSidebar({
   isAnonymous = false,
 }: CollapsibleSidebarProps): React.ReactElement {
-  const router = useRouter();
   const { open, toggle, hydrate } = useSidebarStore();
-  const { setCurrentSessionId, setSessions } = useSessionStore();
   const { theme, setTheme } = useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ bottom: number; left: number } | null>(null);
@@ -111,25 +106,6 @@ export function CollapsibleSidebar({
     window.location.href = "/";
   };
 
-  const handleNewSession = (): void => {
-    if (isAnonymous) {
-      router.push("/");
-      return;
-    }
-    createSessionApi(null).then((result) => {
-      result.match(
-        (session) => {
-          setCurrentSessionId(session.id);
-          router.push(`/${session.id}`);
-          fetchSessions().then((r) =>
-            r.match((list) => setSessions(list), () => {})
-          );
-        },
-        () => {}
-      );
-    });
-  };
-
   return (
     <nav
       className="flex h-full shrink-0 flex-col overflow-hidden bg-background transition-[width] duration-200 ease-out"
@@ -149,8 +125,10 @@ export function CollapsibleSidebar({
       <div className="shrink-0 pl-1.5 pr-2.5 py-1">
         <button
           type="button"
-          onClick={handleNewSession}
-          className="flex h-10 w-full items-center gap-3 whitespace-nowrap rounded-full px-2.5 text-sm text-foreground/80 transition-colors hover:bg-muted focus:outline-none"
+          disabled
+          aria-disabled="true"
+          aria-label="New session (one session per user)"
+          className="flex h-10 w-full cursor-not-allowed items-center gap-3 whitespace-nowrap rounded-full px-2.5 text-sm text-muted-foreground transition-colors focus:outline-none disabled:opacity-60"
         >
           <SquarePen className="h-5 w-5 shrink-0" />
           <span className="overflow-hidden">New session</span>
