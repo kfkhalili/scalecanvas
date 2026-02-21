@@ -1,7 +1,7 @@
 # Trial Semantics: Who Gets the Free Session — Design
 
 **Date:** 2026-02-21  
-**Status:** Draft for approval
+**Status:** Implemented
 
 ---
 
