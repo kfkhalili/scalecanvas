@@ -282,6 +282,13 @@ git commit -m "docs: mark trial semantics design as implemented"
 
 ---
 
+## Selection from URL (post-handoff)
+
+- **Single source of truth:** Only the session page (`InterviewSplitView`) sets `currentSessionId` from the URL. The handoff callback does not set it.
+- **SessionSelector refetch:** When `currentSessionId` is set but that id is not in the `sessions` list (e.g. after handoff to a newly created trial session), `SessionSelector` refetches sessions once so the sidebar list includes the current session and can show it as selected. A ref (`lastRefetchedForSessionId`) prevents refetch loops if the session still does not appear in the list after the first refetch.
+
+---
+
 ## Summary
 
 | Task | Description |

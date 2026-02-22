@@ -9,6 +9,7 @@ import {
   deleteSessionApi,
   renameSessionApi,
 } from "@/services/sessionsClient";
+import { shouldRefetchSessionsForCurrentSession } from "@/lib/sessionSelectorRefetch";
 import { useEffect, useCallback, useState, useRef } from "react";
 
 function SkeletonRows(): React.ReactElement {
@@ -37,6 +38,7 @@ export function SessionSelector({
   const { currentSessionId, sessions, setCurrentSessionId, setSessions } =
     useSessionStore();
   const [loading, setLoading] = useState(!isAnonymous);
+  const lastRefetchedForSessionId = useRef<string | null>(null);
 
   const loadSessions = useCallback(() => {
     if (isAnonymous) return;
@@ -52,6 +54,20 @@ export function SessionSelector({
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
+
+  useEffect(() => {
+    if (
+      !shouldRefetchSessionsForCurrentSession(
+        currentSessionId,
+        sessions,
+        lastRefetchedForSessionId.current,
+        isAnonymous
+      )
+    )
+      return;
+    lastRefetchedForSessionId.current = currentSessionId;
+    loadSessions();
+  }, [isAnonymous, currentSessionId, sessions, loadSessions]);
 
   const handleSelect = (sessionId: string): void => {
     setCurrentSessionId(sessionId);
