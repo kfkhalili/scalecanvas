@@ -108,7 +108,7 @@ describe("ChatBodySchema", () => {
   it("accepts valid chat body", () => {
     const result = ChatBodySchema.safeParse({
       messages: [{ role: "user", content: "Hello" }],
-      session_id: "sess-1",
+      session_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
     });
     expect(result.success).toBe(true);
   });

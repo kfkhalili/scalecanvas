@@ -66,11 +66,17 @@ const MessageSchema = z.object({
 export const MAX_MESSAGES = 100;
 export const MAX_CONTENT_LENGTH = 10_000;
 
+/** Max request body size for POST /api/chat (bytes). */
+export const MAX_CHAT_BODY_BYTES = 1_000_000;
+
+/** session_id must be a valid UUID when provided (interview_sessions.id). */
+export const SESSION_ID_MAX_LENGTH = 128;
+
 export const ChatBodySchema = z.object({
   messages: z.array(MessageSchema).min(1).max(MAX_MESSAGES),
   nodes: z.array(NodeSchema).max(MAX_NODES).optional().default([]),
   edges: z.array(EdgeSchema).max(MAX_EDGES).optional().default([]),
-  session_id: z.string().min(1).optional(),
+  session_id: z.string().uuid().max(SESSION_ID_MAX_LENGTH).optional(),
   data: z
     .object({
       messages: z.array(MessageSchema).optional(),
