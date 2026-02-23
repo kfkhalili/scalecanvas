@@ -8,6 +8,13 @@ import { getSessionIfWithinTimeLimit } from "@/lib/chatGuardrails";
 import { parseCanvasState } from "@/lib/canvasParser";
 import { getSystemPrompt } from "@/lib/prompts";
 import { checkRateLimit, CHAT_RATE_LIMIT } from "@/lib/rateLimit";
+import {
+  MAX_CHAT_BODY_BYTES,
+  MAX_EDGES,
+  MAX_MESSAGES,
+  MAX_NODES,
+  SESSION_ID_MAX_LENGTH,
+} from "@/lib/api.schemas";
 
 type ParsedMessage = { role: "user" | "assistant" | "system"; content: string };
 type ParsedNode = {
@@ -64,6 +71,23 @@ function parseChatBody(
       ? o.session_id
       : undefined;
   return { messages, nodes, edges, session_id };
+}
+
+function validateChatBoundaries(parsed: {
+  messages: ParsedMessage[];
+  nodes: ParsedNode[];
+  edges: ParsedEdge[];
+  session_id?: string;
+}): string | null {
+  if (parsed.session_id != null) {
+    if (parsed.session_id.length > SESSION_ID_MAX_LENGTH) return "session_id too long.";
+    const uuidResult = z.string().uuid().safeParse(parsed.session_id);
+    if (!uuidResult.success) return "session_id must be a valid UUID.";
+  }
+  if (parsed.messages.length > MAX_MESSAGES) return "Too many messages.";
+  if (parsed.nodes.length > MAX_NODES) return "Too many nodes.";
+  if (parsed.edges.length > MAX_EDGES) return "Too many edges.";
+  return null;
 }
 
 function parseNodeArray(v: unknown): ParsedNode[] {
@@ -158,12 +182,26 @@ export async function POST(
 
   let body: { messages: ParsedMessage[]; nodes: ParsedNode[]; edges: ParsedEdge[]; session_id?: string };
   try {
-    const raw = await request.json();
+    const text = await request.text();
+    if (text.length > MAX_CHAT_BODY_BYTES) {
+      return NextResponse.json(
+        { error: "Request body too large." },
+        { status: 400 }
+      );
+    }
+    const raw = JSON.parse(text) as unknown;
     const parsed = parseChatBody(raw);
     if (!parsed) {
       console.error("[chat] 400 Invalid body. Keys:", raw && typeof raw === "object" ? Object.keys(raw as object) : "not object");
       return NextResponse.json(
         { error: "Invalid request body: messages required." },
+        { status: 400 }
+      );
+    }
+    const boundaryError = validateChatBoundaries(parsed);
+    if (boundaryError != null) {
+      return NextResponse.json(
+        { error: boundaryError },
         { status: 400 }
       );
     }
@@ -187,7 +225,7 @@ export async function POST(
       { status: guardrail.error.status }
     );
   }
-  const sessionId = body.session_id as string;
+  const sessionId = guardrail.value.id;
 
   const { messages, nodes, edges } = body;
   const nodesForParser = nodes.map((n) => ({
@@ -197,8 +235,6 @@ export async function POST(
     data: n.data ?? {},
   }));
   const canvasContext = parseCanvasState(nodesForParser, edges);
-  // Debug: log canvas data sent to Bedrock (system prompt context)
-  console.log("[chat] canvas → Bedrock:", { nodes: nodes.length, edges: edges.length, canvasContext });
   const systemPrompt = getSystemPrompt(canvasContext);
 
   const coreMessages = convertToCoreMessages(
