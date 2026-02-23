@@ -32,6 +32,28 @@ describe("SERVICE_CATALOG", () => {
     expect(textEntry!.category).toBe("notes");
     expect(textEntry!.label).toBe("Text");
   });
+
+  it("has generic (brandless) entries under correct categories", () => {
+    const nosql = SERVICE_CATALOG.find((s) => s.type === "genericNosql");
+    expect(nosql).toBeDefined();
+    expect(nosql!.label).toBe("NoSQL DB");
+    expect(nosql!.category).toBe("database");
+    const api = SERVICE_CATALOG.find((s) => s.type === "genericApi");
+    expect(api).toBeDefined();
+    expect(api!.category).toBe("networking");
+  });
+
+  it("sorts generic entries to top of each category in getServicesByCategory", () => {
+    const map = getServicesByCategory();
+    const database = map.get("database")!;
+    expect(database[0].type).toBe("genericNosql");
+    const networking = map.get("networking")!;
+    expect(networking[0].type).toBe("genericApi");
+    const integration = map.get("integration")!;
+    expect(integration[0].type).toBe("genericQueue");
+    const compute = map.get("compute")!;
+    expect(compute[0].type).toBe("genericServerless");
+  });
 });
 
 describe("getServicesByCategory", () => {

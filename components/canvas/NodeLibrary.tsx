@@ -12,6 +12,7 @@ import {
   type ServiceEntry,
 } from "@/lib/serviceCatalog";
 import { getAwsIconUrl } from "@/lib/awsNodeIcons";
+import { getGenericIcon } from "@/lib/genericNodeIcons";
 
 function onDragStart(e: DragEvent, entry: ServiceEntry): void {
   e.dataTransfer.setData("application/reactflow-type", entry.type);
@@ -21,6 +22,7 @@ function onDragStart(e: DragEvent, entry: ServiceEntry): void {
 
 function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
   const iconUrl = entry.type === "text" ? null : getAwsIconUrl(entry.type);
+  const GenericIcon = entry.type === "text" ? null : getGenericIcon(entry.type);
   return (
     <div
       draggable
@@ -40,6 +42,8 @@ function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
           className="h-5 w-5 shrink-0 object-contain"
           unoptimized
         />
+      ) : GenericIcon ? (
+        <GenericIcon className="h-5 w-5 shrink-0 text-foreground/70" aria-hidden />
       ) : (
         <div className="h-5 w-5 shrink-0" />
       )}

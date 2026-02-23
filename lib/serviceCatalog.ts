@@ -17,7 +17,8 @@ export type ServiceEntry = {
 };
 
 export const SERVICE_CATALOG: readonly ServiceEntry[] = [
-  // Compute
+  // Compute — generic first
+  { type: "genericServerless", label: "Serverless Function", description: "Stateless function or serverless compute (name it yourself)", category: "compute" },
   { type: "ec2", label: "EC2", description: "Virtual servers in the cloud", category: "compute" },
   { type: "lambda", label: "Lambda", description: "Run code without provisioning servers", category: "compute" },
   { type: "fargate", label: "Fargate", description: "Serverless compute for containers", category: "containers" },
@@ -27,21 +28,26 @@ export const SERVICE_CATALOG: readonly ServiceEntry[] = [
   { type: "s3", label: "S3", description: "Scalable object storage", category: "storage" },
   { type: "ebs", label: "EBS", description: "Block storage for EC2", category: "storage" },
 
-  // Database
+  // Database — generic first
+  { type: "genericNosql", label: "NoSQL DB", description: "Generic document or key-value database (name it yourself)", category: "database" },
+  { type: "genericCache", label: "Key-Value Store", description: "Generic cache or key-value store (e.g. Redis, Memcached)", category: "database" },
+  { type: "genericRelational", label: "Relational DB", description: "Generic SQL database (name it yourself)", category: "database" },
   { type: "dynamodb", label: "DynamoDB", description: "Managed NoSQL database", category: "database" },
   { type: "rds", label: "RDS", description: "Managed relational database", category: "database" },
   { type: "elasticache", label: "ElastiCache", description: "In-memory caching (Redis/Memcached)", category: "database" },
   { type: "redis", label: "Redis", description: "In-memory cache/store (ElastiCache)", category: "database" },
   { type: "aurora", label: "Aurora", description: "MySQL/PostgreSQL-compatible relational DB", category: "database" },
 
-  // Networking
+  // Networking — generic first
+  { type: "genericApi", label: "API", description: "HTTP API or gateway (name it yourself)", category: "networking" },
   { type: "apiGateway", label: "API Gateway", description: "Create and manage APIs", category: "networking" },
   { type: "elb", label: "ELB", description: "Distribute traffic across targets", category: "networking" },
   { type: "cloudfront", label: "CloudFront", description: "Content delivery network", category: "networking" },
   { type: "route53", label: "Route 53", description: "Scalable DNS and domain registration", category: "networking" },
   { type: "vpc", label: "VPC", description: "Isolated virtual network", category: "networking" },
 
-  // Integration
+  // Integration — generic first
+  { type: "genericQueue", label: "Message Queue", description: "Async message queue or pub/sub (name it yourself)", category: "integration" },
   { type: "sqs", label: "SQS", description: "Managed message queuing", category: "integration" },
   { type: "sns", label: "SNS", description: "Pub/sub messaging and notifications", category: "integration" },
   { type: "eventbridge", label: "EventBridge", description: "Serverless event bus", category: "integration" },
@@ -84,6 +90,11 @@ export const CATEGORY_ORDER: readonly ServiceCategory[] = [
   "analytics",
 ];
 
+/** Generic (brandless) types sort to the top of each category. */
+function isGenericType(type: string): boolean {
+  return type.startsWith("generic");
+}
+
 export function getServicesByCategory(): Map<ServiceCategory, ServiceEntry[]> {
   const map = new Map<ServiceCategory, ServiceEntry[]>();
   for (const cat of CATEGORY_ORDER) {
@@ -93,7 +104,14 @@ export function getServicesByCategory(): Map<ServiceCategory, ServiceEntry[]> {
     const list = map.get(svc.category);
     if (list) list.push(svc);
   }
-  return map;
+  const out = new Map<ServiceCategory, ServiceEntry[]>();
+  for (const [cat, list] of map) {
+    out.set(
+      cat,
+      [...list].sort((a, b) => (isGenericType(a.type) ? 0 : 1) - (isGenericType(b.type) ? 0 : 1))
+    );
+  }
+  return out;
 }
 
 export function searchServices(query: string): ServiceEntry[] {

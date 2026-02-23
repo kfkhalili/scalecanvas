@@ -6,6 +6,7 @@ import { Handle, type NodeProps, Position } from "reactflow";
 import type { NodeData } from "@/lib/types";
 import type { ServiceCategory } from "@/lib/serviceCatalog";
 import { getAwsIconUrl } from "@/lib/awsNodeIcons";
+import { getGenericIcon } from "@/lib/genericNodeIcons";
 
 type OurNode = { id: string; type?: string; data: NodeData };
 type AwsNodeProps = NodeProps<OurNode>;
@@ -49,6 +50,12 @@ const TYPE_TO_CATEGORY: Record<string, ServiceCategory> = {
   waf: "security",
   kinesis: "analytics",
   redshift: "analytics",
+  genericNosql: "database",
+  genericCache: "database",
+  genericRelational: "database",
+  genericServerless: "compute",
+  genericApi: "networking",
+  genericQueue: "integration",
 };
 
 function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
@@ -60,6 +67,7 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
       ? data.label
       : type ?? "Node";
   const iconUrl = type ? getAwsIconUrl(type) : null;
+  const GenericIcon = type ? getGenericIcon(type) : null;
 
   const handleClass = "!bg-gray-500";
   return (
@@ -79,6 +87,8 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
           className="h-7 w-7 shrink-0 object-contain"
           unoptimized
         />
+      ) : GenericIcon ? (
+        <GenericIcon className="h-7 w-7 shrink-0 text-white/90" aria-hidden />
       ) : null}
       <div className="min-w-0 flex-1 font-medium break-words text-left">{label}</div>
       <Handle type="target" position={Position.Right} id="right" className={handleClass} />
