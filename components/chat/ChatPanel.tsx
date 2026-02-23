@@ -61,13 +61,18 @@ export function ChatPanel({
   const setInitialQuestion = useQuestionStore((s) => s.setInitialQuestion);
   const incrementHint = useQuestionStore((s) => s.incrementHint);
 
-  const chatBody = useMemo(() => {
-    const state = getCanvasState();
-    const body: Record<string, unknown> = { nodes: state.nodes, edges: state.edges };
-    const sid = sessionId ?? pendingSessionId;
-    if (sid) body.session_id = sid;
-    return body;
-  }, [getCanvasState, sessionId, pendingSessionId]);
+  const canvasNodes = useCanvasStore((s) => s.nodes);
+  const canvasEdges = useCanvasStore((s) => s.edges);
+  const chatBody = useMemo(
+    () => ({
+      nodes: canvasNodes,
+      edges: canvasEdges,
+      ...(sessionId ?? pendingSessionId
+        ? { session_id: sessionId ?? pendingSessionId ?? undefined }
+        : {}),
+    }),
+    [canvasNodes, canvasEdges, sessionId, pendingSessionId]
+  );
 
   const { messages, setMessages, input, setInput, handleSubmit, isLoading } =
     useChat({
@@ -131,6 +136,7 @@ export function ChatPanel({
     messages,
     setMessages,
     isLoading,
+    sessionId: sessionId ?? pendingSessionId ?? null,
   });
   const setEvaluateAction = useCanvasStore((s) => s.setEvaluateAction);
 
@@ -167,6 +173,14 @@ export function ChatPanel({
           content: question.prompt,
         },
       ]);
+      return;
+    }
+    // After handoff we have messages but question store was reset; set question so Hint button works.
+    if (messages.length > 0 && !activeQuestion && !isAnonymous) {
+      const question = getRandomQuestion();
+      setInitialQuestion(question);
+      const currentTitle = useAuthHandoffStore.getState().questionTitle;
+      if (!currentTitle) setQuestionTitle(question.title);
     }
   }, [messages.length, activeQuestion, isAnonymous, setInitialQuestion, setQuestionTitle, setMessages]);
 

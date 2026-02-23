@@ -49,6 +49,8 @@ type UseCanvasReviewOpts = {
   messages: Message[];
   setMessages: (fn: (prev: Message[]) => Message[]) => void;
   isLoading: boolean;
+  /** Required for authenticated users so the chat API can validate session and time limit. */
+  sessionId?: string | null;
 };
 
 /**
@@ -60,6 +62,7 @@ export function useCanvasReview({
   messages,
   setMessages,
   isLoading,
+  sessionId,
 }: UseCanvasReviewOpts): {
   evaluate: () => void;
   canEvaluate: boolean;
@@ -103,14 +106,18 @@ export function useCanvasReview({
         { role: "user" as const, content: reviewPrompt },
       ];
 
+      const body: Record<string, unknown> = {
+        messages: chatMessages,
+        nodes: state.nodes,
+        edges: state.edges,
+      };
+      if (sessionId) body.session_id = sessionId;
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: chatMessages,
-          nodes: state.nodes,
-          edges: state.edges,
-        }),
+        credentials: "include",
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -135,7 +142,7 @@ export function useCanvasReview({
     } finally {
       setIsEvaluating(false);
     }
-  }, [setMessages, isLoading, isEvaluating]);
+  }, [setMessages, isLoading, isEvaluating, sessionId]);
 
   return { evaluate, canEvaluate, isEvaluating };
 }
