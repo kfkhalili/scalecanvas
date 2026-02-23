@@ -54,6 +54,18 @@ describe("SERVICE_CATALOG", () => {
     const compute = map.get("compute")!;
     expect(compute[0].type).toBe("genericServerless");
   });
+
+  it("has GCP entries under correct categories", () => {
+    const gcpEntries = SERVICE_CATALOG.filter((s) => s.type.startsWith("gcp"));
+    expect(gcpEntries.length).toBeGreaterThanOrEqual(1);
+    const cloudRun = SERVICE_CATALOG.find((s) => s.type === "gcpCloudRun");
+    expect(cloudRun).toBeDefined();
+    expect(cloudRun!.category).toBe("compute");
+    const ordered = new Set(CATEGORY_ORDER);
+    for (const s of gcpEntries) {
+      expect(ordered.has(s.category)).toBe(true);
+    }
+  });
 });
 
 describe("getServicesByCategory", () => {

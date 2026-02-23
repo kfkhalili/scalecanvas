@@ -6,6 +6,7 @@ import { Handle, type NodeProps, Position } from "reactflow";
 import type { NodeData } from "@/lib/types";
 import type { ServiceCategory } from "@/lib/serviceCatalog";
 import { getAwsIconUrl } from "@/lib/awsNodeIcons";
+import { getGcpIconUrl } from "@/lib/gcpNodeIcons";
 import { getGenericIcon } from "@/lib/genericNodeIcons";
 
 type OurNode = { id: string; type?: string; data: NodeData };
@@ -56,6 +57,19 @@ const TYPE_TO_CATEGORY: Record<string, ServiceCategory> = {
   genericServerless: "compute",
   genericApi: "networking",
   genericQueue: "integration",
+  gcpCloudRun: "compute",
+  gcpCloudFunctions: "compute",
+  gcpComputeEngine: "compute",
+  gcpGke: "containers",
+  gcpCloudStorage: "storage",
+  gcpCloudSql: "database",
+  gcpCloudSpanner: "database",
+  gcpAlloyDb: "database",
+  gcpBigQuery: "database",
+  gcpApigee: "networking",
+  gcpLoadBalancing: "networking",
+  gcpPubSub: "integration",
+  gcpVertexAi: "analytics",
 };
 
 function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
@@ -66,7 +80,7 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
     data && "label" in data && typeof data.label === "string"
       ? data.label
       : type ?? "Node";
-  const iconUrl = type ? getAwsIconUrl(type) : null;
+  const iconUrl = type ? (getAwsIconUrl(type) ?? getGcpIconUrl(type)) : null;
   const GenericIcon = type ? getGenericIcon(type) : null;
 
   const handleClass = "!bg-gray-500";

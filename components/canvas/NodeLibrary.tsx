@@ -12,6 +12,7 @@ import {
   type ServiceEntry,
 } from "@/lib/serviceCatalog";
 import { getAwsIconUrl } from "@/lib/awsNodeIcons";
+import { getGcpIconUrl } from "@/lib/gcpNodeIcons";
 import { getGenericIcon } from "@/lib/genericNodeIcons";
 
 function onDragStart(e: DragEvent, entry: ServiceEntry): void {
@@ -21,7 +22,10 @@ function onDragStart(e: DragEvent, entry: ServiceEntry): void {
 }
 
 function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
-  const iconUrl = entry.type === "text" ? null : getAwsIconUrl(entry.type);
+  const iconUrl =
+    entry.type === "text"
+      ? null
+      : getAwsIconUrl(entry.type) ?? getGcpIconUrl(entry.type);
   const GenericIcon = entry.type === "text" ? null : getGenericIcon(entry.type);
   return (
     <div
