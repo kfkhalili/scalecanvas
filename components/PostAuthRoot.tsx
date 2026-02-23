@@ -65,6 +65,7 @@ export function PostAuthRoot(): React.ReactElement {
             if (payload.created && payload.session_id) {
               if (questionTitle) renameSessionApi(payload.session_id, questionTitle);
               setPendingAuthHandoff(payload.session_id);
+              router.replace(`/${payload.session_id}`);
             } else {
               useAuthHandoffStore.getState().setAnonymousMessages([]);
               useAuthHandoffStore.getState().setQuestionTitle(null);
