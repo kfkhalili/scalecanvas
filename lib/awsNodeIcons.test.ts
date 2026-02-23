@@ -7,6 +7,7 @@ describe("getAwsIconUrl", () => {
     expect(getAwsIconUrl("lambda")).toContain("AWSLambda.svg");
     expect(getAwsIconUrl("s3")).toContain("AmazonSimpleStorageService.svg");
     expect(getAwsIconUrl("dynamodb")).toContain("AmazonDynamoDB.svg");
+    expect(getAwsIconUrl("redis")).toContain("AmazonElastiCache.svg");
     expect(getAwsIconUrl("vpc")).toContain("AmazonVirtualPrivateCloud.svg");
   });
 

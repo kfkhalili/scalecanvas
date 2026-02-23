@@ -33,6 +33,7 @@ const TYPE_TO_CATEGORY: Record<string, ServiceCategory> = {
   dynamodb: "database",
   rds: "database",
   elasticache: "database",
+  redis: "database",
   aurora: "database",
   apiGateway: "networking",
   elb: "networking",

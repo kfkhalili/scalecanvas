@@ -16,6 +16,7 @@ const TYPE_TO_ICON: Record<string, string> = {
   dynamodb: "AmazonDynamoDB.svg",
   rds: "AmazonRDS.svg",
   elasticache: "AmazonElastiCache.svg",
+  redis: "AmazonElastiCache.svg",
   aurora: "AmazonAurora.svg",
   apiGateway: "AmazonAPIGateway.svg",
   elb: "ElasticLoadBalancing.svg",

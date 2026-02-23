@@ -31,6 +31,7 @@ export const SERVICE_CATALOG: readonly ServiceEntry[] = [
   { type: "dynamodb", label: "DynamoDB", description: "Managed NoSQL database", category: "database" },
   { type: "rds", label: "RDS", description: "Managed relational database", category: "database" },
   { type: "elasticache", label: "ElastiCache", description: "In-memory caching (Redis/Memcached)", category: "database" },
+  { type: "redis", label: "Redis", description: "In-memory cache/store (ElastiCache)", category: "database" },
   { type: "aurora", label: "Aurora", description: "MySQL/PostgreSQL-compatible relational DB", category: "database" },
 
   // Networking
