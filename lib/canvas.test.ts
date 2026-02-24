@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { canvasFromDb, replaceCanvasState, getSampleCanvasState } from "./canvas";
-import type { DbCanvasState } from "@/lib/database.types";
+import type { DbCanvasState } from "@/lib/database.aliases";
 import type { CanvasState, ReactFlowNode, ReactFlowEdge, Viewport } from "@/lib/types";
 
 describe("canvasFromDb", () => {

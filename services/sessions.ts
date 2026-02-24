@@ -18,7 +18,7 @@ import type {
   DbSessionSettings,
   DbSessionSettingsInsert,
   DbSessionSettingsUpdate,
-} from "@/lib/database.types";
+} from "@/lib/database.aliases";
 
 type SessionError = { message: string };
 
@@ -137,15 +137,10 @@ export async function saveCanvasState(
   sessionId: string,
   state: CanvasState
 ): Promise<Result<undefined, SessionError>> {
-  const row: {
-    session_id: string;
-    nodes: DbCanvasState["nodes"];
-    edges: DbCanvasState["edges"];
-    viewport: DbCanvasState["viewport"];
-  } = {
+  const row = {
     session_id: sessionId,
-    nodes: state.nodes,
-    edges: state.edges,
+    nodes: state.nodes as unknown as DbCanvasState["nodes"],
+    edges: state.edges as unknown as DbCanvasState["edges"],
     viewport: state.viewport ?? null,
   };
   const { error } = await client

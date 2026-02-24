@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sessionToPublic } from "./session";
-import type { DbInterviewSession } from "@/lib/database.types";
+import type { DbInterviewSession } from "@/lib/database.aliases";
 
 describe("sessionToPublic", () => {
   it("maps DbInterviewSession to Session (camelCase)", () => {

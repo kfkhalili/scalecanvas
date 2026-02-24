@@ -8,7 +8,7 @@ import {
   saveSessionSettings,
 } from "./sessions";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
-import type { DbInterviewSession, DbSessionSettings } from "@/lib/database.types";
+import type { DbInterviewSession, DbSessionSettings } from "@/lib/database.aliases";
 
 type PostgresError = { message: string };
 type MockInsertSingle = {

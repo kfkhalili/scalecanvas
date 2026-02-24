@@ -4,7 +4,7 @@ import type {
   ReactFlowEdge,
   Viewport,
 } from "@/lib/types";
-import type { DbCanvasState } from "@/lib/database.types";
+import type { DbCanvasState } from "@/lib/database.aliases";
 
 /** Sample nodes and edges shown when the canvas would otherwise be empty. */
 export function getSampleCanvasState(): CanvasState {
@@ -35,8 +35,8 @@ function parseViewport(value: DbCanvasState["viewport"]): Viewport | undefined {
 
 export function canvasFromDb(db: DbCanvasState): CanvasState {
   return {
-    nodes: db.nodes ?? [],
-    edges: db.edges ?? [],
+    nodes: (db.nodes ?? []) as unknown as ReadonlyArray<ReactFlowNode>,
+    edges: (db.edges ?? []) as unknown as ReadonlyArray<ReactFlowEdge>,
     viewport: parseViewport(db.viewport),
   };
 }

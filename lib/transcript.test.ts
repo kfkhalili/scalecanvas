@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { transcriptToPublic, mergeTranscript } from "./transcript";
-import type { DbSessionTranscript } from "@/lib/database.types";
+import type { DbSessionTranscript } from "@/lib/database.aliases";
 import type { TranscriptEntry } from "@/lib/types";
 
 describe("transcriptToPublic", () => {
