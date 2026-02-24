@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import { getAwsIconUrl } from "./awsNodeIcons";
 
 describe("getAwsIconUrl", () => {
-  it("returns unpkg URL for known types", () => {
-    expect(getAwsIconUrl("lambda")).toContain("unpkg.com");
-    expect(getAwsIconUrl("lambda")).toContain("AWSLambda.svg");
-    expect(getAwsIconUrl("s3")).toContain("AmazonSimpleStorageService.svg");
-    expect(getAwsIconUrl("dynamodb")).toContain("AmazonDynamoDB.svg");
-    expect(getAwsIconUrl("redis")).toContain("AmazonElastiCache.svg");
-    expect(getAwsIconUrl("vpc")).toContain("AmazonVirtualPrivateCloud.svg");
+  it("returns unpkg URL for known types (awsPrefixSmallName)", () => {
+    expect(getAwsIconUrl("awsLambda")).toContain("unpkg.com");
+    expect(getAwsIconUrl("awsLambda")).toContain("AWSLambda.svg");
+    expect(getAwsIconUrl("awsS3")).toContain("AmazonSimpleStorageService.svg");
+    expect(getAwsIconUrl("awsDynamodb")).toContain("AmazonDynamoDB.svg");
+    expect(getAwsIconUrl("awsRedis")).toContain("AmazonElastiCache.svg");
+    expect(getAwsIconUrl("awsVpc")).toContain("AmazonVirtualPrivateCloud.svg");
   });
 
   it("returns null for unknown type", () => {
@@ -17,7 +17,7 @@ describe("getAwsIconUrl", () => {
   });
 
   it("uses architecture-service path", () => {
-    const url = getAwsIconUrl("ec2");
+    const url = getAwsIconUrl("awsEc2");
     expect(url).toContain("architecture-service");
     expect(url).toContain("AmazonEC2.svg");
   });

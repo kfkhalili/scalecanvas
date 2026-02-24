@@ -86,8 +86,8 @@ describe("getServicesByCategory", () => {
   it("groups services correctly", () => {
     const map = getServicesByCategory();
     const compute = map.get("compute")!;
-    expect(compute.some((s) => s.type === "ec2")).toBe(true);
-    expect(compute.some((s) => s.type === "lambda")).toBe(true);
+    expect(compute.some((s) => s.type === "awsEc2")).toBe(true);
+    expect(compute.some((s) => s.type === "awsLambda")).toBe(true);
   });
 });
 
@@ -99,17 +99,17 @@ describe("searchServices", () => {
 
   it("finds by label", () => {
     const results = searchServices("Lambda");
-    expect(results.some((s) => s.type === "lambda")).toBe(true);
+    expect(results.some((s) => s.type === "awsLambda")).toBe(true);
   });
 
   it("finds by description keyword", () => {
     const results = searchServices("message");
-    expect(results.some((s) => s.type === "sqs")).toBe(true);
+    expect(results.some((s) => s.type === "awsSqs")).toBe(true);
   });
 
   it("finds by category", () => {
     const results = searchServices("storage");
-    expect(results.some((s) => s.type === "s3")).toBe(true);
+    expect(results.some((s) => s.type === "awsS3")).toBe(true);
   });
 
   it("is case-insensitive", () => {

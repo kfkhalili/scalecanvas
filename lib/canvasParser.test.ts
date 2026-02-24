@@ -15,7 +15,7 @@ describe("parseCanvasState", () => {
     const nodes: ReactFlowNode[] = [
       {
         id: "n1",
-        type: "s3",
+        type: "awsS3",
         position: { x: 100, y: 200 },
         data: { label: "My Bucket" },
       },
@@ -24,7 +24,7 @@ describe("parseCanvasState", () => {
     expect(result).toContain("<nodes>");
     expect(result).toContain("</nodes>");
     expect(result).toContain("My Bucket");
-    expect(result).toContain("s3");
+    expect(result).toContain("awsS3");
     expect(result).not.toContain("n1");
     expect(result).not.toContain("100");
     expect(result).not.toContain("200");
@@ -32,8 +32,8 @@ describe("parseCanvasState", () => {
 
   it("serializes edges by label when nodes present (no edge id) inside <edges>", () => {
     const nodes: ReactFlowNode[] = [
-      { id: "n1", type: "lambda", position: { x: 0, y: 0 }, data: { label: "API" } },
-      { id: "n2", type: "s3", position: { x: 0, y: 0 }, data: { label: "Bucket" } },
+      { id: "n1", type: "awsLambda", position: { x: 0, y: 0 }, data: { label: "API" } },
+      { id: "n2", type: "awsS3", position: { x: 0, y: 0 }, data: { label: "Bucket" } },
     ];
     const edges: ReactFlowEdge[] = [
       { id: "e1", source: "n1", target: "n2" },

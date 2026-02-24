@@ -9,11 +9,11 @@ import type { DbCanvasState } from "@/lib/database.types";
 /** Sample nodes and edges shown when the canvas would otherwise be empty. */
 export function getSampleCanvasState(): CanvasState {
   const nodes: ReactFlowNode[] = [
-    { id: "sample-client", type: "vpc", position: { x: 250, y: 0 }, data: { label: "Client" } },
-    { id: "sample-api", type: "apiGateway", position: { x: 250, y: 120 }, data: { label: "API Gateway" } },
-    { id: "sample-lambda", type: "lambda", position: { x: 250, y: 240 }, data: { label: "Auth Handler" } },
-    { id: "sample-db", type: "dynamodb", position: { x: 250, y: 360 }, data: { label: "User Data" } },
-    { id: "sample-s3", type: "s3", position: { x: 480, y: 240 }, data: { label: "Assets" } },
+    { id: "sample-client", type: "awsVpc", position: { x: 250, y: 0 }, data: { label: "Client" } },
+    { id: "sample-api", type: "awsApiGateway", position: { x: 250, y: 120 }, data: { label: "API Gateway" } },
+    { id: "sample-lambda", type: "awsLambda", position: { x: 250, y: 240 }, data: { label: "Auth Handler" } },
+    { id: "sample-db", type: "awsDynamodb", position: { x: 250, y: 360 }, data: { label: "User Data" } },
+    { id: "sample-s3", type: "awsS3", position: { x: 480, y: 240 }, data: { label: "Assets" } },
   ];
   const edges: ReactFlowEdge[] = [
     { id: "e1", source: "sample-client", target: "sample-api" },

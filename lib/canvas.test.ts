@@ -75,8 +75,8 @@ describe("getSampleCanvasState", () => {
     expect(ids).toContain("sample-lambda");
     expect(ids).toContain("sample-db");
     expect(ids).toContain("sample-s3");
-    expect(state.nodes.find((n) => n.id === "sample-client")?.type).toBe("vpc");
-    expect(state.nodes.find((n) => n.id === "sample-api")?.type).toBe("apiGateway");
+    expect(state.nodes.find((n) => n.id === "sample-client")?.type).toBe("awsVpc");
+    expect(state.nodes.find((n) => n.id === "sample-api")?.type).toBe("awsApiGateway");
   });
 
   it("returns 4 edges connecting the sample nodes", () => {
