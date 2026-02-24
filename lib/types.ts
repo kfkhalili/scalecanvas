@@ -70,3 +70,14 @@ export type ReadonlyTranscriptEntry = Readonly<TranscriptEntry>;
 
 /** Readonly canvas state */
 export type ReadonlyCanvasState = Readonly<CanvasState>;
+
+/** Node library filter: All or a single cloud provider / generic. */
+export type NodeLibraryProvider =
+  | "all"
+  | "aws"
+  | "gcp"
+  | "azure"
+  | "generic";
+
+/** Key for the node library provider preference in user_preferences. */
+export const NODE_LIBRARY_PROVIDER_KEY = "node_library_provider" as const;

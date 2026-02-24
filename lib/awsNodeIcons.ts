@@ -33,6 +33,9 @@ const TYPE_TO_ICON: Record<string, string> = {
   awsWaf: "AWSWAF.svg",
   awsKinesis: "AmazonKinesis.svg",
   awsRedshift: "AmazonRedshift.svg",
+  awsDocumentdb: "AmazonDocumentDB.svg",
+  awsNeptune: "AmazonNeptune.svg",
+  awsOpensearch: "AmazonOpenSearchService.svg",
 };
 
 export function getAwsIconUrl(type: string): string | null {

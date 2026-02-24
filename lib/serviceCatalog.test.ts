@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   SERVICE_CATALOG,
   CATEGORY_ORDER,
+  getProviderFromType,
   getServicesByCategory,
   searchServices,
 } from "./serviceCatalog";
@@ -68,6 +69,27 @@ describe("SERVICE_CATALOG", () => {
   });
 });
 
+describe("getProviderFromType", () => {
+  it("returns aws for aws-prefixed types", () => {
+    expect(getProviderFromType("awsLambda")).toBe("aws");
+    expect(getProviderFromType("awsS3")).toBe("aws");
+  });
+
+  it("returns gcp for gcp-prefixed types", () => {
+    expect(getProviderFromType("gcpGke")).toBe("gcp");
+    expect(getProviderFromType("gcpCloudRun")).toBe("gcp");
+  });
+
+  it("returns generic for generic-prefixed types", () => {
+    expect(getProviderFromType("genericNosql")).toBe("generic");
+    expect(getProviderFromType("genericApi")).toBe("generic");
+  });
+
+  it("returns generic for text (notes)", () => {
+    expect(getProviderFromType("text")).toBe("generic");
+  });
+});
+
 describe("getServicesByCategory", () => {
   it("returns a Map with every category", () => {
     const map = getServicesByCategory();
@@ -81,6 +103,69 @@ describe("getServicesByCategory", () => {
     let total = 0;
     for (const list of map.values()) total += list.length;
     expect(total).toBe(SERVICE_CATALOG.length);
+  });
+
+  it("getServicesByCategory('all') returns same as no-arg", () => {
+    const mapAll = getServicesByCategory("all");
+    const mapNoArg = getServicesByCategory();
+    let totalAll = 0;
+    let totalNoArg = 0;
+    for (const list of mapAll.values()) totalAll += list.length;
+    for (const list of mapNoArg.values()) totalNoArg += list.length;
+    expect(totalAll).toBe(SERVICE_CATALOG.length);
+    expect(totalNoArg).toBe(totalAll);
+  });
+
+  it("getServicesByCategory('aws') returns only aws entries", () => {
+    const map = getServicesByCategory("aws");
+    let total = 0;
+    for (const list of map.values()) {
+      for (const s of list) {
+        expect(s.type.startsWith("aws")).toBe(true);
+        total += 1;
+      }
+    }
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBe(SERVICE_CATALOG.filter((s) => s.type.startsWith("aws")).length);
+  });
+
+  it("getServicesByCategory('gcp') returns only gcp entries", () => {
+    const map = getServicesByCategory("gcp");
+    let total = 0;
+    for (const list of map.values()) {
+      for (const s of list) {
+        expect(s.type.startsWith("gcp")).toBe(true);
+        total += 1;
+      }
+    }
+    expect(total).toBe(SERVICE_CATALOG.filter((s) => s.type.startsWith("gcp")).length);
+  });
+
+  it("getServicesByCategory('azure') returns only azure entries", () => {
+    const map = getServicesByCategory("azure");
+    let total = 0;
+    for (const list of map.values()) {
+      for (const s of list) {
+        expect(s.type.startsWith("azure")).toBe(true);
+        total += 1;
+      }
+    }
+    expect(total).toBe(SERVICE_CATALOG.filter((s) => s.type.startsWith("azure")).length);
+  });
+
+  it("getServicesByCategory('generic') returns only generic and text entries", () => {
+    const map = getServicesByCategory("generic");
+    const genericOrText = (t: string) => t.startsWith("generic") || t === "text";
+    let total = 0;
+    for (const list of map.values()) {
+      for (const s of list) {
+        expect(genericOrText(s.type)).toBe(true);
+        total += 1;
+      }
+    }
+    expect(total).toBe(
+      SERVICE_CATALOG.filter((s) => genericOrText(s.type)).length
+    );
   });
 
   it("groups services correctly", () => {
