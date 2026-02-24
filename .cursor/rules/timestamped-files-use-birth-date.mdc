@@ -1,0 +1,45 @@
+---
+description: Timestamped filenames must use filesystem birth date — no exceptions
+alwaysApply: true
+---
+
+# Timestamped Files: Use Filesystem Birth Date (Hard Rule)
+
+**Before creating any file whose name includes a date or timestamp, you MUST use the file's filesystem birth date for naming. No assumptions, no "today", no git dates.**
+
+## When This Applies
+
+- **Migrations:** `supabase/migrations/*.sql` — prefix is `YYYYMMDDHHMMSS` (e.g. `20260224115726_user_preferences.sql`).
+- **Plan/docs with date in name:** e.g. `docs/plans/YYYY-MM-DD-*.md` — date part must be the file's birth date as `YYYY-MM-DD`.
+
+Any other file type whose filename is intended to contain a date or timestamp follows the same principle.
+
+## Required Workflow
+
+1. **Create the file** (write content; use a temporary or placeholder name if needed).
+2. **Get birth time** by running stat on the created file.
+3. **Rename the file** so the filename uses that birth time (no other source for the timestamp).
+
+## Command (macOS)
+
+```bash
+stat -f '%SB' -t '%Y%m%d%H%M%S' -- /path/to/file
+```
+
+Use the output as the numeric prefix (migrations) or derive `YYYY-MM-DD` for doc filenames.
+
+## Naming Formats
+
+| Location              | Birth output example | Filename format / example                    |
+|-----------------------|----------------------|---------------------------------------------|
+| `supabase/migrations/`| `20260224115726`     | `{birth}_name.sql` → `20260224115726_user_preferences.sql` |
+| `docs/plans/`         | `20260224115726`     | `{YYYY-MM-DD}-name.md` → `2026-02-24-node-library-design.md` |
+
+## Do Not
+
+- Assume "today's date" or use context like "user said today is X".
+- Use git commit or author date instead of filesystem birth.
+- Create a timestamped filename first and skip stat + rename.
+- Keep a timestamped file whose name was not derived from its own `stat` birth time.
+
+**If you created a timestamped file without running stat and renaming, fix it: run stat on the file, then rename to use that birth value.**
