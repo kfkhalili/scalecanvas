@@ -5,9 +5,7 @@ import Image from "next/image";
 import { Handle, type NodeProps, Position } from "reactflow";
 import type { NodeData } from "@/lib/types";
 import type { ServiceCategory } from "@/lib/serviceCatalog";
-import { getAwsIconUrl } from "@/lib/awsNodeIcons";
-import { getGcpIconUrl } from "@/lib/gcpNodeIcons";
-import { getGenericIcon } from "@/lib/genericNodeIcons";
+import { getNodeIconUrl, getNodeIconComponent } from "@/lib/nodeIconResolver";
 
 type OurNode = { id: string; type?: string; data: NodeData };
 type AwsNodeProps = NodeProps<OurNode>;
@@ -37,6 +35,9 @@ const TYPE_TO_CATEGORY: Record<string, ServiceCategory> = {
   awsElasticache: "database",
   awsRedis: "database",
   awsAurora: "database",
+  awsDocumentdb: "database",
+  awsNeptune: "database",
+  awsOpensearch: "database",
   awsApiGateway: "networking",
   awsElb: "networking",
   awsCloudfront: "networking",
@@ -70,6 +71,12 @@ const TYPE_TO_CATEGORY: Record<string, ServiceCategory> = {
   gcpLoadBalancing: "networking",
   gcpPubSub: "integration",
   gcpVertexAi: "analytics",
+  azureFunctions: "compute",
+  azureBlobStorage: "storage",
+  azureCosmosDb: "database",
+  azureServiceBus: "integration",
+  azureEventHubs: "integration",
+  azureKeyVault: "security",
 };
 
 function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
@@ -80,8 +87,8 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
     data && "label" in data && typeof data.label === "string"
       ? data.label
       : type ?? "Node";
-  const iconUrl = type ? (getAwsIconUrl(type) ?? getGcpIconUrl(type)) : null;
-  const GenericIcon = type ? getGenericIcon(type) : null;
+  const iconUrl = type ? getNodeIconUrl(type) : null;
+  const GenericIcon = type ? getNodeIconComponent(type) : null;
 
   const handleClass = "!bg-gray-500";
   return (
