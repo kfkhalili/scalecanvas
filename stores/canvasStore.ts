@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
@@ -17,21 +18,22 @@ export type EvaluateAction = {
 type CanvasStore = {
   nodes: ReadonlyArray<ReactFlowNode>;
   edges: ReadonlyArray<ReactFlowEdge>;
-  viewport: Viewport | undefined;
+  viewport: Option.Option<Viewport>;
   /** Set by ChatPanel so FlowCanvas can show the Evaluate button. */
-  evaluateAction: EvaluateAction | null;
+  evaluateAction: Option.Option<EvaluateAction>;
   /** PLG: true after anonymous user clicks Evaluate or sends chat; survives OAuth redirect. */
   hasAttemptedEval: boolean;
   setNodes: (nodes: ReadonlyArray<ReactFlowNode>) => void;
   setEdges: (edges: ReadonlyArray<ReactFlowEdge>) => void;
-  setViewport: (viewport: Viewport | undefined) => void;
+  setViewport: (viewport: Option.Option<Viewport>) => void;
   setCanvasState: (state: CanvasState) => void;
-  setEvaluateAction: (action: EvaluateAction | null) => void;
+  setEvaluateAction: (action: Option.Option<EvaluateAction>) => void;
   setHasAttemptedEval: (value: boolean) => void;
   getCanvasState: () => CanvasState;
 };
 
-const initial: CanvasState = { nodes: [], edges: [], viewport: undefined };
+const initialNodes: ReadonlyArray<ReactFlowNode> = [];
+const initialEdges: ReadonlyArray<ReactFlowEdge> = [];
 
 const persistStorage = typeof window !== "undefined"
   ? createJSONStorage(() => localStorage)
@@ -40,10 +42,10 @@ const persistStorage = typeof window !== "undefined"
 export const useCanvasStore = create<CanvasStore>()(
   persist(
     (set, get) => ({
-      nodes: initial.nodes,
-      edges: initial.edges,
-      viewport: initial.viewport,
-      evaluateAction: null,
+      nodes: initialNodes,
+      edges: initialEdges,
+      viewport: Option.none(),
+      evaluateAction: Option.none(),
       hasAttemptedEval: false,
       setNodes: (nodes) =>
         set((state) => ({
@@ -63,21 +65,22 @@ export const useCanvasStore = create<CanvasStore>()(
           edges: state.edges,
           viewport,
         })),
-      setEvaluateAction: (evaluateAction) => set({ evaluateAction }),
+      setEvaluateAction: (action) => set({ evaluateAction: action }),
       setHasAttemptedEval: (hasAttemptedEval) => set({ hasAttemptedEval }),
       setCanvasState: (state) =>
         set({
           nodes: state.nodes,
           edges: state.edges,
-          viewport: state.viewport,
+          viewport: Option.fromNullable(state.viewport),
         }),
       getCanvasState: () => {
         const { nodes, edges, viewport } = get();
+        const viewportValue = Option.getOrUndefined(viewport);
         return replaceCanvasState(
-          { nodes, edges, viewport },
+          { nodes, edges, viewport: viewportValue },
           nodes,
           edges,
-          viewport
+          viewportValue
         );
       },
     }),

@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { TranscriptEntry } from "@/lib/types";
@@ -5,19 +6,21 @@ import type { TranscriptEntry } from "@/lib/types";
 /** Message shape for anonymous chat backup (survives OAuth redirect). */
 export type AnonymousMessage = { id: string; role: string; content: string };
 
+type HandoffTranscript = { sessionId: string; entries: TranscriptEntry[] };
+
 type AuthHandoffStore = {
   /** When set, ChatPanel should run BFF handoff then clear and navigate to this session. */
-  pendingSessionId: string | null;
-  setPendingAuthHandoff: (sessionId: string | null) => void;
+  pendingSessionId: Option.Option<string>;
+  setPendingAuthHandoff: (sessionId: Option.Option<string>) => void;
   /** Transcript carried across handoff so the session page can show it before fetch. Cleared when consumed. */
-  handoffTranscript: { sessionId: string; entries: TranscriptEntry[] } | null;
-  setHandoffTranscript: (data: { sessionId: string; entries: TranscriptEntry[] } | null) => void;
+  handoffTranscript: Option.Option<HandoffTranscript>;
+  setHandoffTranscript: (data: Option.Option<HandoffTranscript>) => void;
   /** Anonymous chat messages saved before OAuth redirect; used by handoff when useChat has reset to []. */
   anonymousMessages: AnonymousMessage[];
   setAnonymousMessages: (messages: AnonymousMessage[]) => void;
   /** Title of the question selected during anonymous session; used as session name after handoff. */
-  questionTitle: string | null;
-  setQuestionTitle: (title: string | null) => void;
+  questionTitle: Option.Option<string>;
+  setQuestionTitle: (title: Option.Option<string>) => void;
 };
 
 const persistStorage =
@@ -28,13 +31,13 @@ const persistStorage =
 export const useAuthHandoffStore = create<AuthHandoffStore>()(
   persist(
     (set) => ({
-      pendingSessionId: null,
+      pendingSessionId: Option.none(),
       setPendingAuthHandoff: (sessionId) => set({ pendingSessionId: sessionId }),
-      handoffTranscript: null,
+      handoffTranscript: Option.none(),
       setHandoffTranscript: (data) => set({ handoffTranscript: data }),
       anonymousMessages: [],
       setAnonymousMessages: (messages) => set({ anonymousMessages: messages }),
-      questionTitle: null,
+      questionTitle: Option.none(),
       setQuestionTitle: (title) => set({ questionTitle: title }),
     }),
     {
@@ -42,8 +45,19 @@ export const useAuthHandoffStore = create<AuthHandoffStore>()(
       storage: persistStorage,
       partialize: (state) => ({
         anonymousMessages: state.anonymousMessages,
-        questionTitle: state.questionTitle,
+        questionTitle: Option.getOrNull(state.questionTitle),
       }),
+      merge: (persistedState, currentState) => {
+        const p = persistedState as {
+          anonymousMessages?: AnonymousMessage[];
+          questionTitle?: string | null;
+        };
+        return {
+          ...currentState,
+          anonymousMessages: p.anonymousMessages ?? currentState.anonymousMessages,
+          questionTitle: Option.fromNullable(p.questionTitle),
+        };
+      },
       skipHydration: true,
     }
   )

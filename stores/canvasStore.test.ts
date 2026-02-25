@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { Option } from "effect";
 import { useCanvasStore } from "./canvasStore";
 import { getSampleCanvasState } from "@/lib/canvas";
 import type { ReactFlowNode, ReactFlowEdge } from "@/lib/types";
@@ -7,8 +8,8 @@ beforeEach(() => {
   useCanvasStore.setState({
     nodes: [],
     edges: [],
-    viewport: undefined,
-    evaluateAction: null,
+    viewport: Option.none(),
+    evaluateAction: Option.none(),
     hasAttemptedEval: false,
   });
 });
@@ -48,14 +49,18 @@ describe("canvasStore", () => {
   });
 
   it("setViewport updates viewport", () => {
-    useCanvasStore.getState().setViewport({ x: 10, y: 20, zoom: 1.5 });
-    expect(useCanvasStore.getState().viewport).toEqual({ x: 10, y: 20, zoom: 1.5 });
+    useCanvasStore.getState().setViewport(Option.some({ x: 10, y: 20, zoom: 1.5 }));
+    expect(Option.getOrNull(useCanvasStore.getState().viewport)).toEqual({
+      x: 10,
+      y: 20,
+      zoom: 1.5,
+    });
   });
 
   it("getCanvasState returns current nodes, edges, viewport", () => {
     const sample = getSampleCanvasState();
     useCanvasStore.getState().setCanvasState(sample);
-    useCanvasStore.getState().setViewport({ x: 1, y: 2, zoom: 1 });
+    useCanvasStore.getState().setViewport(Option.some({ x: 1, y: 2, zoom: 1 }));
     const state = useCanvasStore.getState().getCanvasState();
     expect(state.nodes).toEqual(useCanvasStore.getState().nodes);
     expect(state.edges).toEqual(useCanvasStore.getState().edges);
@@ -63,32 +68,47 @@ describe("canvasStore", () => {
   });
 
   describe("evaluateAction", () => {
-    it("initial state has null evaluateAction", () => {
-      expect(useCanvasStore.getState().evaluateAction).toBeNull();
+    it("initial state has none evaluateAction", () => {
+      expect(Option.isNone(useCanvasStore.getState().evaluateAction)).toBe(
+        true
+      );
     });
 
     it("setEvaluateAction sets action for FlowCanvas Evaluate button", () => {
       const noop = () => {};
-      useCanvasStore.getState().setEvaluateAction({
-        evaluate: noop,
-        canEvaluate: true,
-        isEvaluating: false,
+      useCanvasStore.getState().setEvaluateAction(
+        Option.some({
+          evaluate: noop,
+          canEvaluate: true,
+          isEvaluating: false,
+        })
+      );
+      const actionOpt = useCanvasStore.getState().evaluateAction;
+      expect(Option.isSome(actionOpt)).toBe(true);
+      Option.match(actionOpt, {
+        onNone: () => {
+          throw new Error("expected Some");
+        },
+        onSome: (action) => {
+          expect(action.evaluate).toBe(noop);
+          expect(action.canEvaluate).toBe(true);
+          expect(action.isEvaluating).toBe(false);
+        },
       });
-      const action = useCanvasStore.getState().evaluateAction;
-      expect(action).not.toBeNull();
-      expect(action!.evaluate).toBe(noop);
-      expect(action!.canEvaluate).toBe(true);
-      expect(action!.isEvaluating).toBe(false);
     });
 
-    it("setEvaluateAction(null) clears action", () => {
-      useCanvasStore.getState().setEvaluateAction({
-        evaluate: () => {},
-        canEvaluate: false,
-        isEvaluating: false,
-      });
-      useCanvasStore.getState().setEvaluateAction(null);
-      expect(useCanvasStore.getState().evaluateAction).toBeNull();
+    it("setEvaluateAction(Option.none()) clears action", () => {
+      useCanvasStore.getState().setEvaluateAction(
+        Option.some({
+          evaluate: () => {},
+          canEvaluate: false,
+          isEvaluating: false,
+        })
+      );
+      useCanvasStore.getState().setEvaluateAction(Option.none());
+      expect(Option.isNone(useCanvasStore.getState().evaluateAction)).toBe(
+        true
+      );
     });
   });
 
