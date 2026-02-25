@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import type { LucideIcon } from "lucide-react";
 import { Database, Box, Zap, Globe, MessageSquare } from "lucide-react";
 
@@ -11,8 +12,9 @@ const GENERIC_TYPE_TO_ICON: Record<string, LucideIcon> = {
   genericQueue: MessageSquare,
 };
 
-export function getGenericIcon(type: string): LucideIcon | null {
-  return GENERIC_TYPE_TO_ICON[type] ?? null;
+export function getGenericIcon(type: string): Option.Option<LucideIcon> {
+  const icon = GENERIC_TYPE_TO_ICON[type];
+  return icon !== undefined ? Option.some(icon) : Option.none();
 }
 
 export function isGenericNodeType(type: string): boolean {

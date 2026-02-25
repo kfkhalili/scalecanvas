@@ -1,21 +1,28 @@
 import { describe, it, expect } from "vitest";
+import { Option } from "effect";
 import { getGcpIconUrl, isGcpNodeType } from "./gcpNodeIcons";
 
 describe("getGcpIconUrl", () => {
-  it("returns /icons/gcp/ path for known GCP types", () => {
-    expect(getGcpIconUrl("gcpCloudRun")).toMatch(/^\/icons\/gcp\//);
-    expect(getGcpIconUrl("gcpCloudRun")).toContain(".svg");
-    expect(getGcpIconUrl("gcpGke")).toMatch(/^\/icons\/gcp\//);
-    expect(getGcpIconUrl("gcpPubSub")).toMatch(/^\/icons\/gcp\//);
-    expect(getGcpIconUrl("gcpBigQuery")).toMatch(/^\/icons\/gcp\//);
+  it("returns some(/icons/gcp/) for known GCP types", () => {
+    expect(Option.getOrNull(getGcpIconUrl("gcpCloudRun"))).toMatch(
+      /^\/icons\/gcp\//
+    );
+    expect(Option.getOrNull(getGcpIconUrl("gcpCloudRun"))).toContain(".svg");
+    expect(Option.getOrNull(getGcpIconUrl("gcpGke"))).toMatch(/^\/icons\/gcp\//);
+    expect(Option.getOrNull(getGcpIconUrl("gcpPubSub"))).toMatch(
+      /^\/icons\/gcp\//
+    );
+    expect(Option.getOrNull(getGcpIconUrl("gcpBigQuery"))).toMatch(
+      /^\/icons\/gcp\//
+    );
   });
 
-  it("returns null for non-GCP types", () => {
-    expect(getGcpIconUrl("lambda")).toBeNull();
-    expect(getGcpIconUrl("dynamodb")).toBeNull();
-    expect(getGcpIconUrl("genericNosql")).toBeNull();
-    expect(getGcpIconUrl("unknown")).toBeNull();
-    expect(getGcpIconUrl("")).toBeNull();
+  it("returns none for non-GCP types", () => {
+    expect(Option.isNone(getGcpIconUrl("lambda"))).toBe(true);
+    expect(Option.isNone(getGcpIconUrl("dynamodb"))).toBe(true);
+    expect(Option.isNone(getGcpIconUrl("genericNosql"))).toBe(true);
+    expect(Option.isNone(getGcpIconUrl("unknown"))).toBe(true);
+    expect(Option.isNone(getGcpIconUrl(""))).toBe(true);
   });
 });
 

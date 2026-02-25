@@ -1,3 +1,5 @@
+import { Option } from "effect";
+
 /**
  * Maps our node type (serviceCatalog type) to aws-icons architecture-service SVG filename.
  * Icons are loaded from the aws-icons package via CDN so no bundler config is needed.
@@ -38,8 +40,8 @@ const TYPE_TO_ICON: Record<string, string> = {
   awsOpensearch: "AmazonOpenSearchService.svg",
 };
 
-export function getAwsIconUrl(type: string): string | null {
+export function getAwsIconUrl(type: string): Option.Option<string> {
   const filename = TYPE_TO_ICON[type];
-  if (!filename) return null;
-  return `${AWS_ICONS_BASE}/${filename}`;
+  if (!filename) return Option.none();
+  return Option.some(`${AWS_ICONS_BASE}/${filename}`);
 }

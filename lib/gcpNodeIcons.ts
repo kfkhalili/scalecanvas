@@ -1,3 +1,5 @@
+import { Option } from "effect";
+
 /**
  * Maps GCP catalog node types to SVG filenames in public/icons/gcp/ (2025 set).
  * Icons are from https://cloud.google.com/icons (Core product + Category icons).
@@ -18,10 +20,10 @@ const GCP_TYPE_TO_FILENAME: Record<string, string> = {
   gcpVertexAi: "VertexAI-512-color.svg",
 };
 
-export function getGcpIconUrl(type: string): string | null {
+export function getGcpIconUrl(type: string): Option.Option<string> {
   const filename = GCP_TYPE_TO_FILENAME[type];
-  if (!filename) return null;
-  return `/icons/gcp/${filename}`;
+  if (!filename) return Option.none();
+  return Option.some(`/icons/gcp/${filename}`);
 }
 
 export function isGcpNodeType(type: string): boolean {

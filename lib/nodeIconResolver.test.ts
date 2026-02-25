@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Option } from "effect";
 import {
   getNodeIconUrl,
   getNodeIconComponent,
@@ -11,46 +12,61 @@ import { getGenericIcon } from "./genericNodeIcons";
 describe("getNodeIconUrl", () => {
   it("returns same URL as getAwsIconUrl for aws types", () => {
     const type = "awsLambda";
-    const expected = getAwsIconUrl(type);
-    expect(getNodeIconUrl(type)).toBe(expected);
-    expect(getNodeIconUrl("awsS3")).toBe(getAwsIconUrl("awsS3"));
+    expect(Option.getOrNull(getNodeIconUrl(type))).toBe(
+      Option.getOrNull(getAwsIconUrl(type))
+    );
+    expect(Option.getOrNull(getNodeIconUrl("awsS3"))).toBe(
+      Option.getOrNull(getAwsIconUrl("awsS3"))
+    );
   });
 
   it("returns same URL as getGcpIconUrl for gcp types", () => {
     const type = "gcpGke";
-    expect(getNodeIconUrl(type)).toBe(getGcpIconUrl(type));
-    expect(getNodeIconUrl("gcpCloudRun")).toBe(getGcpIconUrl("gcpCloudRun"));
+    expect(Option.getOrNull(getNodeIconUrl(type))).toBe(
+      Option.getOrNull(getGcpIconUrl(type))
+    );
+    expect(Option.getOrNull(getNodeIconUrl("gcpCloudRun"))).toBe(
+      Option.getOrNull(getGcpIconUrl("gcpCloudRun"))
+    );
   });
 
-  it("returns null for generic types (no URL, use component)", () => {
-    expect(getNodeIconUrl("genericNosql")).toBeNull();
-    expect(getNodeIconUrl("genericApi")).toBeNull();
+  it("returns none for generic types (no URL, use component)", () => {
+    expect(Option.isNone(getNodeIconUrl("genericNosql"))).toBe(true);
+    expect(Option.isNone(getNodeIconUrl("genericApi"))).toBe(true);
   });
 
   it("returns same path as getAzureIconUrl for azure types", () => {
-    expect(getNodeIconUrl("azureFunctions")).toBe(getAzureIconUrl("azureFunctions"));
-    expect(getNodeIconUrl("azureCosmosDb")).toBe(getAzureIconUrl("azureCosmosDb"));
+    expect(Option.getOrNull(getNodeIconUrl("azureFunctions"))).toBe(
+      Option.getOrNull(getAzureIconUrl("azureFunctions"))
+    );
+    expect(Option.getOrNull(getNodeIconUrl("azureCosmosDb"))).toBe(
+      Option.getOrNull(getAzureIconUrl("azureCosmosDb"))
+    );
   });
 
-  it("returns null for unknown types", () => {
-    expect(getNodeIconUrl("unknown")).toBeNull();
-    expect(getNodeIconUrl("")).toBeNull();
+  it("returns none for unknown types", () => {
+    expect(Option.isNone(getNodeIconUrl("unknown"))).toBe(true);
+    expect(Option.isNone(getNodeIconUrl(""))).toBe(true);
   });
 });
 
 describe("getNodeIconComponent", () => {
   it("returns same component as getGenericIcon for generic types", () => {
-    expect(getNodeIconComponent("genericNosql")).toBe(getGenericIcon("genericNosql"));
-    expect(getNodeIconComponent("genericApi")).toBe(getGenericIcon("genericApi"));
+    expect(Option.getOrNull(getNodeIconComponent("genericNosql"))).toBe(
+      Option.getOrNull(getGenericIcon("genericNosql"))
+    );
+    expect(Option.getOrNull(getNodeIconComponent("genericApi"))).toBe(
+      Option.getOrNull(getGenericIcon("genericApi"))
+    );
   });
 
-  it("returns null for aws/gcp types (use URL instead)", () => {
-    expect(getNodeIconComponent("awsLambda")).toBeNull();
-    expect(getNodeIconComponent("gcpGke")).toBeNull();
+  it("returns none for aws/gcp types (use URL instead)", () => {
+    expect(Option.isNone(getNodeIconComponent("awsLambda"))).toBe(true);
+    expect(Option.isNone(getNodeIconComponent("gcpGke"))).toBe(true);
   });
 
-  it("returns null for unknown types", () => {
-    expect(getNodeIconComponent("unknown")).toBeNull();
-    expect(getNodeIconComponent("")).toBeNull();
+  it("returns none for unknown types", () => {
+    expect(Option.isNone(getNodeIconComponent("unknown"))).toBe(true);
+    expect(Option.isNone(getNodeIconComponent(""))).toBe(true);
   });
 });
