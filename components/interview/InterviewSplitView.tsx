@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect, Either } from "effect";
 import { useEffect, useRef, useState } from "react";
 import { SplitScreen } from "@/components/layout/SplitScreen";
 import { CollapsibleSidebar } from "@/components/layout/CollapsibleSidebar";
@@ -74,20 +75,25 @@ export function InterviewSplitView({
 
     if (prevId != null && prevId !== sessionId) {
       const state = getCanvasState();
-      saveCanvasApi(prevId, state).then(() => {});
+      void Effect.runPromise(
+        Effect.either(saveCanvasApi(prevId, state))
+      ).then(() => {});
     }
 
     loadingSessionIdRef.current = sessionId;
     setCanvasReady(false);
 
-    fetchCanvas(sessionId).then((canvasResult) => {
-      if (loadingSessionIdRef.current !== sessionId) return;
-      canvasResult.match(
-        (state) => setCanvasState(state.nodes.length > 0 ? state : empty),
-        () => setCanvasState(empty)
-      );
-      setCanvasReady(true);
-    });
+    void Effect.runPromise(Effect.either(fetchCanvas(sessionId))).then(
+      (canvasEither) => {
+        if (loadingSessionIdRef.current !== sessionId) return;
+        Either.match(canvasEither, {
+          onLeft: () => setCanvasState(empty),
+          onRight: (state) =>
+            setCanvasState(state.nodes.length > 0 ? state : empty),
+        });
+        setCanvasReady(true);
+      }
+    );
   }, [sessionId, isAnonymous, setCanvasState, getCanvasState]);
 
   useEffect(() => {
@@ -107,19 +113,21 @@ export function InterviewSplitView({
     }
     loadingSessionIdRef.current = sessionId;
     setTranscriptForSession(null);
-    fetchTranscript(sessionId).then((result) => {
-      if (loadingSessionIdRef.current !== sessionId) return;
-      result.match(
-        (list) => {
-          setTranscriptForSession(list);
-          setEntries(list);
-        },
-        () => {
-          setTranscriptForSession([]);
-          setEntries([]);
-        }
-      );
-    });
+    void Effect.runPromise(Effect.either(fetchTranscript(sessionId))).then(
+      (result) => {
+        if (loadingSessionIdRef.current !== sessionId) return;
+        Either.match(result, {
+          onLeft: () => {
+            setTranscriptForSession([]);
+            setEntries([]);
+          },
+          onRight: (list) => {
+            setTranscriptForSession(list);
+            setEntries(list);
+          },
+        });
+      }
+    );
   }, [sessionId, setEntries, setHandoffTranscript]);
 
   const sessionReady = isSessionContentReady(

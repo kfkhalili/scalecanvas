@@ -1,5 +1,5 @@
+import { Effect } from "effect";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ok, err } from "neverthrow";
 import { runPostAuthHandoff } from "./usePostAuthHandoff";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
@@ -13,7 +13,7 @@ describe("runPostAuthHandoff", () => {
   it("when session exists and hasAttemptedEval true: resets flag and calls RPC, sets pending handoff on success", async () => {
     const sessionId = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
     useCanvasStore.setState({ hasAttemptedEval: true });
-    const deductRpc = vi.fn().mockResolvedValue(ok(sessionId));
+    const deductRpc = vi.fn().mockReturnValue(Effect.succeed(sessionId));
     const setPending = vi.fn();
 
     await runPostAuthHandoff(
@@ -64,7 +64,7 @@ describe("runPostAuthHandoff", () => {
 
   it("when RPC returns err: resets hasAttemptedEval but does not set pending", async () => {
     useCanvasStore.setState({ hasAttemptedEval: true });
-    const deductRpc = vi.fn().mockResolvedValue(err({ message: "Insufficient tokens" }));
+    const deductRpc = vi.fn().mockReturnValue(Effect.fail({ message: "Insufficient tokens" }));
     const setPending = vi.fn();
 
     await runPostAuthHandoff(

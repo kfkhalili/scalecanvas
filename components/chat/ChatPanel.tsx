@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect, Either } from "effect";
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
@@ -88,8 +89,15 @@ export function ChatPanel({
           return;
         }
         if (message.role === "assistant" && message.content && sessionId) {
-          appendTranscriptApi(sessionId, "assistant", message.content).then(
-            (r) => r.match((entry) => appendEntry(entry), () => {})
+          void Effect.runPromise(
+            Effect.either(
+              appendTranscriptApi(sessionId, "assistant", message.content)
+            )
+          ).then((either) =>
+            Either.match(either, {
+              onLeft: () => {},
+              onRight: (entry) => appendEntry(entry),
+            })
           );
         }
       },
@@ -117,8 +125,15 @@ export function ChatPanel({
           ? "The request took too long. The first request can be slow—please try again; the next one is usually faster."
           : rawMessage || fallback;
         if (sessionId) {
-          appendTranscriptApi(sessionId, "assistant", message).then((r) =>
-            r.match((entry) => appendEntry(entry), () => {})
+          void Effect.runPromise(
+            Effect.either(
+              appendTranscriptApi(sessionId, "assistant", message)
+            )
+          ).then((either) =>
+            Either.match(either, {
+              onLeft: () => {},
+              onRight: (entry) => appendEntry(entry),
+            })
           );
         }
         setMessages((prev) => [
@@ -240,7 +255,9 @@ export function ChatPanel({
       setMessages: setMessages as unknown as RunBffHandoffParams["setMessages"],
       persistTranscript: async (sid, entries) => {
         for (const { role, content } of entries) {
-          await appendTranscriptApi(sid, role, content);
+          await Effect.runPromise(
+            Effect.either(appendTranscriptApi(sid, role, content))
+          );
         }
       },
       onCanvasSaveError: () =>
@@ -319,8 +336,13 @@ export function ChatPanel({
       return;
     }
     if (sessionId) {
-      appendTranscriptApi(sessionId, "user", content).then((r) =>
-        r.match((entry) => appendEntry(entry), () => {})
+      void Effect.runPromise(
+        Effect.either(appendTranscriptApi(sessionId, "user", content))
+      ).then((either) =>
+        Either.match(either, {
+          onLeft: () => {},
+          onRight: (entry) => appendEntry(entry),
+        })
       );
     }
     handleSubmit(e);

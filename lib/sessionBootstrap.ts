@@ -1,4 +1,4 @@
-import type { Result } from "neverthrow";
+import { Effect, Either } from "effect";
 import type { Session } from "@/lib/types";
 
 export type BootstrapContext = {
@@ -30,8 +30,8 @@ export function decideBootstrapAction(
 }
 
 export type BootstrapDeps = {
-  fetchSessions: () => Promise<Result<ReadonlyArray<Session>, { message: string }>>;
-  deductTokenAndCreateSession: () => Promise<Result<string, { message: string }>>;
+  fetchSessions: () => Effect.Effect<ReadonlyArray<Session>, { message: string }>;
+  deductTokenAndCreateSession: () => Effect.Effect<string, { message: string }>;
   renameSession: (id: string, title: string) => Promise<void>;
   setPendingAuthHandoff: (sessionId: string) => void;
   setHasAttemptedEval: (value: boolean) => void;
@@ -47,23 +47,31 @@ export async function executeBootstrapAction(
     case "redirect_login":
       deps.redirectTo("/login");
       return;
-    case "resume_or_idle":
-      (await deps.fetchSessions()).match(
-        (list) => {
+    case "resume_or_idle": {
+      const fetchEither = await Effect.runPromise(
+        Effect.either(deps.fetchSessions())
+      );
+      Either.match(fetchEither, {
+        onLeft: () => {},
+        onRight: (list) => {
           if (list.length > 0) deps.redirectTo(`/${list[0].id}`);
         },
-        () => {}
-      );
+      });
       return;
-    case "deduct_and_handoff":
+    }
+    case "deduct_and_handoff": {
       deps.setHasAttemptedEval(false);
-      (await deps.deductTokenAndCreateSession()).match(
-        (sessionId) => {
-          if (ctx.questionTitle) deps.renameSession(sessionId, ctx.questionTitle);
+      const deductEither = await Effect.runPromise(
+        Effect.either(deps.deductTokenAndCreateSession())
+      );
+      Either.match(deductEither, {
+        onLeft: () => {},
+        onRight: (sessionId) => {
+          if (ctx.questionTitle) void deps.renameSession(sessionId, ctx.questionTitle);
           deps.setPendingAuthHandoff(sessionId);
         },
-        () => {}
-      );
+      });
       return;
+    }
   }
 }

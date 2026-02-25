@@ -1,4 +1,4 @@
-import { ok, err, type Result } from "neverthrow";
+import { Effect, pipe } from "effect";
 
 export type TokenError = { message: string };
 
@@ -11,22 +11,24 @@ type SupabaseRpcClient = {
 /**
  * Calls the Supabase RPC deduct_token_and_create_session. If the user has
  * tokens > 0, decrements one and creates a session; returns the new session_id.
- * Otherwise returns err (e.g. insufficient tokens). Uses Result for strict FP.
+ * Otherwise fails with TokenError (e.g. insufficient tokens).
  */
-export async function deductTokenAndCreateSession(
+export function deductTokenAndCreateSession(
   supabase: SupabaseRpcClient
-): Promise<Result<string, TokenError>> {
-  try {
-    const { data, error } = await supabase.rpc("deduct_token_and_create_session");
-    if (error) {
-      return err({ message: error.message ?? "Token deduction failed" });
-    }
-    if (data == null || typeof data !== "string") {
-      return err({ message: "No session_id returned" });
-    }
-    return ok(data);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return err({ message });
-  }
+): Effect.Effect<string, TokenError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () => supabase.rpc("deduct_token_and_create_session"),
+      catch: (e) => ({
+        message: e instanceof Error ? e.message : String(e),
+      }),
+    }),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail({ message: error.message ?? "Token deduction failed" })
+        : data != null && typeof data === "string"
+          ? Effect.succeed(data)
+          : Effect.fail({ message: "No session_id returned" })
+    )
+  );
 }

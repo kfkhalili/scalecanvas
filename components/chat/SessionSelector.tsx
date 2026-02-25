@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect, Either } from "effect";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
@@ -42,11 +43,11 @@ export function SessionSelector({
 
   const loadSessions = useCallback(() => {
     if (isAnonymous) return;
-    fetchSessions().then((result) => {
-      result.match(
-        (list) => setSessions(list),
-        () => setSessions([])
-      );
+    void Effect.runPromise(Effect.either(fetchSessions())).then((either) => {
+      Either.match(either, {
+        onLeft: () => setSessions([]),
+        onRight: (list) => setSessions(list),
+      });
       setLoading(false);
     });
   }, [isAnonymous, setSessions]);
@@ -92,17 +93,21 @@ export function SessionSelector({
     const id = renamingId;
     setRenamingId(null);
     if (!trimmed) return;
-    renameSessionApi(id, trimmed).then((r) =>
-      r.match(
-        () =>
-          fetchSessions().then((fr) =>
-            fr.match(
-              (list) => setSessions(list),
-              () => {}
-            )
-          ),
-        () => {}
-      )
+    void Effect.runPromise(
+      Effect.either(renameSessionApi(id, trimmed))
+    ).then((renameEither) =>
+      Either.match(renameEither, {
+        onLeft: () => {},
+        onRight: () => {
+          void Effect.runPromise(Effect.either(fetchSessions())).then(
+            (fr) =>
+              Either.match(fr, {
+                onLeft: () => {},
+                onRight: (list) => setSessions(list),
+              })
+          );
+        },
+      })
     );
   };
 
@@ -130,26 +135,34 @@ export function SessionSelector({
     if (deleteConfirmSessionId == null) return;
     const sessionId = deleteConfirmSessionId;
     setDeleteConfirmSessionId(null);
-    deleteSessionApi(sessionId).then(() => {
-      fetchSessions().then((r) =>
-        r.match(
-          (list) => {
-            setSessions(list);
-            if (sessionId === currentSessionId) {
-              const next = list[0];
-              if (next) {
-                setCurrentSessionId(next.id);
-                router.push(`/${next.id}`);
-              } else {
-                setCurrentSessionId(null);
-                router.push("/");
-              }
-            }
-          },
-          () => {}
-        )
-      );
-    });
+    void Effect.runPromise(
+      Effect.either(deleteSessionApi(sessionId))
+    ).then((delEither) =>
+      Either.match(delEither, {
+        onLeft: () => {},
+        onRight: () => {
+          void Effect.runPromise(Effect.either(fetchSessions())).then(
+            (r) =>
+              Either.match(r, {
+                onLeft: () => {},
+                onRight: (list) => {
+                  setSessions(list);
+                  if (sessionId === currentSessionId) {
+                    const next = list[0];
+                    if (next) {
+                      setCurrentSessionId(next.id);
+                      router.push(`/${next.id}`);
+                    } else {
+                      setCurrentSessionId(null);
+                      router.push("/");
+                    }
+                  }
+                },
+              })
+          );
+        },
+      })
+    );
   };
 
   const openDeleteConfirm = (sessionId: string): void => {

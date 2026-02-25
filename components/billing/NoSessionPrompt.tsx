@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect, Either } from "effect";
 import { useEffect, useState, useCallback } from "react";
 import { SquarePen, ShoppingCart } from "lucide-react";
 import { fetchTokenBalance, initiateCheckout } from "@/services/checkoutClient";
@@ -13,11 +14,11 @@ export function NoSessionPrompt(): React.ReactElement {
   const [buying, setBuying] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
-    fetchTokenBalance().then((r) =>
-      r.match(
-        (tokens) => setState(tokens > 0 ? "has_tokens" : "no_tokens"),
-        () => setState("no_tokens")
-      )
+    void Effect.runPromise(Effect.either(fetchTokenBalance())).then((either) =>
+      Either.match(either, {
+        onLeft: () => setState("no_tokens"),
+        onRight: (tokens) => setState(tokens > 0 ? "has_tokens" : "no_tokens"),
+      })
     );
   }, []);
 
@@ -27,16 +28,16 @@ export function NoSessionPrompt(): React.ReactElement {
 
   const handleBuy = async (packId: string): Promise<void> => {
     setBuying(packId);
-    const result = await initiateCheckout(packId);
-    result.match(
-      (url) => {
-        window.location.href = url;
-      },
-      (e) => {
+    const either = await Effect.runPromise(Effect.either(initiateCheckout(packId)));
+    Either.match(either, {
+      onLeft: (e) => {
         toast.error(e.message);
         setBuying(null);
-      }
-    );
+      },
+      onRight: (url) => {
+        window.location.href = url;
+      },
+    });
   };
 
   if (state === "loading") {

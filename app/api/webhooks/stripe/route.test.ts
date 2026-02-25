@@ -12,11 +12,11 @@ vi.mock("@/services/tokens", () => ({
   creditTokensForPurchase: vi.fn(),
 }));
 
+import { Effect } from "effect";
 import { POST } from "./route";
 import { getStripeClient } from "@/lib/stripe";
 import { creditTokensForPurchase } from "@/services/tokens";
 import { createServerClientInstance } from "@/lib/supabase/server";
-import { ok, err } from "neverthrow";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 import type Stripe from "stripe";
 
@@ -92,7 +92,7 @@ describe("POST /api/webhooks/stripe", () => {
     } as unknown as Stripe);
 
     mockedCreateClient.mockResolvedValue({} as ServerSupabaseClient);
-    mockedCreditTokens.mockResolvedValue(ok(15));
+    mockedCreditTokens.mockReturnValue(Effect.succeed(15));
 
     const req = new Request("http://localhost/api/webhooks/stripe", {
       method: "POST",
@@ -200,7 +200,7 @@ describe("POST /api/webhooks/stripe", () => {
     } as unknown as Stripe);
 
     mockedCreateClient.mockResolvedValue({} as ServerSupabaseClient);
-    mockedCreditTokens.mockResolvedValue(err({ message: "DB error" }));
+    mockedCreditTokens.mockReturnValue(Effect.fail({ message: "DB error" }));
 
     const req = new Request("http://localhost/api/webhooks/stripe", {
       method: "POST",

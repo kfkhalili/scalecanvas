@@ -1,3 +1,4 @@
+import { Effect, Either } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getTranscript, appendTranscriptEntry } from "@/services/sessions";
@@ -14,11 +15,13 @@ export async function GET(_request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await getTranscript(supabase, id);
-  return result.match(
-    (entries) => NextResponse.json(entries),
-    (e) => NextResponse.json({ error: e.message }, { status: 500 })
+  const either = await Effect.runPromise(
+    Effect.either(getTranscript(supabase, id))
   );
+  return Either.match(either, {
+    onLeft: (e) => NextResponse.json({ error: e.message }, { status: 500 }),
+    onRight: (entries) => NextResponse.json(entries),
+  });
 }
 
 export async function POST(request: Request, { params }: Params) {
@@ -40,14 +43,18 @@ export async function POST(request: Request, { params }: Params) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
-  const result = await appendTranscriptEntry(
-    supabase,
-    id,
-    parsed.data.role,
-    parsed.data.content
+  const either = await Effect.runPromise(
+    Effect.either(
+      appendTranscriptEntry(
+        supabase,
+        id,
+        parsed.data.role,
+        parsed.data.content
+      )
+    )
   );
-  return result.match(
-    (entry) => NextResponse.json(entry, { status: 201 }),
-    (e) => NextResponse.json({ error: e.message }, { status: 500 })
-  );
+  return Either.match(either, {
+    onLeft: (e) => NextResponse.json({ error: e.message }, { status: 500 }),
+    onRight: (entry) => NextResponse.json(entry, { status: 201 }),
+  });
 }

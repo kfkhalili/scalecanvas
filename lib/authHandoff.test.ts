@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ok, err } from "neverthrow";
+import { Effect } from "effect";
 import { runBffHandoff } from "./authHandoff";
 import { PLG_TEASER_MESSAGE } from "./plg";
 import type { CanvasState } from "@/lib/types";
@@ -19,7 +19,7 @@ describe("runBffHandoff", () => {
     const callOrder: string[] = [];
     const saveCanvasApi = vi.fn().mockImplementation(() => {
       callOrder.push("save");
-      return Promise.resolve(ok(undefined));
+      return Effect.succeed(undefined);
     });
     const setMessages = vi.fn().mockImplementation((fn: (prev: { id: string; content?: string }[]) => { id: string; content?: string }[]) => {
       callOrder.push("setMessages");
@@ -62,7 +62,7 @@ describe("runBffHandoff", () => {
   });
 
   it("calls onCanvasSaveError when saveCanvasApi returns err", async () => {
-    const saveCanvasApi = vi.fn().mockResolvedValue(err({ message: "Network error" }));
+    const saveCanvasApi = vi.fn().mockReturnValue(Effect.fail({ message: "Network error" }));
     const setMessages = vi.fn();
     const persistTranscript = vi.fn().mockResolvedValue(undefined);
     const onHandoffComplete = vi.fn();
@@ -88,7 +88,7 @@ describe("runBffHandoff", () => {
   });
 
   it("does not call onCanvasSaveError when saveCanvasApi returns ok", async () => {
-    const saveCanvasApi = vi.fn().mockResolvedValue(ok(undefined));
+    const saveCanvasApi = vi.fn().mockReturnValue(Effect.succeed(undefined));
     const onCanvasSaveError = vi.fn();
 
     await runBffHandoff({

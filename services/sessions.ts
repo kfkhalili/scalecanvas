@@ -1,4 +1,4 @@
-import { ok, err, type Result } from "neverthrow";
+import { Effect, pipe } from "effect";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 import type {
   Session,
@@ -20,150 +20,205 @@ import type {
   DbSessionSettingsUpdate,
 } from "@/lib/database.aliases";
 
-type SessionError = { message: string };
+export type SessionError = { message: string };
 
-export async function createSession(
+function toSessionError(e: { message: string }): SessionError {
+  return { message: e.message };
+}
+
+export function createSession(
   client: ServerSupabaseClient,
   userId: string,
   title?: string | null
-): Promise<Result<Session, SessionError>> {
+): Effect.Effect<Session, SessionError> {
   const insertRow: DbInterviewSessionInsert = {
     user_id: userId,
     title: title ?? null,
   };
-  const { data, error } = await client
-    .from("interview_sessions")
-    .insert(insertRow as never) // SSR client types insert as never; payload is DbInterviewSessionInsert
-    .select()
-    .single();
-  if (error) return err({ message: error.message });
-  if (!data) return err({ message: "No data returned" });
-  return ok(sessionToPublic(data as DbInterviewSession));
+  return pipe(
+    Effect.promise(() =>
+      client
+        .from("interview_sessions")
+        .insert(insertRow as never)
+        .select()
+        .single()
+    ),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail(toSessionError(error))
+        : data
+          ? Effect.succeed(sessionToPublic(data as DbInterviewSession))
+          : Effect.fail({ message: "No data returned" })
+    )
+  );
 }
 
-export async function listSessions(
+export function listSessions(
   client: ServerSupabaseClient,
   userId: string
-): Promise<Result<Session[], SessionError>> {
-  const { data, error } = await client
-    .from("interview_sessions")
-    .select()
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-  if (error) return err({ message: error.message });
-  const list = (data ?? []) as DbInterviewSession[];
-  return ok(list.map(sessionToPublic));
+): Effect.Effect<Session[], SessionError> {
+  return pipe(
+    Effect.promise(() =>
+      client
+        .from("interview_sessions")
+        .select()
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+    ),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail(toSessionError(error))
+        : Effect.succeed(
+            ((data ?? []) as DbInterviewSession[]).map(sessionToPublic)
+          )
+    )
+  );
 }
 
-export async function getSession(
+export function getSession(
   client: ServerSupabaseClient,
   sessionId: string
-): Promise<Result<Session, SessionError>> {
-  const { data, error } = await client
-    .from("interview_sessions")
-    .select()
-    .eq("id", sessionId)
-    .single();
-  if (error) return err({ message: error.message });
-  if (!data) return err({ message: "Not found" });
-  return ok(sessionToPublic(data as DbInterviewSession));
+): Effect.Effect<Session, SessionError> {
+  return pipe(
+    Effect.promise(() =>
+      client.from("interview_sessions").select().eq("id", sessionId).single()
+    ),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail(toSessionError(error))
+        : data
+          ? Effect.succeed(sessionToPublic(data as DbInterviewSession))
+          : Effect.fail({ message: "Not found" })
+    )
+  );
 }
 
-export async function updateSession(
+export function updateSession(
   client: ServerSupabaseClient,
   sessionId: string,
   fields: { title?: string | null; status?: string | null }
-): Promise<Result<Session, SessionError>> {
-  const { data, error } = await client
-    .from("interview_sessions")
-    .update(fields as never)
-    .eq("id", sessionId)
-    .select()
-    .single();
-  if (error) return err({ message: error.message });
-  if (!data) return err({ message: "Not found" });
-  return ok(sessionToPublic(data as DbInterviewSession));
+): Effect.Effect<Session, SessionError> {
+  return pipe(
+    Effect.promise(() =>
+      client
+        .from("interview_sessions")
+        .update(fields as never)
+        .eq("id", sessionId)
+        .select()
+        .single()
+    ),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail(toSessionError(error))
+        : data
+          ? Effect.succeed(sessionToPublic(data as DbInterviewSession))
+          : Effect.fail({ message: "Not found" })
+    )
+  );
 }
 
-export async function deleteSession(
+export function deleteSession(
   client: ServerSupabaseClient,
   sessionId: string
-): Promise<Result<undefined, SessionError>> {
-  const { error } = await client
-    .from("interview_sessions")
-    .delete()
-    .eq("id", sessionId);
-  if (error) return err({ message: error.message });
-  return ok(undefined);
+): Effect.Effect<undefined, SessionError> {
+  return pipe(
+    Effect.promise(() =>
+      client.from("interview_sessions").delete().eq("id", sessionId)
+    ),
+    Effect.flatMap(({ error }) =>
+      error ? Effect.fail(toSessionError(error)) : Effect.succeed(undefined)
+    )
+  );
 }
 
-export async function appendTranscriptEntry(
+export function appendTranscriptEntry(
   client: ServerSupabaseClient,
   sessionId: string,
   role: "user" | "assistant",
   content: string
-): Promise<Result<TranscriptEntry, SessionError>> {
+): Effect.Effect<TranscriptEntry, SessionError> {
   const insertRow: DbSessionTranscriptInsert = {
     session_id: sessionId,
     role,
     content,
   };
-  const { data, error } = await client
-    .from("session_transcripts")
-    .insert(insertRow as never)
-    .select()
-    .single();
-  if (error) return err({ message: error.message });
-  if (!data) return err({ message: "No data returned" });
-  return ok(transcriptToPublic(data as DbSessionTranscript));
+  return pipe(
+    Effect.promise(() =>
+      client
+        .from("session_transcripts")
+        .insert(insertRow as never)
+        .select()
+        .single()
+    ),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail(toSessionError(error))
+        : data
+          ? Effect.succeed(transcriptToPublic(data as DbSessionTranscript))
+          : Effect.fail({ message: "No data returned" })
+    )
+  );
 }
 
-export async function getTranscript(
+export function getTranscript(
   client: ServerSupabaseClient,
   sessionId: string
-): Promise<Result<TranscriptEntry[], SessionError>> {
-  const { data, error } = await client
-    .from("session_transcripts")
-    .select()
-    .eq("session_id", sessionId)
-    .order("created_at", { ascending: true });
-  if (error) return err({ message: error.message });
-  const list = (data ?? []) as DbSessionTranscript[];
-  return ok(list.map(transcriptToPublic));
+): Effect.Effect<TranscriptEntry[], SessionError> {
+  return pipe(
+    Effect.promise(() =>
+      client
+        .from("session_transcripts")
+        .select()
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true })
+    ),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail(toSessionError(error))
+        : Effect.succeed(
+            ((data ?? []) as DbSessionTranscript[]).map(transcriptToPublic)
+          )
+    )
+  );
 }
 
-export async function saveCanvasState(
+export function saveCanvasState(
   client: ServerSupabaseClient,
   sessionId: string,
   state: CanvasState
-): Promise<Result<undefined, SessionError>> {
+): Effect.Effect<undefined, SessionError> {
   const row = {
     session_id: sessionId,
     nodes: state.nodes as unknown as DbCanvasState["nodes"],
     edges: state.edges as unknown as DbCanvasState["edges"],
     viewport: state.viewport ?? null,
   };
-  const { error } = await client
-    .from("canvas_states")
-    .upsert(row as never, { onConflict: "session_id" });
-  if (error) return err({ message: error.message });
-  return ok(undefined);
+  return pipe(
+    Effect.promise(() =>
+      client.from("canvas_states").upsert(row as never, { onConflict: "session_id" })
+    ),
+    Effect.flatMap(({ error }) =>
+      error ? Effect.fail(toSessionError(error)) : Effect.succeed(undefined)
+    )
+  );
 }
 
-export async function getCanvasState(
+export function getCanvasState(
   client: ServerSupabaseClient,
   sessionId: string
-): Promise<Result<CanvasState, SessionError>> {
-  const { data, error } = await client
-    .from("canvas_states")
-    .select()
-    .eq("session_id", sessionId)
-    .maybeSingle();
-  if (error) return err({ message: error.message });
-  if (!data) {
-    return ok({ nodes: [], edges: [] });
-  }
-  return ok(canvasFromDb(data as DbCanvasState));
+): Effect.Effect<CanvasState, SessionError> {
+  return pipe(
+    Effect.promise(() =>
+      client.from("canvas_states").select().eq("session_id", sessionId).maybeSingle()
+    ),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail(toSessionError(error))
+        : data
+          ? Effect.succeed(canvasFromDb(data as DbCanvasState))
+          : Effect.succeed({ nodes: [], edges: [] })
+    )
+  );
 }
 
 function sessionSettingsFromDb(_row: DbSessionSettings): SessionSettings {
@@ -172,33 +227,44 @@ function sessionSettingsFromDb(_row: DbSessionSettings): SessionSettings {
 
 const DEFAULT_SESSION_SETTINGS: SessionSettings = {};
 
-export async function getSessionSettings(
+export function getSessionSettings(
   client: ServerSupabaseClient,
   sessionId: string
-): Promise<Result<SessionSettings, SessionError>> {
-  const { data, error } = await client
-    .from("session_settings")
-    .select()
-    .eq("session_id", sessionId)
-    .maybeSingle();
-  if (error) return err({ message: error.message });
-  if (!data) return ok(DEFAULT_SESSION_SETTINGS);
-  return ok(sessionSettingsFromDb(data as DbSessionSettings));
+): Effect.Effect<SessionSettings, SessionError> {
+  return pipe(
+    Effect.promise(() =>
+      client
+        .from("session_settings")
+        .select()
+        .eq("session_id", sessionId)
+        .maybeSingle()
+    ),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail(toSessionError(error))
+        : Effect.succeed(
+            data ? sessionSettingsFromDb(data as DbSessionSettings) : DEFAULT_SESSION_SETTINGS
+          )
+    )
+  );
 }
 
-export async function saveSessionSettings(
+export function saveSessionSettings(
   client: ServerSupabaseClient,
   sessionId: string,
-  settings: SessionSettings
-): Promise<Result<undefined, SessionError>> {
+  _settings: SessionSettings
+): Effect.Effect<undefined, SessionError> {
   const row: DbSessionSettingsInsert & DbSessionSettingsUpdate = {
     session_id: sessionId,
     auto_review_enabled: false,
     updated_at: new Date().toISOString(),
   };
-  const { error } = await client
-    .from("session_settings")
-    .upsert(row as never, { onConflict: "session_id" });
-  if (error) return err({ message: error.message });
-  return ok(undefined);
+  return pipe(
+    Effect.promise(() =>
+      client.from("session_settings").upsert(row as never, { onConflict: "session_id" })
+    ),
+    Effect.flatMap(({ error }) =>
+      error ? Effect.fail(toSessionError(error)) : Effect.succeed(undefined)
+    )
+  );
 }

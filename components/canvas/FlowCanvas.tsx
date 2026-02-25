@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, type DragEvent } from "react";
 import {
   ReactFlow,
@@ -150,7 +151,9 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       const state = getCanvasState();
-      saveCanvasApi(sessionId, state).then(() => {});
+      void Effect.runPromise(
+        Effect.either(saveCanvasApi(sessionId, state))
+      ).then(() => {});
     }, SAVE_DEBOUNCE_MS);
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);

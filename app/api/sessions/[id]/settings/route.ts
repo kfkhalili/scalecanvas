@@ -1,3 +1,4 @@
+import { Effect, Either } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import {
@@ -17,11 +18,13 @@ export async function GET(_request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await getSessionSettings(supabase, id);
-  return result.match(
-    (settings) => NextResponse.json(settings),
-    (e) => NextResponse.json({ error: e.message }, { status: 500 })
+  const either = await Effect.runPromise(
+    Effect.either(getSessionSettings(supabase, id))
   );
+  return Either.match(either, {
+    onLeft: (e) => NextResponse.json({ error: e.message }, { status: 500 }),
+    onRight: (settings) => NextResponse.json(settings),
+  });
 }
 
 export async function PATCH(request: Request, { params }: Params) {
@@ -38,17 +41,21 @@ export async function PATCH(request: Request, { params }: Params) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const result = await getSessionSettings(supabase, id);
-  if (result.isErr()) {
+  const getEither = await Effect.runPromise(
+    Effect.either(getSessionSettings(supabase, id))
+  );
+  if (Either.isLeft(getEither)) {
     return NextResponse.json(
-      { error: result.error.message },
+      { error: getEither.left.message },
       { status: 500 }
     );
   }
   const settings: SessionSettings = {};
-  const saveResult = await saveSessionSettings(supabase, id, settings);
-  return saveResult.match(
-    () => NextResponse.json(settings),
-    (e) => NextResponse.json({ error: e.message }, { status: 500 })
+  const saveEither = await Effect.runPromise(
+    Effect.either(saveSessionSettings(supabase, id, settings))
   );
+  return Either.match(saveEither, {
+    onLeft: (e) => NextResponse.json({ error: e.message }, { status: 500 }),
+    onRight: () => NextResponse.json(settings),
+  });
 }

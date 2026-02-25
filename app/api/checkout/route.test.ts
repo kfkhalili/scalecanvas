@@ -1,5 +1,5 @@
+import { Effect, Option } from "effect";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ok, err } from "neverthrow";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -93,7 +93,7 @@ describe("POST /api/checkout", () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1", email: "a@b.com" }));
     mockedGetPack.mockReturnValue(PACK);
     mockedGetPrice.mockReturnValue("price_abc");
-    mockedGetCustomer.mockResolvedValue(ok("cus_existing"));
+    mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
     const stripe = fakeStripe();
     mockedGetStripeClient.mockReturnValue(stripe as never);
 
@@ -114,8 +114,8 @@ describe("POST /api/checkout", () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1", email: "a@b.com" }));
     mockedGetPack.mockReturnValue(PACK);
     mockedGetPrice.mockReturnValue("price_abc");
-    mockedGetCustomer.mockResolvedValue(ok(null));
-    mockedSaveCustomer.mockResolvedValue(ok(undefined));
+    mockedGetCustomer.mockReturnValue(Effect.succeed(Option.none()));
+    mockedSaveCustomer.mockReturnValue(Effect.succeed(undefined));
     const stripe = fakeStripe();
     mockedGetStripeClient.mockReturnValue(stripe as never);
 
@@ -131,7 +131,7 @@ describe("POST /api/checkout", () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
     mockedGetPack.mockReturnValue(PACK);
     mockedGetPrice.mockReturnValue("price_abc");
-    mockedGetCustomer.mockResolvedValue(err({ message: "DB error" }));
+    mockedGetCustomer.mockReturnValue(Effect.fail({ message: "DB error" }));
     mockedGetStripeClient.mockReturnValue(fakeStripe() as never);
 
     const res = await POST(makeRequest({ pack_id: "pack_3" }));
@@ -144,8 +144,8 @@ describe("POST /api/checkout", () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
     mockedGetPack.mockReturnValue(PACK);
     mockedGetPrice.mockReturnValue("price_abc");
-    mockedGetCustomer.mockResolvedValue(ok(null));
-    mockedSaveCustomer.mockResolvedValue(err({ message: "save failed" }));
+    mockedGetCustomer.mockReturnValue(Effect.succeed(Option.none()));
+    mockedSaveCustomer.mockReturnValue(Effect.fail({ message: "save failed" }));
     const stripe = fakeStripe();
     mockedGetStripeClient.mockReturnValue(stripe as never);
 
@@ -159,7 +159,7 @@ describe("POST /api/checkout", () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
     mockedGetPack.mockReturnValue(PACK);
     mockedGetPrice.mockReturnValue("price_abc");
-    mockedGetCustomer.mockResolvedValue(ok("cus_existing"));
+    mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
     const stripe = fakeStripe(null);
     mockedGetStripeClient.mockReturnValue(stripe as never);
 

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -12,7 +13,6 @@ vi.mock("@/services/tokens", () => ({
 import { GET } from "./route";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getTokenBalance } from "@/services/tokens";
-import { ok, err } from "neverthrow";
 
 const mockedCreate = vi.mocked(createServerClientInstance);
 const mockedGetBalance = vi.mocked(getTokenBalance);
@@ -37,7 +37,7 @@ describe("GET /api/tokens/balance", () => {
   it("returns token balance on success", async () => {
     const client = fakeSupabase({ id: "user-1" });
     mockedCreate.mockResolvedValue(client);
-    mockedGetBalance.mockResolvedValue(ok(12));
+    mockedGetBalance.mockReturnValue(Effect.succeed(12));
     const res = await GET();
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -47,7 +47,7 @@ describe("GET /api/tokens/balance", () => {
   it("returns 500 on service error", async () => {
     const client = fakeSupabase({ id: "user-1" });
     mockedCreate.mockResolvedValue(client);
-    mockedGetBalance.mockResolvedValue(err({ message: "DB down" }));
+    mockedGetBalance.mockReturnValue(Effect.fail({ message: "DB down" }));
     const res = await GET();
     expect(res.status).toBe(500);
     const json = await res.json();

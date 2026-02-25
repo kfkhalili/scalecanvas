@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect, Either } from "effect";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
@@ -45,53 +46,60 @@ export function PostAuthRoot(): React.ReactElement {
       }
 
       if (!hasAnonymousChat) {
-        fetchSessions().then((r) =>
-          r.match(
-            (list) => {
-              if (list.length > 0) {
-                router.replace(`/${list[0].id}`);
-              }
+        void Effect.runPromise(Effect.either(fetchSessions())).then((either) =>
+          Either.match(either, {
+            onLeft: () => {},
+            onRight: (list) => {
+              if (list.length > 0) router.replace(`/${list[0].id}`);
             },
-            () => {}
-          )
+          })
         );
         return;
       }
 
       setHasAttemptedEval(false);
-      postHandoff(questionTitle).then((result) =>
-        result.match(
-          (payload) => {
+      void Effect.runPromise(
+        Effect.either(postHandoff(questionTitle))
+      ).then((handoffEither) =>
+        Either.match(handoffEither, {
+          onLeft: () => {
+            useAuthHandoffStore.getState().setAnonymousMessages([]);
+            useAuthHandoffStore.getState().setQuestionTitle(null);
+            void Effect.runPromise(Effect.either(fetchSessions())).then(
+              (either) =>
+                Either.match(either, {
+                  onLeft: () => {},
+                  onRight: (list) => {
+                    if (list.length > 0) router.replace(`/${list[0].id}`);
+                  },
+                })
+            );
+          },
+          onRight: (payload) => {
             if (payload.created && payload.session_id) {
-              if (questionTitle) renameSessionApi(payload.session_id, questionTitle);
+              if (questionTitle)
+                void Effect.runPromise(
+                  Effect.either(
+                    renameSessionApi(payload.session_id, questionTitle)
+                  )
+                );
               setPendingAuthHandoff(payload.session_id);
               router.replace(`/${payload.session_id}`);
             } else {
               useAuthHandoffStore.getState().setAnonymousMessages([]);
               useAuthHandoffStore.getState().setQuestionTitle(null);
-              fetchSessions().then((r) =>
-                r.match(
-                  (list) => {
-                    if (list.length > 0) router.replace(`/${list[0].id}`);
-                  },
-                  () => {}
-                )
+              void Effect.runPromise(Effect.either(fetchSessions())).then(
+                (either) =>
+                  Either.match(either, {
+                    onLeft: () => {},
+                    onRight: (list) => {
+                      if (list.length > 0) router.replace(`/${list[0].id}`);
+                    },
+                  })
               );
             }
           },
-          () => {
-            useAuthHandoffStore.getState().setAnonymousMessages([]);
-            useAuthHandoffStore.getState().setQuestionTitle(null);
-            fetchSessions().then((r) =>
-              r.match(
-                (list) => {
-                  if (list.length > 0) router.replace(`/${list[0].id}`);
-                },
-                () => {}
-              )
-            );
-          }
-        )
+        })
       );
     });
   }, [storesReady, router]);

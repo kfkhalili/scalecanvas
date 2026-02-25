@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect, Either } from "effect";
 import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,16 +18,16 @@ export function BuyTokensButton({ className }: BuyTokensButtonProps): React.Reac
 
   async function handlePurchase(packId: string): Promise<void> {
     setLoading(packId);
-    const result = await initiateCheckout(packId);
-    result.match(
-      (url) => {
-        window.location.href = url;
-      },
-      (e) => {
+    const either = await Effect.runPromise(Effect.either(initiateCheckout(packId)));
+    Either.match(either, {
+      onLeft: (e) => {
         toast.error(e.message);
         setLoading(null);
-      }
-    );
+      },
+      onRight: (url) => {
+        window.location.href = url;
+      },
+    });
   }
 
   return (

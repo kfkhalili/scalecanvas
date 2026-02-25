@@ -1,9 +1,14 @@
+import { Effect, Either } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getSession, updateSession, deleteSession } from "@/services/sessions";
 import { UpdateSessionBodySchema } from "@/lib/api.schemas";
 
 type Params = { params: Promise<{ id: string }> };
+
+function statusForMessage(message: string): number {
+  return message === "Not found" ? 404 : 500;
+}
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -14,15 +19,12 @@ export async function GET(_request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await getSession(supabase, id);
-  return result.match(
-    (session) => NextResponse.json(session),
-    (e) =>
-      NextResponse.json(
-        { error: e.message },
-        { status: e.message === "Not found" ? 404 : 500 }
-      )
-  );
+  const either = await Effect.runPromise(Effect.either(getSession(supabase, id)));
+  return Either.match(either, {
+    onLeft: (e) =>
+      NextResponse.json({ error: e.message }, { status: statusForMessage(e.message) }),
+    onRight: (session) => NextResponse.json(session),
+  });
 }
 
 export async function PATCH(request: Request, { params }: Params) {
@@ -44,15 +46,14 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
-  const result = await updateSession(supabase, id, { title: parsed.data.title });
-  return result.match(
-    (session) => NextResponse.json(session),
-    (e) =>
-      NextResponse.json(
-        { error: e.message },
-        { status: e.message === "Not found" ? 404 : 500 }
-      )
+  const either = await Effect.runPromise(
+    Effect.either(updateSession(supabase, id, { title: parsed.data.title }))
   );
+  return Either.match(either, {
+    onLeft: (e) =>
+      NextResponse.json({ error: e.message }, { status: statusForMessage(e.message) }),
+    onRight: (session) => NextResponse.json(session),
+  });
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
@@ -64,9 +65,11 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await deleteSession(supabase, id);
-  return result.match(
-    () => new NextResponse(null, { status: 204 }),
-    (e) => NextResponse.json({ error: e.message }, { status: 500 })
+  const either = await Effect.runPromise(
+    Effect.either(deleteSession(supabase, id))
   );
+  return Either.match(either, {
+    onLeft: (e) => NextResponse.json({ error: e.message }, { status: 500 }),
+    onRight: () => new NextResponse(null, { status: 204 }),
+  });
 }

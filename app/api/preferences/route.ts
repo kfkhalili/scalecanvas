@@ -1,3 +1,4 @@
+import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerClientInstance } from "@/lib/supabase/server";
@@ -22,7 +23,10 @@ export async function GET(): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const provider = await getNodeLibraryProvider(supabase, user.id);
+  const providerOption = await Effect.runPromise(
+    getNodeLibraryProvider(supabase, user.id)
+  );
+  const provider = Option.getOrNull(providerOption);
   return NextResponse.json({ provider });
 }
 
@@ -50,9 +54,12 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       { status: 400 }
     );
   }
-  const result = await setNodeLibraryProvider(supabase, user.id, parsed.data);
-  return result.match(
-    () => NextResponse.json({ ok: true }),
-    (e) => NextResponse.json({ error: e.message }, { status: 500 })
+  const either = await Effect.runPromise(
+    Effect.either(setNodeLibraryProvider(supabase, user.id, parsed.data))
   );
+  return Either.match(either, {
+    onLeft: (e) =>
+      NextResponse.json({ error: e.message }, { status: 500 }),
+    onRight: () => NextResponse.json({ ok: true }),
+  });
 }

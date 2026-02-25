@@ -1,3 +1,4 @@
+import { Effect, Either } from "effect";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripeClient } from "@/lib/stripe";
@@ -45,24 +46,25 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const supabase = await createServerClientInstance();
-    const result = await creditTokensForPurchase(
-      supabase,
-      metadata.user_id,
-      session.id,
-      metadata.pack_id,
-      tokens
+    const either = await Effect.runPromise(
+      Effect.either(
+        creditTokensForPurchase(
+          supabase,
+          metadata.user_id,
+          session.id,
+          metadata.pack_id,
+          tokens
+        )
+      )
     );
-
-    result.match(
-      (newBalance) => {
+    Either.match(either, {
+      onLeft: (e) =>
+        console.error("[stripe-webhook] Failed to credit tokens:", e.message),
+      onRight: (newBalance) =>
         console.log(
           `[stripe-webhook] Credited ${tokens} tokens to ${metadata.user_id}. New balance: ${newBalance}`
-        );
-      },
-      (e) => {
-        console.error("[stripe-webhook] Failed to credit tokens:", e.message);
-      }
-    );
+        ),
+    });
   }
 
   return NextResponse.json({ received: true });

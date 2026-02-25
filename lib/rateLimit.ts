@@ -1,5 +1,4 @@
-import type { Result } from "neverthrow";
-import { ok, err } from "neverthrow";
+import { Effect } from "effect";
 
 type RateLimitEntry = {
   readonly count: number;
@@ -11,7 +10,7 @@ type RateLimitConfig = {
   readonly maxRequests: number;
 };
 
-type RateLimitResult = {
+export type RateLimitResult = {
   readonly allowed: boolean;
   readonly remaining: number;
   readonly resetAt: number;
@@ -31,7 +30,7 @@ export function checkRateLimit(
   key: string,
   config: RateLimitConfig,
   now: number = Date.now()
-): Result<RateLimitResult, RateLimitResult> {
+): Effect.Effect<RateLimitResult, RateLimitResult> {
   if (store.size > 10_000) {
     pruneExpired(now);
   }
@@ -44,7 +43,7 @@ export function checkRateLimit(
       resetAt: now + config.windowMs,
     };
     store.set(key, entry);
-    return ok({
+    return Effect.succeed({
       allowed: true,
       remaining: config.maxRequests - 1,
       resetAt: entry.resetAt,
@@ -52,7 +51,7 @@ export function checkRateLimit(
   }
 
   if (existing.count >= config.maxRequests) {
-    return err({
+    return Effect.fail({
       allowed: false,
       remaining: 0,
       resetAt: existing.resetAt,
@@ -64,7 +63,7 @@ export function checkRateLimit(
     resetAt: existing.resetAt,
   };
   store.set(key, updated);
-  return ok({
+  return Effect.succeed({
     allowed: true,
     remaining: config.maxRequests - updated.count,
     resetAt: updated.resetAt,

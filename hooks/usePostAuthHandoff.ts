@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect, Either } from "effect";
 import { useEffect } from "react";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -22,11 +23,11 @@ export async function runPostAuthHandoff(
   const session = getSessionResult?.data?.session;
   if (!session || !hasAttemptedEval) return;
   setHasAttemptedEval(false);
-  const result = await deductRpc();
-  result.match(
-    (sessionId) => setPendingHandoff(sessionId),
-    () => {}
-  );
+  const either = await Effect.runPromise(Effect.either(deductRpc()));
+  Either.match(either, {
+    onLeft: () => {},
+    onRight: (sessionId) => setPendingHandoff(sessionId),
+  });
 }
 
 /**

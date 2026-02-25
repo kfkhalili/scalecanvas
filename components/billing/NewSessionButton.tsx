@@ -1,5 +1,6 @@
 "use client";
 
+import { Effect, Either } from "effect";
 import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -30,11 +31,11 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
   const [balance, setBalance] = useState<number | null>(null);
 
   const refreshBalance = useCallback(() => {
-    fetchTokenBalance().then((r) =>
-      r.match(
-        (tokens) => setBalance(tokens),
-        () => setBalance(null)
-      )
+    void Effect.runPromise(Effect.either(fetchTokenBalance())).then((either) =>
+      Either.match(either, {
+        onLeft: () => setBalance(null),
+        onRight: (tokens) => setBalance(tokens),
+      })
     );
   }, []);
 
@@ -44,9 +45,13 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
 
   const handleClick = async (): Promise<void> => {
     setDialog({ kind: "loading" });
-    const result = await fetchTokenBalance();
-    result.match(
-      (tokens) => {
+    const either = await Effect.runPromise(Effect.either(fetchTokenBalance()));
+    Either.match(either, {
+      onLeft: () => {
+        toast.error("Failed to check token balance");
+        setDialog({ kind: "closed" });
+      },
+      onRight: (tokens) => {
         setBalance(tokens);
         if (tokens > 0) {
           setDialog({ kind: "confirm", balance: tokens });
@@ -54,43 +59,41 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
           setDialog({ kind: "no_tokens" });
         }
       },
-      () => {
-        toast.error("Failed to check token balance");
-        setDialog({ kind: "closed" });
-      }
-    );
+    });
   };
 
   const handleConfirm = async (): Promise<void> => {
     setDialog({ kind: "creating" });
     const supabase = createBrowserClientInstance();
-    const result = await deductTokenAndCreateSession(supabase);
-    result.match(
-      (sessionId) => {
+    const either = await Effect.runPromise(
+      Effect.either(deductTokenAndCreateSession(supabase))
+    );
+    Either.match(either, {
+      onLeft: (e) => {
+        toast.error(e.message);
+        setDialog({ kind: "closed" });
+      },
+      onRight: (sessionId) => {
         setCurrentSessionId(sessionId);
         setBalance((prev) => (prev !== null ? prev - 1 : null));
         setDialog({ kind: "closed" });
         router.push(`/${sessionId}`);
       },
-      (e) => {
-        toast.error(e.message);
-        setDialog({ kind: "closed" });
-      }
-    );
+    });
   };
 
   const handleBuy = async (packId: string): Promise<void> => {
     setDialog({ kind: "buying", packId });
-    const result = await initiateCheckout(packId);
-    result.match(
-      (url) => {
-        window.location.href = url;
-      },
-      (e) => {
+    const either = await Effect.runPromise(Effect.either(initiateCheckout(packId)));
+    Either.match(either, {
+      onLeft: (e) => {
         toast.error(e.message);
         setDialog({ kind: "no_tokens" });
-      }
-    );
+      },
+      onRight: (url) => {
+        window.location.href = url;
+      },
+    });
   };
 
   const close = (): void => setDialog({ kind: "closed" });

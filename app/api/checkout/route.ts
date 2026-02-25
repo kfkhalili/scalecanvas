@@ -1,3 +1,4 @@
+import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getStripeClient, getPackById, getStripePriceId } from "@/lib/stripe";
@@ -41,24 +42,34 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const stripe = getStripeClient();
 
-  const existingResult = await getOrCreateStripeCustomerId(supabase, user.id);
-  let stripeCustomerId: string;
-
-  if (existingResult.isErr()) {
-    return NextResponse.json({ error: existingResult.error.message }, { status: 500 });
+  const existingEither = await Effect.runPromise(
+    Effect.either(getOrCreateStripeCustomerId(supabase, user.id))
+  );
+  if (Either.isLeft(existingEither)) {
+    return NextResponse.json(
+      { error: existingEither.left.message },
+      { status: 500 }
+    );
   }
+  const existingOption = existingEither.right;
 
-  if (existingResult.value) {
-    stripeCustomerId = existingResult.value;
+  let stripeCustomerId: string;
+  if (Option.isSome(existingOption)) {
+    stripeCustomerId = existingOption.value;
   } else {
     const customer = await stripe.customers.create({
       email: user.email ?? undefined,
       metadata: { supabase_user_id: user.id },
     });
     stripeCustomerId = customer.id;
-    const saveResult = await saveStripeCustomerId(supabase, user.id, stripeCustomerId);
-    if (saveResult.isErr()) {
-      return NextResponse.json({ error: saveResult.error.message }, { status: 500 });
+    const saveEither = await Effect.runPromise(
+      Effect.either(saveStripeCustomerId(supabase, user.id, stripeCustomerId))
+    );
+    if (Either.isLeft(saveEither)) {
+      return NextResponse.json(
+        { error: saveEither.left.message },
+        { status: 500 }
+      );
     }
   }
 

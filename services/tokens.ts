@@ -1,46 +1,78 @@
-import { ok, err, type Result } from "neverthrow";
+import { Effect, Option, pipe } from "effect";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
-type TokenError = { message: string };
+export type TokenError = { message: string };
 
-export async function getTokenBalance(
+export function getTokenBalance(
   client: ServerSupabaseClient,
   userId: string
-): Promise<Result<number, TokenError>> {
-  const { data, error } = await client
-    .from("profiles")
-    .select("tokens")
-    .eq("id", userId)
-    .single();
-  if (error) return err({ message: error.message });
-  if (!data) return err({ message: "Profile not found" });
-  return ok((data as { tokens: number }).tokens);
+): Effect.Effect<number, TokenError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        client.from("profiles").select("tokens").eq("id", userId).single(),
+      catch: (e) => ({ message: e instanceof Error ? e.message : String(e) }),
+    }),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail({ message: error.message })
+        : data == null
+          ? Effect.fail({ message: "Profile not found" })
+          : Effect.succeed((data as { tokens: number }).tokens)
+    )
+  );
 }
 
-export async function getOrCreateStripeCustomerId(
+export function getOrCreateStripeCustomerId(
   client: ServerSupabaseClient,
   userId: string
-): Promise<Result<string | null, TokenError>> {
-  const { data, error } = await client
-    .from("stripe_customers")
-    .select("stripe_customer_id")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (error) return err({ message: error.message });
-  if (!data) return ok(null);
-  return ok((data as { stripe_customer_id: string }).stripe_customer_id);
+): Effect.Effect<Option.Option<string>, TokenError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        client
+          .from("stripe_customers")
+          .select("stripe_customer_id")
+          .eq("user_id", userId)
+          .maybeSingle(),
+      catch: (e) => ({ message: e instanceof Error ? e.message : String(e) }),
+    }),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail({ message: error.message })
+        : Effect.succeed(
+            data == null
+              ? Option.none()
+              : Option.some(
+                  (data as { stripe_customer_id: string }).stripe_customer_id
+                )
+          )
+    )
+  );
 }
 
-export async function saveStripeCustomerId(
+export function saveStripeCustomerId(
   client: ServerSupabaseClient,
   userId: string,
   stripeCustomerId: string
-): Promise<Result<undefined, TokenError>> {
-  const { error } = await client
-    .from("stripe_customers")
-    .insert({ user_id: userId, stripe_customer_id: stripeCustomerId } as never);
-  if (error) return err({ message: error.message });
-  return ok(undefined);
+): Effect.Effect<void, TokenError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        client
+          .from("stripe_customers")
+          .insert({
+            user_id: userId,
+            stripe_customer_id: stripeCustomerId,
+          } as never),
+      catch: (e) => ({ message: e instanceof Error ? e.message : String(e) }),
+    }),
+    Effect.flatMap(({ error }) =>
+      error
+        ? Effect.fail({ message: error.message })
+        : Effect.succeed(undefined)
+    )
+  );
 }
 
 type RpcClient = {
@@ -50,23 +82,33 @@ type RpcClient = {
   ) => PromiseLike<{ data: unknown; error: { message?: string } | null }>;
 };
 
-export async function creditTokensForPurchase(
+export function creditTokensForPurchase(
   client: ServerSupabaseClient,
   userId: string,
   stripeSessionId: string,
   packId: string,
   tokens: number
-): Promise<Result<number, TokenError>> {
+): Effect.Effect<number, TokenError> {
   const rpcClient = client as unknown as RpcClient;
-  const { data, error } = await rpcClient.rpc("credit_tokens_for_purchase", {
-    p_user_id: userId,
-    p_stripe_session_id: stripeSessionId,
-    p_pack_id: packId,
-    p_tokens: tokens,
-  });
-  if (error) return err({ message: error.message ?? "Token credit failed" });
-  if (data == null || typeof data !== "number") {
-    return err({ message: "Unexpected response from credit_tokens_for_purchase" });
-  }
-  return ok(data);
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        rpcClient.rpc("credit_tokens_for_purchase", {
+          p_user_id: userId,
+          p_stripe_session_id: stripeSessionId,
+          p_pack_id: packId,
+          p_tokens: tokens,
+        }),
+      catch: (e) => ({ message: e instanceof Error ? e.message : String(e) }),
+    }),
+    Effect.flatMap(({ data, error }) =>
+      error
+        ? Effect.fail({ message: error.message ?? "Token credit failed" })
+        : data != null && typeof data === "number"
+          ? Effect.succeed(data)
+          : Effect.fail({
+              message: "Unexpected response from credit_tokens_for_purchase",
+            })
+    )
+  );
 }

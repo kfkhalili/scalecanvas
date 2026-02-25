@@ -1,3 +1,4 @@
+import { Effect, Either } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { claimTrialAndCreateSession } from "@/services/handoff";
@@ -24,15 +25,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const result = await claimTrialAndCreateSession(
-    supabase,
-    user.id,
-    parsed.data.question_title ?? null
+  const either = await Effect.runPromise(
+    Effect.either(
+      claimTrialAndCreateSession(
+        supabase,
+        user.id,
+        parsed.data.question_title ?? null
+      )
+    )
   );
 
-  return result.match(
-    (sessionId) =>
+  return Either.match(either, {
+    onLeft: () => NextResponse.json({ created: false }, { status: 200 }),
+    onRight: (sessionId) =>
       NextResponse.json({ created: true, session_id: sessionId }, { status: 201 }),
-    () => NextResponse.json({ created: false }, { status: 200 })
-  );
+  });
 }

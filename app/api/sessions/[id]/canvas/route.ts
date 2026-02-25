@@ -1,3 +1,4 @@
+import { Effect, Either } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getCanvasState, saveCanvasState } from "@/services/sessions";
@@ -14,11 +15,13 @@ export async function GET(_request: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await getCanvasState(supabase, id);
-  return result.match(
-    (state) => NextResponse.json(state),
-    (e) => NextResponse.json({ error: e.message }, { status: 500 })
+  const either = await Effect.runPromise(
+    Effect.either(getCanvasState(supabase, id))
   );
+  return Either.match(either, {
+    onLeft: (e) => NextResponse.json({ error: e.message }, { status: 500 }),
+    onRight: (state) => NextResponse.json(state),
+  });
 }
 
 export async function PUT(request: Request, { params }: Params) {
@@ -40,13 +43,17 @@ export async function PUT(request: Request, { params }: Params) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
-  const result = await saveCanvasState(supabase, id, {
-    nodes: parsed.data.nodes.map((n) => ({ ...n, data: n.data ?? {} })),
-    edges: parsed.data.edges,
-    viewport: parsed.data.viewport,
-  });
-  return result.match(
-    () => new NextResponse(null, { status: 204 }),
-    (e) => NextResponse.json({ error: e.message }, { status: 500 })
+  const either = await Effect.runPromise(
+    Effect.either(
+      saveCanvasState(supabase, id, {
+        nodes: parsed.data.nodes.map((n) => ({ ...n, data: n.data ?? {} })),
+        edges: parsed.data.edges,
+        viewport: parsed.data.viewport,
+      })
+    )
   );
+  return Either.match(either, {
+    onLeft: (e) => NextResponse.json({ error: e.message }, { status: 500 }),
+    onRight: () => new NextResponse(null, { status: 204 }),
+  });
 }

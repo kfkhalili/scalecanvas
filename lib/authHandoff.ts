@@ -1,3 +1,4 @@
+import { Effect, Either } from "effect";
 import { isTeaserMessage } from "@/lib/plg";
 import type { CanvasState } from "@/lib/types";
 
@@ -10,7 +11,7 @@ export type RunBffHandoffParams = {
   saveCanvasApi: (
     sessionId: string,
     state: CanvasState
-  ) => Promise<{ isOk: () => boolean }>;
+  ) => Effect.Effect<undefined, { message: string }>;
   setMessages: (fn: (prev: MessageLike[]) => MessageLike[]) => void;
   /** Persist filtered messages to the new session's transcript; called before onHandoffComplete. */
   persistTranscript: (
@@ -40,9 +41,14 @@ export async function runBffHandoff(params: RunBffHandoffParams): Promise<void> 
   } = params;
 
   const state = getCanvasState();
-  saveCanvasApi(sessionId, state).then((result) => {
-    if (!result.isOk()) onCanvasSaveError();
-  });
+  void Effect.runPromise(
+    Effect.either(saveCanvasApi(sessionId, state))
+  ).then((either) =>
+    Either.match(either, {
+      onLeft: onCanvasSaveError,
+      onRight: () => {},
+    })
+  );
 
   const filtered = messages.filter(
     (m) =>

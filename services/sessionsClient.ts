@@ -1,4 +1,4 @@
-import { ok, err, type Result } from "neverthrow";
+import { Effect, pipe } from "effect";
 import type {
   Session,
   TranscriptEntry,
@@ -7,64 +7,131 @@ import type {
 } from "@/lib/types";
 import type { ApiErrorResponse, SessionApiPostBody } from "@/lib/api.types";
 
-type ApiError = { message: string };
+export type ApiError = { message: string };
 
 function parseErrorResponse(data: ApiErrorResponse): string {
   return data.error ?? "Unknown error";
 }
 
-async function apiGet<T>(path: string): Promise<Result<T, ApiError>> {
-  const res = await fetch(path, { credentials: "include" });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-    return err({ message: parseErrorResponse(data) || res.statusText });
-  }
-  const data = (await res.json()) as T;
-  return ok(data);
+function apiGet<T>(path: string): Effect.Effect<T, ApiError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () => fetch(path, { credentials: "include" }),
+      catch: (e) => ({
+        message: e instanceof Error ? e.message : "Network error",
+      }),
+    }),
+    Effect.flatMap((res) =>
+      res.ok
+        ? Effect.tryPromise({
+            try: () => res.json() as Promise<T>,
+            catch: (e) => ({
+              message: e instanceof Error ? e.message : "Parse error",
+            }),
+          })
+        : Effect.tryPromise({
+            try: () =>
+              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
+            catch: () => ({ message: res.statusText || "Request failed" }),
+          }).pipe(
+            Effect.flatMap((data) =>
+              Effect.fail({ message: parseErrorResponse(data) || res.statusText })
+            )
+          )
+    )
+  );
 }
 
-async function apiPost<T>(
+function apiPost<T>(
   path: string,
   body: SessionApiPostBody
-): Promise<Result<T, ApiError>> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    credentials: "include",
-  });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-    return err({ message: parseErrorResponse(data) || res.statusText });
-  }
-  const data = (await res.json()) as T;
-  return ok(data);
+): Effect.Effect<T, ApiError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          credentials: "include",
+        }),
+      catch: (e) => ({
+        message: e instanceof Error ? e.message : "Network error",
+      }),
+    }),
+    Effect.flatMap((res) =>
+      res.ok
+        ? Effect.tryPromise({
+            try: () => res.json() as Promise<T>,
+            catch: (e) => ({
+              message: e instanceof Error ? e.message : "Parse error",
+            }),
+          })
+        : Effect.tryPromise({
+            try: () =>
+              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
+            catch: () => ({ message: res.statusText || "Request failed" }),
+          }).pipe(
+            Effect.flatMap((data) =>
+              Effect.fail({ message: parseErrorResponse(data) || res.statusText })
+            )
+          )
+    )
+  );
 }
 
-async function apiPut(
-  path: string,
-  body: CanvasState
-): Promise<Result<undefined, ApiError>> {
-  const res = await fetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    credentials: "include",
-  });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-    return err({ message: parseErrorResponse(data) || res.statusText });
-  }
-  return ok(undefined);
+function apiPut(path: string, body: CanvasState): Effect.Effect<undefined, ApiError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        fetch(path, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          credentials: "include",
+        }),
+      catch: (e) => ({
+        message: e instanceof Error ? e.message : "Network error",
+      }),
+    }),
+    Effect.flatMap((res) =>
+      res.ok
+        ? Effect.succeed(undefined)
+        : Effect.tryPromise({
+            try: () =>
+              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
+            catch: () => ({ message: res.statusText || "Request failed" }),
+          }).pipe(
+            Effect.flatMap((data) =>
+              Effect.fail({ message: parseErrorResponse(data) || res.statusText })
+            )
+          )
+    )
+  );
 }
 
-async function apiDelete(path: string): Promise<Result<undefined, ApiError>> {
-  const res = await fetch(path, { method: "DELETE", credentials: "include" });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-    return err({ message: parseErrorResponse(data) || res.statusText });
-  }
-  return ok(undefined);
+function apiDelete(path: string): Effect.Effect<undefined, ApiError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () => fetch(path, { method: "DELETE", credentials: "include" }),
+      catch: (e) => ({
+        message: e instanceof Error ? e.message : "Network error",
+      }),
+    }),
+    Effect.flatMap((res) =>
+      res.ok
+        ? Effect.succeed(undefined)
+        : Effect.tryPromise({
+            try: () =>
+              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
+            catch: () => ({ message: res.statusText || "Request failed" }),
+          }).pipe(
+            Effect.flatMap((data) =>
+              Effect.fail({ message: parseErrorResponse(data) || res.statusText })
+            )
+          )
+    )
+  );
 }
 
 function sessionsPath(): string {
@@ -72,103 +139,144 @@ function sessionsPath(): string {
   return `${window.location.origin}/api/sessions`;
 }
 
-export async function fetchSessions(): Promise<Result<Session[], ApiError>> {
+export function fetchSessions(): Effect.Effect<Session[], ApiError> {
   return apiGet<Session[]>(sessionsPath());
 }
 
-export async function createSessionApi(
+export function createSessionApi(
   title?: string | null
-): Promise<Result<Session, ApiError>> {
+): Effect.Effect<Session, ApiError> {
   return apiPost<Session>(sessionsPath(), { title: title ?? null });
 }
 
-export async function fetchSession(
+export function fetchSession(
   sessionId: string
-): Promise<Result<Session, ApiError>> {
+): Effect.Effect<Session, ApiError> {
   return apiGet<Session>(`${sessionsPath()}/${sessionId}`);
 }
 
-export async function renameSessionApi(
+export function renameSessionApi(
   sessionId: string,
   title: string
-): Promise<Result<Session, ApiError>> {
-  const res = await fetch(`${sessionsPath()}/${sessionId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
-    credentials: "include",
-  });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-    return err({ message: parseErrorResponse(data) || res.statusText });
-  }
-  const data = (await res.json()) as Session;
-  return ok(data);
+): Effect.Effect<Session, ApiError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        fetch(`${sessionsPath()}/${sessionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+          credentials: "include",
+        }),
+      catch: (e) => ({
+        message: e instanceof Error ? e.message : "Network error",
+      }),
+    }),
+    Effect.flatMap((res) =>
+      res.ok
+        ? Effect.tryPromise({
+            try: () => res.json() as Promise<Session>,
+            catch: (e) => ({
+              message: e instanceof Error ? e.message : "Parse error",
+            }),
+          })
+        : Effect.tryPromise({
+            try: () =>
+              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
+            catch: () => ({ message: res.statusText || "Request failed" }),
+          }).pipe(
+            Effect.flatMap((data) =>
+              Effect.fail({
+                message: parseErrorResponse(data) || res.statusText,
+              })
+            )
+          )
+    )
+  );
 }
 
-export async function deleteSessionApi(
+export function deleteSessionApi(
   sessionId: string
-): Promise<Result<undefined, ApiError>> {
+): Effect.Effect<undefined, ApiError> {
   return apiDelete(`${sessionsPath()}/${sessionId}`);
 }
 
-export async function fetchTranscript(
+export function fetchTranscript(
   sessionId: string
-): Promise<Result<TranscriptEntry[], ApiError>> {
+): Effect.Effect<TranscriptEntry[], ApiError> {
   return apiGet<TranscriptEntry[]>(
     `${sessionsPath()}/${sessionId}/transcript`
   );
 }
 
-export async function appendTranscriptApi(
+export function appendTranscriptApi(
   sessionId: string,
   role: "user" | "assistant",
   content: string
-): Promise<Result<TranscriptEntry, ApiError>> {
+): Effect.Effect<TranscriptEntry, ApiError> {
   return apiPost<TranscriptEntry>(
     `${sessionsPath()}/${sessionId}/transcript`,
     { role, content }
   );
 }
 
-export async function fetchCanvas(
+export function fetchCanvas(
   sessionId: string
-): Promise<Result<CanvasState, ApiError>> {
+): Effect.Effect<CanvasState, ApiError> {
   return apiGet<CanvasState>(`${sessionsPath()}/${sessionId}/canvas`);
 }
 
-export async function saveCanvasApi(
+export function saveCanvasApi(
   sessionId: string,
   state: CanvasState
-): Promise<Result<undefined, ApiError>> {
+): Effect.Effect<undefined, ApiError> {
   return apiPut(`${sessionsPath()}/${sessionId}/canvas`, state);
 }
 
-export async function fetchSessionSettings(
+export function fetchSessionSettings(
   sessionId: string
-): Promise<Result<SessionSettings, ApiError>> {
+): Effect.Effect<SessionSettings, ApiError> {
   return apiGet<SessionSettings>(
     `${sessionsPath()}/${sessionId}/settings`
   );
 }
 
-export async function saveSessionSettingsApi(
+export function saveSessionSettingsApi(
   sessionId: string,
   settings: SessionSettings
-): Promise<Result<SessionSettings, ApiError>> {
-  const res = await fetch(
-    `${sessionsPath()}/${sessionId}/settings`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-      credentials: "include",
-    }
+): Effect.Effect<SessionSettings, ApiError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        fetch(`${sessionsPath()}/${sessionId}/settings`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(settings),
+          credentials: "include",
+        }),
+      catch: (e) => ({
+        message: e instanceof Error ? e.message : "Network error",
+      }),
+    }),
+    Effect.flatMap((res) =>
+      res.ok
+        ? Effect.tryPromise({
+            try: () => res.json() as Promise<SessionSettings>,
+            catch: (e) => ({
+              message: e instanceof Error ? e.message : "Parse error",
+            }),
+          })
+        : Effect.tryPromise({
+            try: () =>
+              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
+            catch: () => ({ message: res.statusText || "Request failed" }),
+          }).pipe(
+            Effect.flatMap((data) =>
+              Effect.fail({
+                message: data.error ?? res.statusText,
+              })
+            )
+          )
+    )
   );
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-    return err({ message: data.error ?? res.statusText });
-  }
-  const data = (await res.json()) as SessionSettings;
-  return ok(data);
 }

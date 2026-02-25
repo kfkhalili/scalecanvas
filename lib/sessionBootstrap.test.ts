@@ -1,5 +1,5 @@
+import { Effect } from "effect";
 import { describe, it, expect, vi } from "vitest";
-import { ok, err } from "neverthrow";
 import {
   decideBootstrapAction,
   executeBootstrapAction,
@@ -31,8 +31,8 @@ function mockSession(id: string): Session {
 
 function mockDeps(overrides: Partial<BootstrapDeps> = {}): BootstrapDeps {
   return {
-    fetchSessions: vi.fn().mockResolvedValue(ok([])),
-    deductTokenAndCreateSession: vi.fn().mockResolvedValue(ok("deducted-1")),
+    fetchSessions: vi.fn().mockReturnValue(Effect.succeed([])),
+    deductTokenAndCreateSession: vi.fn().mockReturnValue(Effect.succeed("deducted-1")),
     renameSession: vi.fn().mockResolvedValue(undefined),
     setPendingAuthHandoff: vi.fn(),
     setHasAttemptedEval: vi.fn(),
@@ -72,7 +72,7 @@ describe("executeBootstrapAction", () => {
 
   it("resume_or_idle: redirects to most recent session when sessions exist", async () => {
     const deps = mockDeps({
-      fetchSessions: vi.fn().mockResolvedValue(ok([mockSession("s-recent")])),
+      fetchSessions: vi.fn().mockReturnValue(Effect.succeed([mockSession("s-recent")])),
     });
     await executeBootstrapAction({ type: "resume_or_idle" }, ctx(), deps);
     expect(deps.redirectTo).toHaveBeenCalledWith("/s-recent");
@@ -80,7 +80,7 @@ describe("executeBootstrapAction", () => {
 
   it("resume_or_idle: does nothing when no sessions exist", async () => {
     const deps = mockDeps({
-      fetchSessions: vi.fn().mockResolvedValue(ok([])),
+      fetchSessions: vi.fn().mockReturnValue(Effect.succeed([])),
     });
     await executeBootstrapAction({ type: "resume_or_idle" }, ctx(), deps);
     expect(deps.redirectTo).not.toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe("executeBootstrapAction", () => {
 
   it("resume_or_idle: does nothing on fetch error", async () => {
     const deps = mockDeps({
-      fetchSessions: vi.fn().mockResolvedValue(err({ message: "fail" })),
+      fetchSessions: vi.fn().mockReturnValue(Effect.fail({ message: "fail" })),
     });
     await executeBootstrapAction({ type: "resume_or_idle" }, ctx(), deps);
     expect(deps.redirectTo).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe("executeBootstrapAction", () => {
 
   it("deduct_and_handoff: does nothing on deduction error", async () => {
     const deps = mockDeps({
-      deductTokenAndCreateSession: vi.fn().mockResolvedValue(err({ message: "no tokens" })),
+      deductTokenAndCreateSession: vi.fn().mockReturnValue(Effect.fail({ message: "no tokens" })),
     });
     const c = ctx({ hasAnonymousChat: true, hasAttemptedEval: true });
     await executeBootstrapAction({ type: "deduct_and_handoff" }, c, deps);

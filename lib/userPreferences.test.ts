@@ -1,3 +1,4 @@
+import { Effect, Option } from "effect";
 import { describe, it, expect, vi } from "vitest";
 import {
   getNodeLibraryProvider,
@@ -27,18 +28,22 @@ function mockPrefsClient(overrides: {
 }
 
 describe("getNodeLibraryProvider", () => {
-  it("returns null when no row exists", async () => {
+  it("returns None when no row exists", async () => {
     const client = mockPrefsClient({ maybeSingle: { data: null, error: null } });
-    const result = await getNodeLibraryProvider(client, "user-1");
-    expect(result).toBeNull();
+    const option = await Effect.runPromise(
+      getNodeLibraryProvider(client, "user-1")
+    );
+    expect(Option.isNone(option)).toBe(true);
   });
 
-  it("returns stored value when row exists", async () => {
+  it("returns Some(stored value) when row exists", async () => {
     const client = mockPrefsClient({
       maybeSingle: { data: { value: "aws" }, error: null },
     });
-    const result = await getNodeLibraryProvider(client, "user-1");
-    expect(result).toBe("aws");
+    const option = await Effect.runPromise(
+      getNodeLibraryProvider(client, "user-1")
+    );
+    expect(Option.getOrNull(option)).toBe("aws");
   });
 });
 
@@ -65,10 +70,13 @@ describe("setNodeLibraryProvider", () => {
       from: vi.fn().mockReturnValue(chain),
     } as unknown as ServerSupabaseClient;
 
-    const setResult = await setNodeLibraryProvider(client, "user-1", "aws");
-    expect(setResult.isOk()).toBe(true);
+    await Effect.runPromise(
+      setNodeLibraryProvider(client, "user-1", "aws")
+    );
 
-    const getResult = await getNodeLibraryProvider(client, "user-1");
-    expect(getResult).toBe("aws");
+    const getOption = await Effect.runPromise(
+      getNodeLibraryProvider(client, "user-1")
+    );
+    expect(Option.getOrNull(getOption)).toBe("aws");
   });
 });

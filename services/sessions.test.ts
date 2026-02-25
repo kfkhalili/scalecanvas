@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { Effect, Either } from "effect";
 import {
   createSession,
   listSessions,
@@ -87,6 +88,10 @@ function asServerSupabaseClient(
   return mock as ServerSupabaseClient;
 }
 
+async function runEffect<A, E>(effect: Effect.Effect<A, E>): Promise<Either.Either<A, E>> {
+  return Effect.runPromise(Effect.either(effect));
+}
+
 describe("createSession", () => {
   it("returns ok(Session) when insert succeeds", async () => {
     const dbRow = {
@@ -101,24 +106,24 @@ describe("createSession", () => {
     const client = mockSupabaseClient({
       insertSingle: { data: dbRow, error: null },
     });
-    const result = await createSession(client, "user-1", "New");
-    expect(result.isOk()).toBe(true);
-    result.match(
-      (s) => {
+    const result = await runEffect(createSession(client, "user-1", "New"));
+    expect(Either.isRight(result)).toBe(true);
+    Either.match(result, {
+      onLeft: () => {},
+      onRight: (s) => {
         expect(s.id).toBe("sess-1");
         expect(s.userId).toBe("user-1");
         expect(s.title).toBe("New");
       },
-      () => {}
-    );
+    });
   });
 
   it("returns err when insert fails", async () => {
     const client = mockSupabaseClient({
       insertSingle: { data: null, error: { message: "DB error" } },
     });
-    const result = await createSession(client, "user-1", "New");
-    expect(result.isErr()).toBe(true);
+    const result = await runEffect(createSession(client, "user-1", "New"));
+    expect(Either.isLeft(result)).toBe(true);
   });
 });
 
@@ -138,15 +143,15 @@ describe("listSessions", () => {
     const client = mockSupabaseClient({
       selectEqOrder: { data: dbRows, error: null },
     });
-    const result = await listSessions(client, "user-1");
-    expect(result.isOk()).toBe(true);
-    result.match(
-      (list) => {
+    const result = await runEffect(listSessions(client, "user-1"));
+    expect(Either.isRight(result)).toBe(true);
+    Either.match(result, {
+      onLeft: () => {},
+      onRight: (list) => {
         expect(list).toHaveLength(1);
         expect(list[0].title).toBe("A");
       },
-      () => {}
-    );
+    });
   });
 });
 
@@ -164,12 +169,12 @@ describe("getSession", () => {
     const client = mockSupabaseClient({
       selectEqSingle: { data: dbRow, error: null },
     });
-    const result = await getSession(client, "sess-1");
-    expect(result.isOk()).toBe(true);
-    result.match(
-      (s) => expect(s.id).toBe("sess-1"),
-      () => {}
-    );
+    const result = await runEffect(getSession(client, "sess-1"));
+    expect(Either.isRight(result)).toBe(true);
+    Either.match(result, {
+      onLeft: () => {},
+      onRight: (s) => expect(s.id).toBe("sess-1"),
+    });
   });
 });
 
@@ -178,8 +183,8 @@ describe("deleteSession", () => {
     const client = mockSupabaseClient({
       deleteEq: { error: null },
     });
-    const result = await deleteSession(client, "sess-1");
-    expect(result.isOk()).toBe(true);
+    const result = await runEffect(deleteSession(client, "sess-1"));
+    expect(Either.isRight(result)).toBe(true);
   });
 });
 
@@ -188,14 +193,14 @@ describe("getSessionSettings", () => {
     const client = mockSupabaseClient({
       sessionSettingsSelect: { data: null, error: null },
     });
-    const result = await getSessionSettings(client, "sess-1");
-    expect(result.isOk()).toBe(true);
-    result.match(
-      (s) => {
+    const result = await runEffect(getSessionSettings(client, "sess-1"));
+    expect(Either.isRight(result)).toBe(true);
+    Either.match(result, {
+      onLeft: () => {},
+      onRight: (s) => {
         expect(s).toEqual({});
       },
-      () => {}
-    );
+    });
   });
 
   it("returns empty settings when row exists", async () => {
@@ -209,22 +214,22 @@ describe("getSessionSettings", () => {
         error: null,
       },
     });
-    const result = await getSessionSettings(client, "sess-1");
-    expect(result.isOk()).toBe(true);
-    result.match(
-      (s) => {
+    const result = await runEffect(getSessionSettings(client, "sess-1"));
+    expect(Either.isRight(result)).toBe(true);
+    Either.match(result, {
+      onLeft: () => {},
+      onRight: (s) => {
         expect(s).toEqual({});
       },
-      () => {}
-    );
+    });
   });
 
   it("returns err when select fails", async () => {
     const client = mockSupabaseClient({
       sessionSettingsSelect: { data: null, error: { message: "DB error" } },
     });
-    const result = await getSessionSettings(client, "sess-1");
-    expect(result.isErr()).toBe(true);
+    const result = await runEffect(getSessionSettings(client, "sess-1"));
+    expect(Either.isLeft(result)).toBe(true);
   });
 });
 
@@ -233,15 +238,15 @@ describe("saveSessionSettings", () => {
     const client = mockSupabaseClient({
       sessionSettingsUpsert: { error: null },
     });
-    const result = await saveSessionSettings(client, "sess-1", {});
-    expect(result.isOk()).toBe(true);
+    const result = await runEffect(saveSessionSettings(client, "sess-1", {}));
+    expect(Either.isRight(result)).toBe(true);
   });
 
   it("returns err when upsert fails", async () => {
     const client = mockSupabaseClient({
       sessionSettingsUpsert: { error: { message: "DB error" } },
     });
-    const result = await saveSessionSettings(client, "sess-1", {});
-    expect(result.isErr()).toBe(true);
+    const result = await runEffect(saveSessionSettings(client, "sess-1", {}));
+    expect(Either.isLeft(result)).toBe(true);
   });
 });

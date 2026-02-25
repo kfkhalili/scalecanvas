@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { Effect, Either } from "effect";
 import { postHandoff } from "./handoffClient";
 
 const originalFetch = globalThis.fetch;
@@ -6,6 +7,12 @@ const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
+
+async function runEffect<A, E>(
+  effect: Effect.Effect<A, E>
+): Promise<Either.Either<A, E>> {
+  return Effect.runPromise(Effect.either(effect));
+}
 
 describe("postHandoff", () => {
   it("returns created true and session_id on 201", async () => {
@@ -15,10 +22,10 @@ describe("postHandoff", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await postHandoff("URL Shortener");
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value).toEqual({ created: true, session_id: "session-xyz" });
+    const result = await runEffect(postHandoff("URL Shortener"));
+    expect(Either.isRight(result)).toBe(true);
+    if (Either.isRight(result)) {
+      expect(result.right).toEqual({ created: true, session_id: "session-xyz" });
     }
   });
 
@@ -29,9 +36,9 @@ describe("postHandoff", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await postHandoff(null);
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) expect(result.value).toEqual({ created: false });
+    const result = await runEffect(postHandoff(null));
+    expect(Either.isRight(result)).toBe(true);
+    if (Either.isRight(result)) expect(result.right).toEqual({ created: false });
   });
 
   it("returns err on 401", async () => {
@@ -41,9 +48,9 @@ describe("postHandoff", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await postHandoff();
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) expect(result.error.message).toBe("Unauthorized");
+    const result = await runEffect(postHandoff());
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isLeft(result)) expect(result.left.message).toBe("Unauthorized");
   });
 
   it("sends question_title in body", async () => {
@@ -54,7 +61,7 @@ describe("postHandoff", () => {
       })
     );
     globalThis.fetch = mockFetch;
-    await postHandoff("My Question");
+    await Effect.runPromise(Effect.either(postHandoff("My Question")));
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/auth/handoff",
       expect.objectContaining({

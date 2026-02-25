@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ok, err } from "neverthrow";
+import { Effect } from "effect";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -44,7 +44,7 @@ describe("POST /api/auth/handoff", () => {
 
   it("returns 201 and session_id when trial claimed", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedClaimTrial.mockResolvedValue(ok("session-123"));
+    mockedClaimTrial.mockReturnValue(Effect.succeed("session-123"));
     const res = await POST(makeRequest({ question_title: "URL Shortener" }));
     expect(res.status).toBe(201);
     const json = await res.json();
@@ -58,7 +58,9 @@ describe("POST /api/auth/handoff", () => {
 
   it("returns 200 and created false when trial already claimed", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedClaimTrial.mockResolvedValue(err({ message: "Trial already claimed" }));
+    mockedClaimTrial.mockReturnValue(
+      Effect.fail({ message: "Trial already claimed" })
+    );
     const res = await POST(makeRequest({}));
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -78,7 +80,7 @@ describe("POST /api/auth/handoff", () => {
 
   it("accepts empty body", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedClaimTrial.mockResolvedValue(ok("session-456"));
+    mockedClaimTrial.mockReturnValue(Effect.succeed("session-456"));
     const res = await POST(makeRequest({}));
     expect(res.status).toBe(201);
     expect(mockedClaimTrial).toHaveBeenCalledWith(expect.anything(), "user-1", null);
