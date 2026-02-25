@@ -1,4 +1,4 @@
-import { Effect, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 import type {
   Session,
@@ -29,11 +29,11 @@ function toSessionError(e: { message: string }): SessionError {
 export function createSession(
   client: ServerSupabaseClient,
   userId: string,
-  title?: string | null
+  titleOpt: Option.Option<string> = Option.none()
 ): Effect.Effect<Session, SessionError> {
   const insertRow: DbInterviewSessionInsert = {
     user_id: userId,
-    title: title ?? null,
+    title: Option.getOrNull(titleOpt),
   };
   return pipe(
     Effect.promise(() =>
@@ -93,16 +93,33 @@ export function getSession(
   );
 }
 
+/** Session update fields in Option form; adapter converts to DB shape. */
+export type SessionUpdateFields = {
+  titleOpt: Option.Option<string>;
+  statusOpt?: Option.Option<string>;
+};
+
+function toSessionUpdateDbFields(fields: SessionUpdateFields): {
+  title?: string | null;
+  status?: string | null;
+} {
+  return {
+    title: Option.getOrNull(fields.titleOpt),
+    status: Option.getOrNull(fields.statusOpt ?? Option.none()),
+  };
+}
+
 export function updateSession(
   client: ServerSupabaseClient,
   sessionId: string,
-  fields: { title?: string | null; status?: string | null }
+  fields: SessionUpdateFields
 ): Effect.Effect<Session, SessionError> {
+  const dbFields = toSessionUpdateDbFields(fields);
   return pipe(
     Effect.promise(() =>
       client
         .from("interview_sessions")
-        .update(fields as never)
+        .update(dbFields as never)
         .eq("id", sessionId)
         .select()
         .single()
@@ -182,17 +199,25 @@ export function getTranscript(
   );
 }
 
-export function saveCanvasState(
-  client: ServerSupabaseClient,
+/** Single place we convert optional viewport to DB shape (viewport: null when absent). */
+function toCanvasDbInsert(
   sessionId: string,
   state: CanvasState
-): Effect.Effect<undefined, SessionError> {
-  const row = {
+): { session_id: string; nodes: DbCanvasState["nodes"]; edges: DbCanvasState["edges"]; viewport: DbCanvasState["viewport"] } {
+  return {
     session_id: sessionId,
     nodes: state.nodes as unknown as DbCanvasState["nodes"],
     edges: state.edges as unknown as DbCanvasState["edges"],
     viewport: state.viewport ?? null,
   };
+}
+
+export function saveCanvasState(
+  client: ServerSupabaseClient,
+  sessionId: string,
+  state: CanvasState
+): Effect.Effect<undefined, SessionError> {
+  const row = toCanvasDbInsert(sessionId, state);
   return pipe(
     Effect.promise(() =>
       client.from("canvas_states").upsert(row as never, { onConflict: "session_id" })
@@ -216,7 +241,7 @@ export function getCanvasState(
         ? Effect.fail(toSessionError(error))
         : data
           ? Effect.succeed(canvasFromDb(data as DbCanvasState))
-          : Effect.succeed({ nodes: [], edges: [] })
+          : Effect.succeed({ nodes: [], edges: [] } as CanvasState)
     )
   );
 }
@@ -243,7 +268,9 @@ export function getSessionSettings(
       error
         ? Effect.fail(toSessionError(error))
         : Effect.succeed(
-            data ? sessionSettingsFromDb(data as DbSessionSettings) : DEFAULT_SESSION_SETTINGS
+            data
+              ? sessionSettingsFromDb(data as DbSessionSettings)
+              : DEFAULT_SESSION_SETTINGS
           )
     )
   );

@@ -26,7 +26,7 @@ export function deductTokenAndCreateSession(
     Effect.flatMap(({ data, error }) =>
       error
         ? Effect.fail({ message: error.message ?? "Token deduction failed" })
-        : data != null && typeof data === "string"
+        : typeof data === "string"
           ? Effect.succeed(data)
           : Effect.fail({ message: "No session_id returned" })
     )

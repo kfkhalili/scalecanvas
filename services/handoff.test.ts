@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { claimTrialAndCreateSession } from "./handoff";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -24,7 +24,7 @@ describe("claimTrialAndCreateSession", () => {
       vi.fn().mockResolvedValue({ data: "session-abc", error: null })
     );
     const result = await runEffect(
-      claimTrialAndCreateSession(client, "user-1", "URL Shortener")
+      claimTrialAndCreateSession(client, "user-1", Option.some("URL Shortener"))
     );
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) expect(result.right).toBe("session-abc");
@@ -38,7 +38,7 @@ describe("claimTrialAndCreateSession", () => {
       })
     );
     const result = await runEffect(
-      claimTrialAndCreateSession(client, "user-1", null)
+      claimTrialAndCreateSession(client, "user-1", Option.none())
     );
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result))
@@ -49,7 +49,9 @@ describe("claimTrialAndCreateSession", () => {
     const client = asClient(
       vi.fn().mockResolvedValue({ data: 123, error: null })
     );
-    const result = await runEffect(claimTrialAndCreateSession(client, "user-1"));
+    const result = await runEffect(
+      claimTrialAndCreateSession(client, "user-1", Option.none())
+    );
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result))
       expect(result.left.message).toBe("No session_id returned");
@@ -59,7 +61,9 @@ describe("claimTrialAndCreateSession", () => {
     const rpc = vi.fn().mockResolvedValue({ data: "sid", error: null });
     const client = asClient(rpc);
     await Effect.runPromise(
-      Effect.either(claimTrialAndCreateSession(client, "user-1", "My Question"))
+      Effect.either(
+        claimTrialAndCreateSession(client, "user-1", Option.some("My Question"))
+      )
     );
     expect(rpc).toHaveBeenCalledWith("claim_trial_and_create_session", {
       p_title: "My Question",

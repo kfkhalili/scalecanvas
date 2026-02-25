@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { postHandoff } from "./handoffClient";
 
 const originalFetch = globalThis.fetch;
@@ -22,7 +22,7 @@ describe("postHandoff", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await runEffect(postHandoff("URL Shortener"));
+    const result = await runEffect(postHandoff(Option.some("URL Shortener")));
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) {
       expect(result.right).toEqual({ created: true, session_id: "session-xyz" });
@@ -36,7 +36,7 @@ describe("postHandoff", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await runEffect(postHandoff(null));
+    const result = await runEffect(postHandoff(Option.none()));
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) expect(result.right).toEqual({ created: false });
   });
@@ -48,7 +48,7 @@ describe("postHandoff", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await runEffect(postHandoff());
+    const result = await runEffect(postHandoff(Option.none()));
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) expect(result.left.message).toBe("Unauthorized");
   });
@@ -61,7 +61,7 @@ describe("postHandoff", () => {
       })
     );
     globalThis.fetch = mockFetch;
-    await Effect.runPromise(Effect.either(postHandoff("My Question")));
+    await Effect.runPromise(Effect.either(postHandoff(Option.some("My Question"))));
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/auth/handoff",
       expect.objectContaining({

@@ -1,4 +1,4 @@
-import { Effect, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
 export type HandoffError = { message: string };
@@ -17,14 +17,14 @@ type RpcClient = {
 export function claimTrialAndCreateSession(
   client: ServerSupabaseClient,
   _userId: string,
-  title?: string | null
+  titleOpt: Option.Option<string> = Option.none()
 ): Effect.Effect<string, HandoffError> {
   const rpcClient = client as unknown as RpcClient;
   return pipe(
     Effect.tryPromise({
       try: () =>
         rpcClient.rpc("claim_trial_and_create_session", {
-          p_title: title ?? null,
+          p_title: Option.getOrNull(titleOpt),
         }),
       catch: (e) => ({
         message: e instanceof Error ? e.message : String(e),
@@ -36,10 +36,9 @@ export function claimTrialAndCreateSession(
           message: error.message ?? "Trial claim failed",
         });
       }
-      if (data == null || typeof data !== "string") {
-        return Effect.fail({ message: "No session_id returned" });
-      }
-      return Effect.succeed(data);
+      return typeof data === "string"
+        ? Effect.succeed(data)
+        : Effect.fail({ message: "No session_id returned" });
     })
   );
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
+import { whenRight } from "@/lib/optionHelpers";
 import {
   createSession,
   listSessions,
@@ -106,15 +107,12 @@ describe("createSession", () => {
     const client = mockSupabaseClient({
       insertSingle: { data: dbRow, error: null },
     });
-    const result = await runEffect(createSession(client, "user-1", "New"));
+    const result = await runEffect(createSession(client, "user-1", Option.some("New")));
     expect(Either.isRight(result)).toBe(true);
-    Either.match(result, {
-      onLeft: () => {},
-      onRight: (s) => {
-        expect(s.id).toBe("sess-1");
-        expect(s.userId).toBe("user-1");
-        expect(s.title).toBe("New");
-      },
+    whenRight(result, (s) => {
+      expect(s.id).toBe("sess-1");
+      expect(s.userId).toBe("user-1");
+      expect(s.title).toBe("New");
     });
   });
 
@@ -122,7 +120,7 @@ describe("createSession", () => {
     const client = mockSupabaseClient({
       insertSingle: { data: null, error: { message: "DB error" } },
     });
-    const result = await runEffect(createSession(client, "user-1", "New"));
+    const result = await runEffect(createSession(client, "user-1", Option.some("New")));
     expect(Either.isLeft(result)).toBe(true);
   });
 });
@@ -145,12 +143,9 @@ describe("listSessions", () => {
     });
     const result = await runEffect(listSessions(client, "user-1"));
     expect(Either.isRight(result)).toBe(true);
-    Either.match(result, {
-      onLeft: () => {},
-      onRight: (list) => {
-        expect(list).toHaveLength(1);
-        expect(list[0].title).toBe("A");
-      },
+    whenRight(result, (list) => {
+      expect(list).toHaveLength(1);
+      expect(list[0].title).toBe("A");
     });
   });
 });
@@ -171,10 +166,7 @@ describe("getSession", () => {
     });
     const result = await runEffect(getSession(client, "sess-1"));
     expect(Either.isRight(result)).toBe(true);
-    Either.match(result, {
-      onLeft: () => {},
-      onRight: (s) => expect(s.id).toBe("sess-1"),
-    });
+    whenRight(result, (s) => expect(s.id).toBe("sess-1"));
   });
 });
 
@@ -195,11 +187,8 @@ describe("getSessionSettings", () => {
     });
     const result = await runEffect(getSessionSettings(client, "sess-1"));
     expect(Either.isRight(result)).toBe(true);
-    Either.match(result, {
-      onLeft: () => {},
-      onRight: (s) => {
-        expect(s).toEqual({});
-      },
+    whenRight(result, (s) => {
+      expect(s).toEqual({});
     });
   });
 
@@ -216,11 +205,8 @@ describe("getSessionSettings", () => {
     });
     const result = await runEffect(getSessionSettings(client, "sess-1"));
     expect(Either.isRight(result)).toBe(true);
-    Either.match(result, {
-      onLeft: () => {},
-      onRight: (s) => {
-        expect(s).toEqual({});
-      },
+    whenRight(result, (s) => {
+      expect(s).toEqual({});
     });
   });
 

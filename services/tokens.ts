@@ -16,9 +16,9 @@ export function getTokenBalance(
     Effect.flatMap(({ data, error }) =>
       error
         ? Effect.fail({ message: error.message })
-        : data == null
-          ? Effect.fail({ message: "Profile not found" })
-          : Effect.succeed((data as { tokens: number }).tokens)
+        : data
+          ? Effect.succeed((data as { tokens: number }).tokens)
+          : Effect.fail({ message: "Profile not found" })
     )
   );
 }
@@ -41,11 +41,9 @@ export function getOrCreateStripeCustomerId(
       error
         ? Effect.fail({ message: error.message })
         : Effect.succeed(
-            data == null
-              ? Option.none()
-              : Option.some(
-                  (data as { stripe_customer_id: string }).stripe_customer_id
-                )
+            data
+              ? Option.some((data as { stripe_customer_id: string }).stripe_customer_id)
+              : Option.none()
           )
     )
   );
@@ -104,7 +102,7 @@ export function creditTokensForPurchase(
     Effect.flatMap(({ data, error }) =>
       error
         ? Effect.fail({ message: error.message ?? "Token credit failed" })
-        : data != null && typeof data === "number"
+        : typeof data === "number"
           ? Effect.succeed(data)
           : Effect.fail({
               message: "Unexpected response from credit_tokens_for_purchase",

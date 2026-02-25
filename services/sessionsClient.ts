@@ -1,4 +1,4 @@
-import { Effect, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 import type {
   Session,
   TranscriptEntry,
@@ -144,9 +144,11 @@ export function fetchSessions(): Effect.Effect<Session[], ApiError> {
 }
 
 export function createSessionApi(
-  title?: string | null
+  titleOpt: Option.Option<string> = Option.none()
 ): Effect.Effect<Session, ApiError> {
-  return apiPost<Session>(sessionsPath(), { title: title ?? null });
+  return apiPost<Session>(sessionsPath(), {
+    title: Option.getOrNull(titleOpt),
+  });
 }
 
 export function fetchSession(

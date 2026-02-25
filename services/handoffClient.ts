@@ -1,10 +1,10 @@
-import { Effect, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 import type { HandoffResponse } from "@/lib/api.schemas";
 
 export type HandoffError = { message: string };
 
 export function postHandoff(
-  questionTitle?: string | null
+  questionTitleOpt: Option.Option<string> = Option.none()
 ): Effect.Effect<HandoffResponse, HandoffError> {
   return pipe(
     Effect.tryPromise({
@@ -13,7 +13,9 @@ export function postHandoff(
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ question_title: questionTitle ?? null }),
+          body: JSON.stringify({
+            question_title: Option.getOrNull(questionTitleOpt),
+          }),
         }),
       catch: (e) => ({
         message: e instanceof Error ? e.message : "Network error",
