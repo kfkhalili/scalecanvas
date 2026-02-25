@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import type {
   CanvasState,
   ReactFlowNode,
@@ -24,20 +25,23 @@ export function getSampleCanvasState(): CanvasState {
   return { nodes, edges };
 }
 
-function parseViewport(value: DbCanvasState["viewport"]): Viewport | undefined {
-  if (value === null || value === undefined) return undefined;
-  if (typeof value === "object" && "x" in value && "y" in value && "zoom" in value) {
-    const o = value as Viewport;
-    return { x: o.x, y: o.y, zoom: o.zoom };
-  }
-  return undefined;
+function parseViewport(value: DbCanvasState["viewport"]): Option.Option<Viewport> {
+  return Option.flatMap(Option.fromNullable(value), (v) => {
+    if (typeof v === "object" && "x" in v && "y" in v && "zoom" in v) {
+      const o = v as Viewport;
+      return Option.some({ x: o.x, y: o.y, zoom: o.zoom });
+    }
+    return Option.none();
+  });
 }
 
 export function canvasFromDb(db: DbCanvasState): CanvasState {
+  const nodes = (db.nodes ?? []) as unknown as ReadonlyArray<ReactFlowNode>;
+  const edges = (db.edges ?? []) as unknown as ReadonlyArray<ReactFlowEdge>;
   return {
-    nodes: (db.nodes ?? []) as unknown as ReadonlyArray<ReactFlowNode>,
-    edges: (db.edges ?? []) as unknown as ReadonlyArray<ReactFlowEdge>,
-    viewport: parseViewport(db.viewport),
+    nodes,
+    edges,
+    viewport: Option.getOrUndefined(parseViewport(db.viewport)),
   };
 }
 

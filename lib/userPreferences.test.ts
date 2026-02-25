@@ -49,12 +49,20 @@ describe("getNodeLibraryProvider", () => {
 
 describe("setNodeLibraryProvider", () => {
   it("upserts row and subsequent get returns value", async () => {
-    let stored: NodeLibraryProvider | null = null;
+    const storedRef = {
+      opt: Option.none() as Option.Option<NodeLibraryProvider>,
+    };
     const selectChain = {
       eq: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           maybeSingle: vi.fn().mockImplementation(() =>
-            Promise.resolve({ data: stored ? { value: stored } : null, error: null })
+            Promise.resolve({
+              data: Option.match(storedRef.opt, {
+                onNone: () => null,
+                onSome: (v) => ({ value: v }),
+              }),
+              error: null,
+            })
           ),
         }),
       }),
@@ -62,7 +70,7 @@ describe("setNodeLibraryProvider", () => {
     const chain = {
       select: vi.fn().mockReturnValue(selectChain),
       upsert: vi.fn().mockImplementation((row: { value: string }) => {
-        stored = row.value as NodeLibraryProvider;
+        storedRef.opt = Option.some(row.value as NodeLibraryProvider);
         return Promise.resolve({ error: null });
       }),
     };

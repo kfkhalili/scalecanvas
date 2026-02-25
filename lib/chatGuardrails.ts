@@ -1,4 +1,4 @@
-import { Effect, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 import type { Session } from "@/lib/types";
 
 export type GuardrailError = { status: 401 | 403; error: string };
@@ -16,33 +16,38 @@ export function timeLimitForSession(session: Session): number {
  */
 export function getSessionIfWithinTimeLimit(
   fetchSession: (sessionId: string) => Effect.Effect<Session, { message: string }>,
-  sessionId: string | undefined,
+  sessionIdOpt: Option.Option<string>,
   userId: string
 ): Effect.Effect<Session, GuardrailError> {
-  if (sessionId == null || sessionId.trim() === "") {
-    return Effect.fail({ status: 401, error: "Unauthorized." });
-  }
-  return pipe(
-    fetchSession(sessionId),
-    Effect.mapError(() => ({ status: 401 as const, error: "Unauthorized." })),
-    Effect.flatMap((session) => {
-      if (session.userId !== userId) {
-        return Effect.fail({ status: 403 as const, error: "Forbidden." });
+  return Option.match(sessionIdOpt, {
+    onNone: () => Effect.fail({ status: 401, error: "Unauthorized." }),
+    onSome: (sessionId) => {
+      if (sessionId.trim() === "") {
+        return Effect.fail({ status: 401, error: "Unauthorized." });
       }
-      if (session.status === "terminated") {
-        return Effect.fail({
-          status: 403 as const,
-          error: "Session has been terminated.",
-        });
-      }
-      const elapsed = Date.now() - new Date(session.createdAt).getTime();
-      if (elapsed > timeLimitForSession(session)) {
-        return Effect.fail({
-          status: 403 as const,
-          error: "Interview time has expired.",
-        });
-      }
-      return Effect.succeed(session);
-    })
-  );
+      return pipe(
+        fetchSession(sessionId),
+        Effect.mapError(() => ({ status: 401 as const, error: "Unauthorized." })),
+        Effect.flatMap((session) => {
+          if (session.userId !== userId) {
+            return Effect.fail({ status: 403 as const, error: "Forbidden." });
+          }
+          if (session.status === "terminated") {
+            return Effect.fail({
+              status: 403 as const,
+              error: "Session has been terminated.",
+            });
+          }
+          const elapsed = Date.now() - new Date(session.createdAt).getTime();
+          if (elapsed > timeLimitForSession(session)) {
+            return Effect.fail({
+              status: 403 as const,
+              error: "Interview time has expired.",
+            });
+          }
+          return Effect.succeed(session);
+        })
+      );
+    },
+  });
 }

@@ -1,29 +1,51 @@
 import { describe, it, expect } from "vitest";
+import { Option } from "effect";
 import { isValidOrigin, isMutationMethod } from "./csrf";
 
 describe("isValidOrigin", () => {
   it("returns true when origin host matches request host", () => {
-    expect(isValidOrigin("http://localhost:3000", "localhost:3000")).toBe(true);
+    expect(
+      isValidOrigin(
+        Option.some("http://localhost:3000"),
+        Option.some("localhost:3000")
+      )
+    ).toBe(true);
   });
 
   it("returns true for HTTPS origin matching host", () => {
-    expect(isValidOrigin("https://example.com", "example.com")).toBe(true);
+    expect(
+      isValidOrigin(
+        Option.some("https://example.com"),
+        Option.some("example.com")
+      )
+    ).toBe(true);
   });
 
   it("returns false when origin host differs", () => {
-    expect(isValidOrigin("https://evil.com", "example.com")).toBe(false);
+    expect(
+      isValidOrigin(
+        Option.some("https://evil.com"),
+        Option.some("example.com")
+      )
+    ).toBe(false);
   });
 
-  it("returns false when origin is null", () => {
-    expect(isValidOrigin(null, "localhost:3000")).toBe(false);
+  it("returns false when origin is none", () => {
+    expect(
+      isValidOrigin(Option.none(), Option.some("localhost:3000"))
+    ).toBe(false);
   });
 
-  it("returns false when host is null", () => {
-    expect(isValidOrigin("http://localhost:3000", null)).toBe(false);
+  it("returns false when host is none", () => {
+    expect(
+      isValidOrigin(Option.some("http://localhost:3000"), Option.none())
+    ).toBe(false);
   });
 
   it("returns false for malformed origin", () => {
-    expect(isValidOrigin("not-a-url", "localhost")).toBe(false);
+    expect(
+      isValidOrigin(Option.some("not-a-url"), Option.some("localhost"))
+    ).toBe(false);
   });
 });
 

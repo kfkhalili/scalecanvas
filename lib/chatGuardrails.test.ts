@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import {
   getSessionIfWithinTimeLimit,
   timeLimitForSession,
@@ -28,11 +28,11 @@ function session(createdAt: string, overrides?: Partial<Session>): Session {
 
 async function runGuardrail(
   fetchSession: (sessionId: string) => Effect.Effect<Session, { message: string }>,
-  sessionId: string | undefined,
+  sessionIdOpt: Option.Option<string>,
   userId: string
 ): Promise<Either.Either<Session, { status: 401 | 403; error: string }>> {
   return Effect.runPromise(
-    Effect.either(getSessionIfWithinTimeLimit(fetchSession, sessionId, userId))
+    Effect.either(getSessionIfWithinTimeLimit(fetchSession, sessionIdOpt, userId))
   );
 }
 
@@ -58,7 +58,7 @@ describe("getSessionIfWithinTimeLimit", () => {
 
   it("returns 401 when sessionId is missing", async () => {
     const fetchSession = vi.fn();
-    const result = await runGuardrail(fetchSession, undefined, USER_ID);
+    const result = await runGuardrail(fetchSession, Option.none(), USER_ID);
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
       expect(result.left.status).toBe(401);
@@ -69,7 +69,7 @@ describe("getSessionIfWithinTimeLimit", () => {
 
   it("returns 401 when sessionId is empty string", async () => {
     const fetchSession = vi.fn();
-    const result = await runGuardrail(fetchSession, "", USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(""), USER_ID);
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) expect(result.left.status).toBe(401);
     expect(fetchSession).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe("getSessionIfWithinTimeLimit", () => {
     const fetchSession = vi
       .fn()
       .mockReturnValue(Effect.fail({ message: "Not found" }));
-    const result = await runGuardrail(fetchSession, SESSION_ID, USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(SESSION_ID), USER_ID);
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
       expect(result.left.status).toBe(401);
@@ -92,7 +92,7 @@ describe("getSessionIfWithinTimeLimit", () => {
     const fetchSession = vi
       .fn()
       .mockReturnValue(Effect.succeed(session(created)));
-    const result = await runGuardrail(fetchSession, SESSION_ID, OTHER_USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(SESSION_ID), OTHER_USER_ID);
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
       expect(result.left.status).toBe(403);
@@ -107,7 +107,7 @@ describe("getSessionIfWithinTimeLimit", () => {
       .mockReturnValue(
         Effect.succeed(session(created, { status: "terminated" }))
       );
-    const result = await runGuardrail(fetchSession, SESSION_ID, USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(SESSION_ID), USER_ID);
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
       expect(result.left.status).toBe(403);
@@ -122,7 +122,7 @@ describe("getSessionIfWithinTimeLimit", () => {
       .mockReturnValue(
         Effect.succeed(session(created, { isTrial: false }))
       );
-    const result = await runGuardrail(fetchSession, SESSION_ID, USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(SESSION_ID), USER_ID);
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
       expect(result.left.status).toBe(403);
@@ -137,7 +137,7 @@ describe("getSessionIfWithinTimeLimit", () => {
       .mockReturnValue(
         Effect.succeed(session(created, { isTrial: true }))
       );
-    const result = await runGuardrail(fetchSession, SESSION_ID, USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(SESSION_ID), USER_ID);
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
       expect(result.left.status).toBe(403);
@@ -149,7 +149,7 @@ describe("getSessionIfWithinTimeLimit", () => {
     const created = new Date(NOW - PAID_TIME_LIMIT_MS + 1000).toISOString();
     const s = session(created, { isTrial: false });
     const fetchSession = vi.fn().mockReturnValue(Effect.succeed(s));
-    const result = await runGuardrail(fetchSession, SESSION_ID, USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(SESSION_ID), USER_ID);
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) expect(result.right.id).toBe(SESSION_ID);
   });
@@ -158,7 +158,7 @@ describe("getSessionIfWithinTimeLimit", () => {
     const created = new Date(NOW - 1000).toISOString();
     const s = session(created, { isTrial: true });
     const fetchSession = vi.fn().mockReturnValue(Effect.succeed(s));
-    const result = await runGuardrail(fetchSession, SESSION_ID, USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(SESSION_ID), USER_ID);
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) expect(result.right.id).toBe(SESSION_ID);
   });
@@ -167,7 +167,7 @@ describe("getSessionIfWithinTimeLimit", () => {
     const created = new Date(NOW - PAID_TIME_LIMIT_MS).toISOString();
     const s = session(created, { isTrial: false });
     const fetchSession = vi.fn().mockReturnValue(Effect.succeed(s));
-    const result = await runGuardrail(fetchSession, SESSION_ID, USER_ID);
+    const result = await runGuardrail(fetchSession, Option.some(SESSION_ID), USER_ID);
     expect(Either.isRight(result)).toBe(true);
   });
 });

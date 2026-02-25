@@ -12,3 +12,7 @@ export function sessionToPublic(db: DbInterviewSession): Session {
     updatedAt: db.updated_at,
   };
 }
+
+export function getSessionDisplayTitle(session: Session): string {
+  return session.title ?? "Untitled";
+}

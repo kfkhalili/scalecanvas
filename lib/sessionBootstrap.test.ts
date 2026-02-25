@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { describe, it, expect, vi } from "vitest";
 import {
   decideBootstrapAction,
@@ -12,7 +12,7 @@ function ctx(overrides: Partial<BootstrapContext> = {}): BootstrapContext {
   return {
     hasAnonymousChat: false,
     hasAttemptedEval: false,
-    questionTitle: null,
+    questionTitle: Option.none(),
     ...overrides,
   };
 }
@@ -96,19 +96,27 @@ describe("executeBootstrapAction", () => {
 
   it("deduct_and_handoff: clears eval flag, deducts, renames, and hands off", async () => {
     const deps = mockDeps();
-    const c = ctx({ hasAnonymousChat: true, hasAttemptedEval: true, questionTitle: "Design X" });
+    const c = ctx({
+      hasAnonymousChat: true,
+      hasAttemptedEval: true,
+      questionTitle: Option.some("Design X"),
+    });
     await executeBootstrapAction({ type: "deduct_and_handoff" }, c, deps);
     expect(deps.setHasAttemptedEval).toHaveBeenCalledWith(false);
     expect(deps.renameSession).toHaveBeenCalledWith("deducted-1", "Design X");
-    expect(deps.setPendingAuthHandoff).toHaveBeenCalledWith("deducted-1");
+    expect(deps.setPendingAuthHandoff).toHaveBeenCalledWith(Option.some("deducted-1"));
   });
 
   it("deduct_and_handoff: skips rename when no questionTitle", async () => {
     const deps = mockDeps();
-    const c = ctx({ hasAnonymousChat: true, hasAttemptedEval: true, questionTitle: null });
+    const c = ctx({
+      hasAnonymousChat: true,
+      hasAttemptedEval: true,
+      questionTitle: Option.none(),
+    });
     await executeBootstrapAction({ type: "deduct_and_handoff" }, c, deps);
     expect(deps.renameSession).not.toHaveBeenCalled();
-    expect(deps.setPendingAuthHandoff).toHaveBeenCalledWith("deducted-1");
+    expect(deps.setPendingAuthHandoff).toHaveBeenCalledWith(Option.some("deducted-1"));
   });
 
   it("deduct_and_handoff: does nothing on deduction error", async () => {

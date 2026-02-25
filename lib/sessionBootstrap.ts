@@ -1,10 +1,11 @@
-import { Effect, Either } from "effect";
+import { Effect, Option } from "effect";
+import { whenRight } from "@/lib/optionHelpers";
 import type { Session } from "@/lib/types";
 
 export type BootstrapContext = {
   readonly hasAnonymousChat: boolean;
   readonly hasAttemptedEval: boolean;
-  readonly questionTitle: string | null;
+  readonly questionTitle: Option.Option<string>;
 };
 
 export type BootstrapAction =
@@ -33,7 +34,7 @@ export type BootstrapDeps = {
   fetchSessions: () => Effect.Effect<ReadonlyArray<Session>, { message: string }>;
   deductTokenAndCreateSession: () => Effect.Effect<string, { message: string }>;
   renameSession: (id: string, title: string) => Promise<void>;
-  setPendingAuthHandoff: (sessionId: string) => void;
+  setPendingAuthHandoff: (sessionId: Option.Option<string>) => void;
   setHasAttemptedEval: (value: boolean) => void;
   redirectTo: (path: string) => void;
 };
@@ -51,11 +52,8 @@ export async function executeBootstrapAction(
       const fetchEither = await Effect.runPromise(
         Effect.either(deps.fetchSessions())
       );
-      Either.match(fetchEither, {
-        onLeft: () => {},
-        onRight: (list) => {
-          if (list.length > 0) deps.redirectTo(`/${list[0].id}`);
-        },
+      whenRight(fetchEither, (list) => {
+        if (list.length > 0) deps.redirectTo(`/${list[0].id}`);
       });
       return;
     }
@@ -64,12 +62,10 @@ export async function executeBootstrapAction(
       const deductEither = await Effect.runPromise(
         Effect.either(deps.deductTokenAndCreateSession())
       );
-      Either.match(deductEither, {
-        onLeft: () => {},
-        onRight: (sessionId) => {
-          if (ctx.questionTitle) void deps.renameSession(sessionId, ctx.questionTitle);
-          deps.setPendingAuthHandoff(sessionId);
-        },
+      whenRight(deductEither, (sessionId) => {
+        if (Option.isSome(ctx.questionTitle))
+          void deps.renameSession(sessionId, ctx.questionTitle.value);
+        deps.setPendingAuthHandoff(Option.some(sessionId));
       });
       return;
     }

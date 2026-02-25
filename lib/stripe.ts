@@ -1,18 +1,24 @@
+import { Option } from "effect";
 import Stripe from "stripe";
 
-let _stripe: Stripe | null = null;
+let _stripeOpt: Option.Option<Stripe> = Option.none();
 
 export function getStripeClient(): Stripe {
-  if (_stripe) return _stripe;
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new Error("Missing STRIPE_SECRET_KEY environment variable");
-  }
-  _stripe = new Stripe(key, {
-    apiVersion: "2026-01-28.clover",
-    typescript: true,
+  return Option.match(_stripeOpt, {
+    onNone: () => {
+      const key = process.env.STRIPE_SECRET_KEY;
+      if (!key) {
+        throw new Error("Missing STRIPE_SECRET_KEY environment variable");
+      }
+      const client = new Stripe(key, {
+        apiVersion: "2026-01-28.clover",
+        typescript: true,
+      });
+      _stripeOpt = Option.some(client);
+      return client;
+    },
+    onSome: (s) => s,
   });
-  return _stripe;
 }
 
 export type TokenPack = {
@@ -29,10 +35,10 @@ export const TOKEN_PACKS: readonly TokenPack[] = [
   { id: "pack_25", tokens: 25, label: "25 Interviews", priceUsd: 49, priceEnvKey: "STRIPE_PRICE_ID_25" },
 ] as const;
 
-export function getPackById(packId: string): TokenPack | undefined {
-  return TOKEN_PACKS.find((p) => p.id === packId);
+export function getPackById(packId: string): Option.Option<TokenPack> {
+  return Option.fromNullable(TOKEN_PACKS.find((p) => p.id === packId));
 }
 
-export function getStripePriceId(pack: TokenPack): string | undefined {
-  return process.env[pack.priceEnvKey];
+export function getStripePriceId(pack: TokenPack): Option.Option<string> {
+  return Option.fromNullable(process.env[pack.priceEnvKey]);
 }

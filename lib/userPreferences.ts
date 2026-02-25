@@ -36,9 +36,15 @@ export function getNodeLibraryProvider(
     }),
     Effect.map(({ data, error }) => {
       if (error) return Option.none();
-      const row = data as { value: string } | null;
       return pipe(
-        Option.fromNullable(row?.value ?? null),
+        Option.fromNullable(data),
+        Option.flatMap((d) =>
+          Option.fromNullable(
+            typeof d === "object" && d !== null && "value" in d
+              ? (d as { value: string }).value
+              : null
+          )
+        ),
         Option.flatMap(parseProviderOption)
       );
     }),

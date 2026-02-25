@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { getPackById, getStripePriceId, TOKEN_PACKS } from "./stripe";
 
@@ -7,14 +8,15 @@ describe("stripe token packs", () => {
   });
 
   it("getPackById returns correct pack", () => {
-    const pack = getPackById("pack_3");
-    expect(pack).toBeDefined();
-    expect(pack?.tokens).toBe(3);
-    expect(pack?.label).toBe("3 Interviews");
+    const packOpt = getPackById("pack_3");
+    expect(Option.isSome(packOpt)).toBe(true);
+    const pack = Option.getOrNull(packOpt)!;
+    expect(pack.tokens).toBe(3);
+    expect(pack.label).toBe("3 Interviews");
   });
 
-  it("getPackById returns undefined for unknown pack", () => {
-    expect(getPackById("unknown")).toBeUndefined();
+  it("getPackById returns none for unknown pack", () => {
+    expect(Option.isNone(getPackById("unknown"))).toBe(true);
   });
 
   it("each pack has a unique id", () => {
@@ -49,15 +51,15 @@ describe("getStripePriceId", () => {
 
   it("returns the env var value when set", () => {
     vi.stubEnv("STRIPE_PRICE_ID_3", "price_test_123");
-    const pack = getPackById("pack_3");
-    expect(pack).toBeDefined();
-    expect(getStripePriceId(pack!)).toBe("price_test_123");
+    const packOpt = getPackById("pack_3");
+    const pack = Option.getOrNull(packOpt)!;
+    expect(Option.getOrNull(getStripePriceId(pack))).toBe("price_test_123");
   });
 
-  it("returns undefined when env var is not set", () => {
+  it("returns none when env var is not set", () => {
     delete process.env.STRIPE_PRICE_ID_3;
-    const pack = getPackById("pack_3");
-    expect(pack).toBeDefined();
-    expect(getStripePriceId(pack!)).toBeUndefined();
+    const packOpt = getPackById("pack_3");
+    const pack = Option.getOrNull(packOpt)!;
+    expect(Option.isNone(getStripePriceId(pack))).toBe(true);
   });
 });
