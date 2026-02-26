@@ -111,8 +111,9 @@ pnpm tsc --noEmit   # full type check
 
 ---
 
-## Commit 6 — `refactor: delete dead code (handoff, bootstrap, CSRF, transcript, settings)`
-**Findings:** 2.1, 2.3, 2.4, 2.5, 4.4, 6.1, 6.2, 6.3
+## ✅ Commit 6 — `refactor: delete dead code (handoff, bootstrap, CSRF, transcript, settings)`
+**Findings:** 2.1, 2.3, 2.4, 2.5, 2.6, 4.4, 6.1, 6.2, 6.3
+**Status:** Done — committed as `84f21c1`
 **Risk:** P2–P4 dead code removal — zero runtime impact
 **Files deleted:**
 
@@ -274,7 +275,7 @@ Commits 6–10 form a linear chain that should land in order.
 | 3 | M | ✅ Done |
 | 4 | XS | ✅ Done |
 | 5 | L | ✅ Done |
-| 6 | M | 45 min (many files but mostly deletion) |
+| 6 | M | ✅ Done |
 | 7 | S | 20 min |
 | 8 | M | 45 min (new preferencesClient + sidebarStore rewrite) |
 | 9 | S | 20 min (find-and-replace renames) |
