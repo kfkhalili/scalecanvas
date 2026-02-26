@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { Menu, SquarePen, Settings, Monitor, Sun, Moon, Check, LogIn, LogOut, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { User } from "@supabase/supabase-js";
-import { useSidebarStore } from "@/stores/sidebarStore";
+import { useSidebarStore, rehydrateSidebarStore } from "@/stores/sidebarStore";
 import { SessionSelector } from "@/components/chat/SessionSelector";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { getAvatarUrl, getDisplayName, getInitials } from "@/lib/userProfile";
@@ -32,7 +32,7 @@ const THEME_OPTIONS = [
 export function CollapsibleSidebar({
   isAnonymous = false,
 }: CollapsibleSidebarProps): React.ReactElement {
-  const { open, toggle, hydrate } = useSidebarStore();
+  const { open, toggle } = useSidebarStore();
   const { theme, setTheme } = useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menuPosOpt, setMenuPosOpt] = useState<Option.Option<{ bottom: number; left: number }>>(Option.none());
@@ -45,8 +45,8 @@ export function CollapsibleSidebar({
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    hydrate();
-  }, [hydrate]);
+    rehydrateSidebarStore();
+  }, []);
 
   useEffect(() => {
     if (isAnonymous) return;

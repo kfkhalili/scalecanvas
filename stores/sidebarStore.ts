@@ -1,43 +1,38 @@
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+
 const SIDEBAR_STORAGE_KEY = "scalecanvas-sidebar-open";
 
-function getStored(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const v = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    return v === "true";
-  } catch {
-    return false;
-  }
-}
-
-function setStored(open: boolean): void {
-  try {
-    localStorage.setItem(SIDEBAR_STORAGE_KEY, String(open));
-  } catch {}
-}
-
-import { create } from "zustand";
+const persistStorage = typeof window !== "undefined"
+  ? createJSONStorage(() => localStorage)
+  : undefined;
 
 type SidebarStore = {
   open: boolean;
   setOpen: (open: boolean) => void;
   toggle: () => void;
-  /** Restore open state from localStorage (call once after mount). */
-  hydrate: () => void;
 };
 
-export const useSidebarStore = create<SidebarStore>((set) => ({
-  open: false,
-  setOpen: (open) => {
-    setStored(open);
-    set({ open });
-  },
-  toggle: () => {
-    set((s) => {
-      const next = !s.open;
-      setStored(next);
-      return { open: next };
-    });
-  },
-  hydrate: () => set({ open: getStored() }),
-}));
+export const useSidebarStore = create<SidebarStore>()(
+  persist(
+    (set) => ({
+      open: false,
+      setOpen: (open) => set({ open }),
+      toggle: () => set((s) => ({ open: !s.open })),
+    }),
+    {
+      name: SIDEBAR_STORAGE_KEY,
+      storage: persistStorage,
+      skipHydration: true,
+    }
+  )
+);
+
+/**
+ * Rehydrate the sidebar store from localStorage.
+ * Call once after mount (e.g. in CollapsibleSidebar's useEffect).
+ */
+export function rehydrateSidebarStore(): Promise<void> | undefined {
+  const store = useSidebarStore as unknown as { persist?: { rehydrate: () => Promise<void> } };
+  return store.persist?.rehydrate();
+}

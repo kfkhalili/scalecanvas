@@ -18,7 +18,7 @@ function parseErrorResponse(data: ApiErrorResponse): string {
   return data.error ?? "Unknown error";
 }
 
-function apiGet<T>(path: string): Effect.Effect<T, ApiError> {
+export function apiGet<T>(path: string): Effect.Effect<T, ApiError> {
   return pipe(
     Effect.tryPromise({
       try: () => fetch(path, { credentials: "include" }),
@@ -56,6 +56,44 @@ function apiPost<T>(
       try: () =>
         fetch(path, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          credentials: "include",
+        }),
+      catch: (e) => ({
+        message: e instanceof Error ? e.message : "Network error",
+      }),
+    }),
+    Effect.flatMap((res) =>
+      res.ok
+        ? Effect.tryPromise({
+            try: () => res.json() as Promise<T>,
+            catch: (e) => ({
+              message: e instanceof Error ? e.message : "Parse error",
+            }),
+          })
+        : Effect.tryPromise({
+            try: () =>
+              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
+            catch: () => ({ message: res.statusText || "Request failed" }),
+          }).pipe(
+            Effect.flatMap((data) =>
+              Effect.fail({ message: parseErrorResponse(data) || res.statusText })
+            )
+          )
+    )
+  );
+}
+
+export function apiPatch<T>(
+  path: string,
+  body: Record<string, unknown>
+): Effect.Effect<T, ApiError> {
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        fetch(path, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
           credentials: "include",
@@ -166,40 +204,7 @@ export function renameSessionApi(
   sessionId: string,
   title: string
 ): Effect.Effect<Session, ApiError> {
-  return pipe(
-    Effect.tryPromise({
-      try: () =>
-        fetch(`${sessionsPath()}/${sessionId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title }),
-          credentials: "include",
-        }),
-      catch: (e) => ({
-        message: e instanceof Error ? e.message : "Network error",
-      }),
-    }),
-    Effect.flatMap((res) =>
-      res.ok
-        ? Effect.tryPromise({
-            try: () => res.json() as Promise<Session>,
-            catch: (e) => ({
-              message: e instanceof Error ? e.message : "Parse error",
-            }),
-          })
-        : Effect.tryPromise({
-            try: () =>
-              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
-            catch: () => ({ message: res.statusText || "Request failed" }),
-          }).pipe(
-            Effect.flatMap((data) =>
-              Effect.fail({
-                message: parseErrorResponse(data) || res.statusText,
-              })
-            )
-          )
-    )
-  );
+  return apiPatch<Session>(`${sessionsPath()}/${sessionId}`, { title });
 }
 
 export function deleteSessionApi(

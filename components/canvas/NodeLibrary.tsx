@@ -1,12 +1,17 @@
 "use client";
 
 import { Option } from "effect";
+import { Effect, Either } from "effect";
 import { useState, useCallback, useEffect, type DragEvent } from "react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronRight, GripVertical, StickyNote } from "lucide-react";
 import { whenSome } from "@/lib/optionHelpers";
 import { NodeLibraryProviderSchema } from "@/lib/api.schemas";
+import {
+  fetchNodeLibraryProvider,
+  saveNodeLibraryProvider,
+} from "@/services/preferencesClient";
 import {
   CATEGORY_ORDER,
   CATEGORY_LABELS,
@@ -158,25 +163,22 @@ export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibrary
     }
 
     // Signed-in users: fetch from backend
-    fetch("/api/preferences")
-      .then((r) =>
-        r.ok
-          ? (r.json() as Promise<{ provider?: string }>).then((d) => Option.some(d))
-          : Promise.resolve(Option.none())
-      )
-      .then((dataOpt) => {
-        const providerOpt = Option.flatMap(dataOpt, (d) =>
-          Option.fromNullable(d.provider)
-        );
-        whenSome(providerOpt, (raw) => {
-          if (parseProviderFromUrl(Option.some(raw)) === "all") return;
-          setProviderState(parseProviderFromUrl(Option.some(raw)));
-          const nextParams = new URLSearchParams(searchParams);
-          nextParams.set("provider", raw);
-          router.replace(`${pathname}?${nextParams.toString()}`);
+    void Effect.runPromise(Effect.either(fetchNodeLibraryProvider())).then(
+      (either) => {
+        Either.match(either, {
+          onLeft: () => {},
+          onRight: (providerOpt) => {
+            whenSome(providerOpt, (raw) => {
+              if (raw === "all") return;
+              setProviderState(raw);
+              const nextParams = new URLSearchParams(searchParams);
+              nextParams.set("provider", raw);
+              router.replace(`${pathname}?${nextParams.toString()}`);
+            });
+          },
         });
-      })
-      .catch(() => {});
+      }
+    );
   }, [pathname, router, searchParams, isAnonymous]);
 
   const setProvider = useCallback(
@@ -191,11 +193,9 @@ export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibrary
       if (isAnonymous) {
         try { localStorage.setItem(ANON_PROVIDER_KEY, next); } catch { /* ignore */ }
       } else {
-        fetch("/api/preferences", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ provider: next }),
-        }).catch(() => {});
+        void Effect.runPromise(
+          Effect.either(saveNodeLibraryProvider(next))
+        );
       }
     },
     [pathname, router, searchParams, isAnonymous]
