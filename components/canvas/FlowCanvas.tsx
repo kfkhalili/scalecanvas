@@ -33,6 +33,7 @@ import {
 import {
   remainingMs,
   getTimerDisplay,
+  countdownEffectKey,
   type TimerDisplay,
 } from "@/lib/chatGuardrails";
 import { HelpCircle, Timer } from "lucide-react";
@@ -273,39 +274,90 @@ type FlowCanvasProps = {
   sessionIdOpt: Option.Option<string>;
 };
 
-function useInterviewCountdown(
-  sessionIdOpt: Option.Option<string>
-): Option.Option<TimerDisplay> {
+/**
+ * Countdown badge with zero re-renders while ticking: updates the display
+ * imperatively so React doesn't run reconciliation every second. One state
+ * update only when the timer elapses (to show the conclusion message).
+ */
+function InterviewCountdownBadge({
+  sessionIdOpt,
+}: {
+  sessionIdOpt: Option.Option<string>;
+}): React.ReactElement | null {
   const sessions = useSessionStore((s) => s.sessions);
   const sessionId = Option.getOrUndefined(sessionIdOpt);
   const session =
     sessionId && sessionId !== "ephemeral"
       ? sessions.find((s) => s.id === sessionId)
       : undefined;
-  const [display, setDisplay] = useState<TimerDisplay | null>(() =>
-    session ? getTimerDisplay(remainingMs(session)) : null
-  );
+  const sessionRef = useRef(session);
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [elapsed, setElapsed] = useState(false);
+  const effectKey = countdownEffectKey(session);
   useEffect(() => {
-    if (!session) return;
-    const current = getTimerDisplay(remainingMs(session));
+    sessionRef.current = session;
+  }, [session]);
+  useEffect(() => {
+    const s = sessionRef.current;
+    if (!s || !effectKey) return;
+    const apply = (next: TimerDisplay): void => {
+      if (containerRef.current)
+        containerRef.current.setAttribute(
+          "aria-label",
+          next.isElapsed
+            ? (next.elapsedMessage ?? "Time has elapsed")
+            : `Time left: ${next.timeLabel}`
+        );
+      if (labelRef.current)
+        labelRef.current.textContent = next.isElapsed
+          ? next.timeLabel
+          : `Time left: ${next.timeLabel}`;
+      if (next.isElapsed) setElapsed(true);
+    };
+    const current = getTimerDisplay(remainingMs(s));
+    apply(current);
     if (current.isElapsed) return;
     const interval = setInterval(() => {
-      const ms = remainingMs(session);
-      const next = getTimerDisplay(ms);
-      setDisplay(next);
+      const currentSession = sessionRef.current;
+      if (!currentSession) return;
+      const next = getTimerDisplay(remainingMs(currentSession));
+      apply(next);
       if (next.isElapsed) clearInterval(interval);
     }, 1000);
     return () => clearInterval(interval);
-  }, [session]);
-  if (!session) return Option.none();
-  const value = display ?? getTimerDisplay(remainingMs(session));
-  return Option.some(value);
+  }, [effectKey]);
+  if (!session) return null;
+  const initial = getTimerDisplay(remainingMs(session));
+  return (
+    <div
+      ref={containerRef}
+      className="absolute left-2 top-2 z-10 flex flex-col gap-0.5 rounded-md border border-input bg-background/95 px-2 py-1.5 text-xs text-foreground shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      aria-live="polite"
+      aria-label={
+        initial.isElapsed
+          ? (initial.elapsedMessage ?? "Time has elapsed")
+          : `Time left: ${initial.timeLabel}`
+      }
+    >
+      <div className="flex items-center gap-1.5">
+        <Timer className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span ref={labelRef}>
+          {initial.isElapsed
+            ? initial.timeLabel
+            : `Time left: ${initial.timeLabel}`}
+        </span>
+      </div>
+      {(elapsed || initial.isElapsed) && initial.elapsedMessage ? (
+        <span className="text-muted-foreground">{initial.elapsedMessage}</span>
+      ) : null}
+    </div>
+  );
 }
 
 export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElement {
   const evaluateActionOpt = useCanvasStore((s) => s.evaluateAction);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
-  const countdownOpt = useInterviewCountdown(sessionIdOpt);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState<{
     bottom: number;
@@ -393,34 +445,7 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
       style={{ minHeight: 400, minWidth: 300 }}
     >
       {shortcutsPanel}
-      {Option.match(countdownOpt, {
-        onNone: () => null,
-        onSome: (timer) => (
-          <div
-            className="absolute left-2 top-2 z-10 flex flex-col gap-0.5 rounded-md border border-input bg-background/95 px-2 py-1.5 text-xs text-foreground shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80"
-            aria-live="polite"
-            aria-label={
-              timer.isElapsed
-                ? timer.elapsedMessage
-                : `Time left: ${timer.timeLabel}`
-            }
-          >
-            <div className="flex items-center gap-1.5">
-              <Timer className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span>
-                {timer.isElapsed
-                  ? timer.timeLabel
-                  : `Time left: ${timer.timeLabel}`}
-              </span>
-            </div>
-            {timer.isElapsed && timer.elapsedMessage ? (
-              <span className="text-muted-foreground">
-                {timer.elapsedMessage}
-              </span>
-            ) : null}
-          </div>
-        ),
-      })}
+      <InterviewCountdownBadge sessionIdOpt={sessionIdOpt} />
       <ReactFlowProvider>
         <FlowCanvasInner sessionIdOpt={sessionIdOpt} />
       </ReactFlowProvider>

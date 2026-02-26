@@ -53,6 +53,20 @@ export function getTimerDisplay(remainingMsValue: number): TimerDisplay {
 }
 
 /**
+ * Stable key for countdown effect (id + createdAt + isTrial) so the effect
+ * only re-runs when session identity or time-relevant fields change, not
+ * when the session object reference changes.
+ */
+export function countdownEffectKey(
+  session:
+    | Pick<Session, "id" | "createdAt" | "isTrial">
+    | undefined
+): string | null {
+  if (!session) return null;
+  return `${session.id}:${session.createdAt}:${session.isTrial}`;
+}
+
+/**
  * Validates session_id, session existence, ownership, status, and elapsed time.
  * The time limit is chosen automatically: 15 min for trial, 60 min for paid.
  */

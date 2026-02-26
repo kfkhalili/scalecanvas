@@ -6,6 +6,7 @@ import {
   remainingMs,
   formatRemainingMs,
   getTimerDisplay,
+  countdownEffectKey,
   TRIAL_TIME_LIMIT_MS,
   PAID_TIME_LIMIT_MS,
 } from "./chatGuardrails";
@@ -125,6 +126,27 @@ describe("getTimerDisplay", () => {
     expect(result.elapsedMessage).toBe(
       "Time has elapsed. Interview concluded."
     );
+  });
+});
+
+describe("countdownEffectKey", () => {
+  it("returns null when session is undefined", () => {
+    expect(countdownEffectKey(undefined)).toBe(null);
+  });
+
+  it("returns stable key from id, createdAt, and isTrial", () => {
+    const s = session("2026-01-01T12:00:00Z", { isTrial: true });
+    expect(countdownEffectKey(s)).toBe(
+      `${SESSION_ID}:2026-01-01T12:00:00Z:true`
+    );
+  });
+
+  it("returns different key for different session or time", () => {
+    const a = session("2026-01-01T12:00:00Z", { isTrial: false });
+    const b = session("2026-01-01T12:00:00Z", { isTrial: true });
+    const c = session("2026-01-02T12:00:00Z", { isTrial: false });
+    expect(countdownEffectKey(a)).not.toBe(countdownEffectKey(b));
+    expect(countdownEffectKey(a)).not.toBe(countdownEffectKey(c));
   });
 });
 
