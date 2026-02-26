@@ -1,2 +1,0 @@
--- Optional seed data for local dev (e.g. after supabase db reset).
--- Leave empty or add test data as needed.
