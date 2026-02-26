@@ -262,4 +262,19 @@ describe("resolveEdgeHandles", () => {
     const second = resolveEdgeHandles(nodes, first);
     expect(second).toBe(first); // idempotent — no infinite loop
   });
+
+  it("preserves user-chosen handles when both are set (e.g. connect from specific anchor)", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 0 }, data: {} },
+      { id: "b", position: { x: 0, y: 200 }, data: {} },
+    ];
+    // User connected from left-out to right (geometry would suggest bottom-out → top)
+    const edges: ReactFlowEdge[] = [
+      { id: "e1", source: "a", target: "b", sourceHandle: "left-out", targetHandle: "right" },
+    ];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0].sourceHandle).toBe("left-out");
+    expect(result[0].targetHandle).toBe("right");
+    expect(result).toBe(edges);
+  });
 });

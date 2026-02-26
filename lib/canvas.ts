@@ -28,10 +28,10 @@ export function canvasFromDb(db: DbCanvasState): CanvasState {
 }
 
 /**
- * For each edge, compute the best sourceHandle / targetHandle pair based on
- * the relative positions of the source and target nodes.  This ensures edges
- * visually connect through the geometrically closest anchor points
- * (e.g. bottom → top when the target node sits below the source node).
+ * For each edge that does not already have both handles set, compute the best
+ * sourceHandle / targetHandle pair based on the relative positions of the
+ * source and target nodes. Preserves user-chosen anchor points (connect or
+ * reconnect); only resolves when handles are missing (e.g. loaded from DB).
  *
  * Handle-id conventions (must match the Handle ids in AwsNode):
  *   source handles: "top-out" | "bottom-out" | "left-out" | "right-out"
@@ -45,6 +45,14 @@ export function resolveEdgeHandles(
   let changed = false;
 
   const resolved = edges.map((edge) => {
+    // Preserve user-chosen handles when both are already set
+    const hasHandles =
+      edge.sourceHandle != null &&
+      edge.sourceHandle !== "" &&
+      edge.targetHandle != null &&
+      edge.targetHandle !== "";
+    if (hasHandles) return edge;
+
     const source = nodeById.get(edge.source);
     const target = nodeById.get(edge.target);
     if (!source || !target) return edge;
@@ -75,8 +83,6 @@ export function resolveEdgeHandles(
       }
     }
 
-    // Preserve reference when handles already match — critical for
-    // avoiding infinite setState → re-render cycles in FlowCanvas.
     if (edge.sourceHandle === sourceHandle && edge.targetHandle === targetHandle) {
       return edge;
     }
@@ -85,8 +91,6 @@ export function resolveEdgeHandles(
     return { ...edge, sourceHandle, targetHandle };
   });
 
-  // Return the original array reference when nothing changed so that
-  // React / Zustand state setters short-circuit via Object.is equality.
   return changed ? resolved : edges;
 }
 
