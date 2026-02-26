@@ -1,9 +1,5 @@
-import { Effect } from "effect";
-
-type RateLimitEntry = {
-  readonly count: number;
-  readonly resetAt: number;
-};
+import { Effect, pipe } from "effect";
+import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
 type RateLimitConfig = {
   readonly windowMs: number;
@@ -13,74 +9,61 @@ type RateLimitConfig = {
 export type RateLimitResult = {
   readonly allowed: boolean;
   readonly remaining: number;
-  readonly resetAt: number;
+  readonly resetAt: string;
 };
 
-const store = new Map<string, RateLimitEntry>();
+type RpcClient = {
+  rpc: (
+    name: string,
+    args: Record<string, string | number>
+  ) => PromiseLike<{ data: unknown; error: { message?: string } | null }>;
+};
 
-function pruneExpired(now: number): void {
-  for (const [key, entry] of store) {
-    if (entry.resetAt <= now) {
-      store.delete(key);
-    }
-  }
-}
-
+/**
+ * Atomically check-and-increment a rate-limit bucket in Supabase.
+ *
+ * Returns `Effect.succeed` when the request is allowed and
+ * `Effect.fail` (with the same shape) when the caller is rate-limited.
+ */
 export function checkRateLimit(
+  client: ServerSupabaseClient,
   key: string,
-  config: RateLimitConfig,
-  now: number = Date.now()
+  config: RateLimitConfig
 ): Effect.Effect<RateLimitResult, RateLimitResult> {
-  if (store.size > 10_000) {
-    pruneExpired(now);
-  }
-
-  const existing = store.get(key);
-
-  if (!existing || existing.resetAt <= now) {
-    const entry: RateLimitEntry = {
-      count: 1,
-      resetAt: now + config.windowMs,
-    };
-    store.set(key, entry);
-    return Effect.succeed({
-      allowed: true,
-      remaining: config.maxRequests - 1,
-      resetAt: entry.resetAt,
-    });
-  }
-
-  if (existing.count >= config.maxRequests) {
-    return Effect.fail({
-      allowed: false,
-      remaining: 0,
-      resetAt: existing.resetAt,
-    });
-  }
-
-  const updated: RateLimitEntry = {
-    count: existing.count + 1,
-    resetAt: existing.resetAt,
-  };
-  store.set(key, updated);
-  return Effect.succeed({
-    allowed: true,
-    remaining: config.maxRequests - updated.count,
-    resetAt: updated.resetAt,
-  });
+  const rpcClient = client as unknown as RpcClient;
+  return pipe(
+    Effect.tryPromise({
+      try: () =>
+        rpcClient.rpc("check_rate_limit", {
+          p_key: key,
+          p_window_ms: config.windowMs,
+          p_max: config.maxRequests,
+        }),
+      catch: (e) => ({
+        allowed: false,
+        remaining: 0,
+        resetAt: new Date(Date.now() + config.windowMs).toISOString(),
+        _rpcError: e instanceof Error ? e.message : String(e),
+      }),
+    }),
+    Effect.flatMap(({ data, error }) => {
+      if (error) {
+        return Effect.fail({
+          allowed: false,
+          remaining: 0,
+          resetAt: new Date(Date.now() + config.windowMs).toISOString(),
+        } as RateLimitResult);
+      }
+      const result = data as RateLimitResult;
+      if (result.allowed) {
+        return Effect.succeed(result);
+      }
+      return Effect.fail(result);
+    })
+  );
 }
 
 export const CHAT_RATE_LIMIT: RateLimitConfig = {
   windowMs: 60_000,
   maxRequests: 20,
 };
-
-export const API_RATE_LIMIT: RateLimitConfig = {
-  windowMs: 60_000,
-  maxRequests: 60,
-};
-
-/** Reset all entries (for testing). */
-export function resetRateLimitStore(): void {
-  store.clear();
-}

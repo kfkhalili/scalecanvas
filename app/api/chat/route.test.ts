@@ -21,6 +21,10 @@ function fakeSupabaseClient(user: { id: string } | null): ServerSupabaseClient {
         }),
       }),
     }),
+    rpc: vi.fn().mockResolvedValue({
+      data: { allowed: true, remaining: 19, resetAt: new Date().toISOString() },
+      error: null,
+    }),
   } as unknown as ServerSupabaseClient;
 }
 

@@ -156,17 +156,18 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rateLimitEither = Effect.runSync(
-    Effect.either(checkRateLimit(`chat:${user.id}`, CHAT_RATE_LIMIT))
+  const rateLimitEither = await Effect.runPromise(
+    Effect.either(checkRateLimit(supabaseAuth, `chat:${user.id}`, CHAT_RATE_LIMIT))
   );
   if (Either.isLeft(rateLimitEither)) {
     const limited = rateLimitEither.left;
+    const resetMs = new Date(limited.resetAt).getTime() - Date.now();
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
         status: 429,
         headers: {
-          "Retry-After": String(Math.ceil((limited.resetAt - Date.now()) / 1000)),
+          "Retry-After": String(Math.max(1, Math.ceil(resetMs / 1000))),
         },
       }
     );

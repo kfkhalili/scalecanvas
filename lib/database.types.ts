@@ -135,6 +135,24 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_buckets: {
+        Row: {
+          count: number
+          key: string
+          reset_at: string
+        }
+        Insert: {
+          count?: number
+          key: string
+          reset_at: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          reset_at?: string
+        }
+        Relationships: []
+      }
       session_settings: {
         Row: {
           auto_review_enabled: boolean
@@ -280,6 +298,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: { p_key: string; p_max: number; p_window_ms: number }
+        Returns: Json
+      }
       claim_trial_and_create_session: {
         Args: { p_title?: string }
         Returns: string
