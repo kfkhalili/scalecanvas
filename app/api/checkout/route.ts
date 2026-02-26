@@ -75,7 +75,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   }
 
-  const origin = request.headers.get("origin") ?? "http://localhost:3000";
+  const origin =
+    request.headers.get("origin") ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    null;
+  if (!origin) {
+    return NextResponse.json(
+      { error: "Unable to determine site origin for checkout redirect" },
+      { status: 500 }
+    );
+  }
   const metadata: CheckoutMetadata = {
     pack_id: pack.id,
     user_id: user.id,

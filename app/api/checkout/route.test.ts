@@ -45,6 +45,14 @@ function makeRequest(body: unknown): Request {
   });
 }
 
+function makeRequestWithoutOrigin(body: unknown): Request {
+  return new Request("http://localhost/api/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 function fakeStripe(sessionUrl: string | null = "https://checkout.stripe.com/test"): {
   customers: { create: ReturnType<typeof vi.fn> };
   checkout: { sessions: { create: ReturnType<typeof vi.fn> } };
@@ -167,5 +175,39 @@ describe("POST /api/checkout", () => {
     expect(res.status).toBe(500);
     const json = await res.json();
     expect(json.error).toBe("Failed to create checkout session");
+  });
+
+  it("falls back to NEXT_PUBLIC_SITE_URL when origin header is missing", async () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://faang-trainer.com";
+    mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
+    mockedGetPack.mockReturnValue(Option.some(PACK));
+    mockedGetPrice.mockReturnValue(Option.some("price_abc"));
+    mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
+    const stripe = fakeStripe();
+    mockedGetStripeClient.mockReturnValue(stripe as never);
+
+    const res = await POST(makeRequestWithoutOrigin({ pack_id: "pack_3" }));
+    expect(res.status).toBe(200);
+    expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success_url: "https://faang-trainer.com/?checkout=success",
+        cancel_url: "https://faang-trainer.com/?checkout=cancel",
+      })
+    );
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+  });
+
+  it("returns 500 when both origin header and NEXT_PUBLIC_SITE_URL are missing", async () => {
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
+    mockedGetPack.mockReturnValue(Option.some(PACK));
+    mockedGetPrice.mockReturnValue(Option.some("price_abc"));
+    mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
+    mockedGetStripeClient.mockReturnValue(fakeStripe() as never);
+
+    const res = await POST(makeRequestWithoutOrigin({ pack_id: "pack_3" }));
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.error).toBe("Unable to determine site origin for checkout redirect");
   });
 });
