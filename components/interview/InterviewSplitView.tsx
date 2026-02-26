@@ -8,7 +8,12 @@ import { FlowCanvas } from "@/components/canvas/FlowCanvas";
 import { NodeLibrary } from "@/components/canvas/NodeLibrary";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { NoSessionPrompt } from "@/components/billing/NoSessionPrompt";
-import { useCanvasStore, rehydrateCanvasStore } from "@/stores/canvasStore";
+import {
+  useCanvasStore,
+  rehydrateCanvasStore,
+  onCanvasRehydrationFinished,
+  applyPersistedCanvasStateSync,
+} from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
@@ -51,18 +56,18 @@ export function InterviewSplitView({
   >(sessionId ? Option.none() : Option.some([]));
 
   useEffect(() => {
-    // Rehydrate the canvas store from localStorage.  For anonymous users
-    // (no sessionId) localStorage IS the only persistence, so we must
-    // finish rehydration before FlowCanvas mounts — otherwise the
-    // local→store sync effect in FlowCanvasInner writes [] to the store
-    // and the persist middleware overwrites localStorage before we read it.
-    const promise = rehydrateCanvasStore();
+    // For anonymous users (no sessionId) localStorage is the only persistence.
+    // Apply persisted state synchronously first so FlowCanvas never mounts with
+    // empty state and overwrites storage; then run async rehydrate so the
+    // persist middleware stays in sync, and set canvasReady so the canvas shows.
     if (!sessionId) {
-      if (promise) {
-        void promise.then(() => setCanvasReady(true));
-      } else {
-        setCanvasReady(true);
-      }
+      applyPersistedCanvasStateSync();
+      setCanvasReady(true);
+      const unsubscribe = onCanvasRehydrationFinished(() =>
+        setCanvasReady(true)
+      );
+      rehydrateCanvasStore();
+      return () => unsubscribe?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
