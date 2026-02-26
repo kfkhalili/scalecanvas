@@ -250,6 +250,10 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
   const evaluateActionOpt = useCanvasStore((s) => s.evaluateAction);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [panelPosition, setPanelPosition] = useState<{
+    bottom: number;
+    left: number;
+  } | null>(null);
   const helpBtnRef = useRef<HTMLButtonElement>(null);
   const helpPanelRef = useRef<HTMLDivElement>(null);
 
@@ -259,6 +263,7 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
       if (helpBtnRef.current?.contains(e.target as globalThis.Node)) return;
       if (helpPanelRef.current?.contains(e.target as globalThis.Node)) return;
       setShortcutsOpen(false);
+      setPanelPosition(null);
     };
     document.addEventListener("click", close, true);
     return () => document.removeEventListener("click", close, true);
@@ -267,17 +272,75 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
   useEffect(() => {
     if (!shortcutsOpen) return;
     const close = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") setShortcutsOpen(false);
+      if (e.key === "Escape") {
+        setShortcutsOpen(false);
+        setPanelPosition(null);
+      }
     };
     document.addEventListener("keydown", close);
     return () => document.removeEventListener("keydown", close);
   }, [shortcutsOpen]);
+
+  const toggleShortcuts = useCallback(() => {
+    const nextOpen = !shortcutsOpen;
+    if (nextOpen) {
+      const rect = helpBtnRef.current?.getBoundingClientRect();
+      if (rect) {
+        setPanelPosition({
+          bottom: window.innerHeight - rect.top + 8,
+          left: rect.left,
+        });
+      }
+    } else {
+      setPanelPosition(null);
+    }
+    setShortcutsOpen(nextOpen);
+  }, [shortcutsOpen]);
+
+  const shortcutsPanel =
+    shortcutsOpen && panelPosition
+      ? _createPortal(
+          <div
+            ref={helpPanelRef}
+            role="dialog"
+            aria-label="Diagram shortcuts"
+            className="fixed z-[200] w-64 rounded-xl border bg-popover p-3 shadow-xl"
+            style={{ bottom: panelPosition.bottom, left: panelPosition.left }}
+          >
+            <div className="mb-2 text-sm font-medium text-foreground">
+              Diagram shortcuts
+            </div>
+            <ul className="space-y-2 text-xs text-muted-foreground" aria-label="Shortcut list">
+              <li>
+                <kbd className="rounded border border-border bg-muted px-1 font-mono">Shift</kbd>
+                {" + "}
+                <kbd className="rounded border border-border bg-muted px-1 font-mono">drag</kbd>
+                {" — Select multiple (box select)"}
+              </li>
+              <li>
+                <kbd className="rounded border border-border bg-muted px-1 font-mono">Drag</kbd>
+                {" — Pan"}
+              </li>
+              <li>
+                <kbd className="rounded border border-border bg-muted px-1 font-mono">Scroll</kbd>
+                {" — Zoom"}
+              </li>
+              <li>
+                <kbd className="rounded border border-border bg-muted px-1 font-mono">Escape</kbd>
+                {" — Clear selection"}
+              </li>
+            </ul>
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <div
       className="relative h-full w-full"
       style={{ minHeight: 400, minWidth: 300 }}
     >
+      {shortcutsPanel}
       <ReactFlowProvider>
         <FlowCanvasInner sessionIdOpt={sessionIdOpt} />
       </ReactFlowProvider>
@@ -285,7 +348,7 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
         <button
           type="button"
           ref={helpBtnRef}
-          onClick={() => setShortcutsOpen((prev) => !prev)}
+          onClick={toggleShortcuts}
           aria-label="Canvas shortcuts"
           aria-expanded={shortcutsOpen}
           className="rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
