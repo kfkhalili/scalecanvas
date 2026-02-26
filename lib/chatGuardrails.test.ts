@@ -3,6 +3,9 @@ import { Effect, Either, Option } from "effect";
 import {
   getSessionIfWithinTimeLimit,
   timeLimitForSession,
+  remainingMs,
+  formatRemainingMs,
+  getTimerDisplay,
   TRIAL_TIME_LIMIT_MS,
   PAID_TIME_LIMIT_MS,
 } from "./chatGuardrails";
@@ -43,6 +46,85 @@ describe("timeLimitForSession", () => {
 
   it("returns 60 min for paid sessions", () => {
     expect(timeLimitForSession(session("", { isTrial: false }))).toBe(PAID_TIME_LIMIT_MS);
+  });
+});
+
+describe("remainingMs", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns full limit for just-created trial session", () => {
+    const s = session(new Date(NOW).toISOString(), { isTrial: true });
+    expect(remainingMs(s)).toBe(TRIAL_TIME_LIMIT_MS);
+  });
+
+  it("returns full limit for just-created paid session", () => {
+    const s = session(new Date(NOW).toISOString(), { isTrial: false });
+    expect(remainingMs(s)).toBe(PAID_TIME_LIMIT_MS);
+  });
+
+  it("returns remaining time after 5 minutes for trial", () => {
+    const created = NOW - 5 * 60 * 1000;
+    const s = session(new Date(created).toISOString(), { isTrial: true });
+    expect(remainingMs(s)).toBe(TRIAL_TIME_LIMIT_MS - 5 * 60 * 1000);
+  });
+
+  it("returns negative when over limit", () => {
+    const created = NOW - (TRIAL_TIME_LIMIT_MS + 60_000);
+    const s = session(new Date(created).toISOString(), { isTrial: true });
+    expect(remainingMs(s)).toBe(-60_000);
+  });
+});
+
+describe("formatRemainingMs", () => {
+  it("formats minutes and seconds", () => {
+    expect(formatRemainingMs(14 * 60 * 1000 + 32 * 1000)).toBe("14:32");
+  });
+
+  it("pads seconds with zero", () => {
+    expect(formatRemainingMs(5 * 60 * 1000)).toBe("5:00");
+  });
+
+  it("clamps negative to 0:00", () => {
+    expect(formatRemainingMs(-1000)).toBe("0:00");
+  });
+
+  it("formats zero", () => {
+    expect(formatRemainingMs(0)).toBe("0:00");
+  });
+});
+
+describe("getTimerDisplay", () => {
+  it("returns countdown label and not elapsed when time remaining", () => {
+    const ms = 14 * 60 * 1000 + 32 * 1000;
+    const result = getTimerDisplay(ms);
+    expect(result.timeLabel).toBe("14:32");
+    expect(result.isElapsed).toBe(false);
+    expect(result.elapsedMessage).toBeUndefined();
+  });
+
+  it("returns 0:00 and elapsed message when time is zero", () => {
+    const result = getTimerDisplay(0);
+    expect(result.timeLabel).toBe("0:00");
+    expect(result.isElapsed).toBe(true);
+    expect(result.elapsedMessage).toBe(
+      "Time has elapsed. Interview concluded."
+    );
+  });
+
+  it("returns 0:00 and elapsed message when time is negative", () => {
+    const result = getTimerDisplay(-60_000);
+    expect(result.timeLabel).toBe("0:00");
+    expect(result.isElapsed).toBe(true);
+    expect(result.elapsedMessage).toBe(
+      "Time has elapsed. Interview concluded."
+    );
   });
 });
 

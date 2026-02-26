@@ -30,7 +30,12 @@ import {
   getDiagramShortcutEntries,
   computeShortcutsPanelPosition,
 } from "@/lib/canvasShortcuts";
-import { HelpCircle } from "lucide-react";
+import {
+  remainingMs,
+  getTimerDisplay,
+  type TimerDisplay,
+} from "@/lib/chatGuardrails";
+import { HelpCircle, Timer } from "lucide-react";
 
 const SAVE_DEBOUNCE_MS = 800;
 
@@ -268,9 +273,39 @@ type FlowCanvasProps = {
   sessionIdOpt: Option.Option<string>;
 };
 
+function useInterviewCountdown(
+  sessionIdOpt: Option.Option<string>
+): Option.Option<TimerDisplay> {
+  const sessions = useSessionStore((s) => s.sessions);
+  const sessionId = Option.getOrUndefined(sessionIdOpt);
+  const session =
+    sessionId && sessionId !== "ephemeral"
+      ? sessions.find((s) => s.id === sessionId)
+      : undefined;
+  const [display, setDisplay] = useState<TimerDisplay | null>(() =>
+    session ? getTimerDisplay(remainingMs(session)) : null
+  );
+  useEffect(() => {
+    if (!session) return;
+    const current = getTimerDisplay(remainingMs(session));
+    if (current.isElapsed) return;
+    const interval = setInterval(() => {
+      const ms = remainingMs(session);
+      const next = getTimerDisplay(ms);
+      setDisplay(next);
+      if (next.isElapsed) clearInterval(interval);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [session]);
+  if (!session) return Option.none();
+  const value = display ?? getTimerDisplay(remainingMs(session));
+  return Option.some(value);
+}
+
 export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElement {
   const evaluateActionOpt = useCanvasStore((s) => s.evaluateAction);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const countdownOpt = useInterviewCountdown(sessionIdOpt);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState<{
     bottom: number;
@@ -358,6 +393,34 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
       style={{ minHeight: 400, minWidth: 300 }}
     >
       {shortcutsPanel}
+      {Option.match(countdownOpt, {
+        onNone: () => null,
+        onSome: (timer) => (
+          <div
+            className="absolute left-2 top-2 z-10 flex flex-col gap-0.5 rounded-md border border-input bg-background/95 px-2 py-1.5 text-xs text-foreground shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80"
+            aria-live="polite"
+            aria-label={
+              timer.isElapsed
+                ? timer.elapsedMessage
+                : `Time left: ${timer.timeLabel}`
+            }
+          >
+            <div className="flex items-center gap-1.5">
+              <Timer className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span>
+                {timer.isElapsed
+                  ? timer.timeLabel
+                  : `Time left: ${timer.timeLabel}`}
+              </span>
+            </div>
+            {timer.isElapsed && timer.elapsedMessage ? (
+              <span className="text-muted-foreground">
+                {timer.elapsedMessage}
+              </span>
+            ) : null}
+          </div>
+        ),
+      })}
       <ReactFlowProvider>
         <FlowCanvasInner sessionIdOpt={sessionIdOpt} />
       </ReactFlowProvider>
