@@ -4,7 +4,6 @@ import type { User } from "@supabase/supabase-js";
 import {
   getAvatarUrl,
   getDisplayName,
-  getProviderLabel,
   getInitials,
 } from "./userProfile";
 
@@ -65,27 +64,6 @@ describe("getDisplayName", () => {
     expect(
       Option.isNone(getDisplayName(fakeUser({ user_metadata: {} })))
     ).toBe(true);
-  });
-});
-
-describe("getProviderLabel", () => {
-  it("returns 'Google Account' for google provider", () => {
-    expect(getProviderLabel(fakeUser())).toBe("Google Account");
-  });
-
-  it("returns 'GitHub Account' for github provider", () => {
-    const user = fakeUser({ app_metadata: { provider: "github" } });
-    expect(getProviderLabel(user)).toBe("GitHub Account");
-  });
-
-  it("returns 'Account' for unknown provider", () => {
-    const user = fakeUser({ app_metadata: { provider: "email" } });
-    expect(getProviderLabel(user)).toBe("Account");
-  });
-
-  it("returns 'Account' when provider is missing", () => {
-    const user = fakeUser({ app_metadata: {} });
-    expect(getProviderLabel(user)).toBe("Account");
   });
 });
 

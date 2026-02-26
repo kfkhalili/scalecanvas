@@ -15,13 +15,6 @@ export function getDisplayName(user: User): Option.Option<string> {
   return typeof name === "string" ? Option.some(name) : Option.none();
 }
 
-export function getProviderLabel(user: User): string {
-  const provider = user.app_metadata?.provider;
-  if (provider === "google") return "Google Account";
-  if (provider === "github") return "GitHub Account";
-  return "Account";
-}
-
 export function getInitials(user: User): string {
   return Option.match(getDisplayName(user), {
     onNone: () => (user.email?.[0] ?? "?").toUpperCase(),

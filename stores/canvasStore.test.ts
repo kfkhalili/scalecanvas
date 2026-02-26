@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Option } from "effect";
 import { useCanvasStore } from "./canvasStore";
-import { getSampleCanvasState } from "@/lib/canvas";
+import { getSampleCanvasState } from "@/lib/__fixtures__/canvas";
 import type { ReactFlowNode, ReactFlowEdge } from "@/lib/types";
 
 beforeEach(() => {

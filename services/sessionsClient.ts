@@ -3,7 +3,6 @@ import type {
   Session,
   TranscriptEntry,
   CanvasState,
-  SessionSettings,
 } from "@/lib/types";
 import type {
   CreateSessionBody,
@@ -239,52 +238,4 @@ export function saveCanvasApi(
   state: CanvasState
 ): Effect.Effect<undefined, ApiError> {
   return apiPut(`${sessionsPath()}/${sessionId}/canvas`, state);
-}
-
-export function fetchSessionSettings(
-  sessionId: string
-): Effect.Effect<SessionSettings, ApiError> {
-  return apiGet<SessionSettings>(
-    `${sessionsPath()}/${sessionId}/settings`
-  );
-}
-
-export function saveSessionSettingsApi(
-  sessionId: string,
-  settings: SessionSettings
-): Effect.Effect<SessionSettings, ApiError> {
-  return pipe(
-    Effect.tryPromise({
-      try: () =>
-        fetch(`${sessionsPath()}/${sessionId}/settings`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(settings),
-          credentials: "include",
-        }),
-      catch: (e) => ({
-        message: e instanceof Error ? e.message : "Network error",
-      }),
-    }),
-    Effect.flatMap((res) =>
-      res.ok
-        ? Effect.tryPromise({
-            try: () => res.json() as Promise<SessionSettings>,
-            catch: (e) => ({
-              message: e instanceof Error ? e.message : "Parse error",
-            }),
-          })
-        : Effect.tryPromise({
-            try: () =>
-              res.json().catch(() => ({})) as Promise<ApiErrorResponse>,
-            catch: () => ({ message: res.statusText || "Request failed" }),
-          }).pipe(
-            Effect.flatMap((data) =>
-              Effect.fail({
-                message: data.error ?? res.statusText,
-              })
-            )
-          )
-    )
-  );
 }

@@ -7,11 +7,9 @@ import {
   getSession,
   updateSession,
   deleteSession,
-  getSessionSettings,
-  saveSessionSettings,
 } from "./sessions";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
-import type { DbInterviewSession, DbSessionSettings } from "@/lib/database.aliases";
+import type { DbInterviewSession } from "@/lib/database.aliases";
 
 type PostgresError = { message: string };
 type MockInsertSingle = {
@@ -28,11 +26,6 @@ type MockUpdateSingle = {
   data: DbInterviewSession | null;
   error: PostgresError | null;
 };
-type MockMaybeSingle = {
-  data: DbSessionSettings | null;
-  error: PostgresError | null;
-};
-type MockUpsert = { error: PostgresError | null };
 
 /** Captures the argument passed to `.update(fields)` so tests can assert on the exact keys. */
 type UpdateCapture = { fields: unknown };
@@ -43,8 +36,6 @@ function mockSupabaseClient(overrides: {
   selectEqSingle?: MockSelectSingle;
   updateEqSingle?: MockUpdateSingle;
   deleteEq?: MockDelete;
-  sessionSettingsSelect?: MockMaybeSingle;
-  sessionSettingsUpsert?: MockUpsert;
   /** Pass an object; `.fields` will be set to the argument of `.update()`. */
   updateCapture?: UpdateCapture;
 } = {}): ServerSupabaseClient {
@@ -56,10 +47,6 @@ function mockSupabaseClient(overrides: {
     overrides.selectEqSingle ?? { data: null, error: null };
   const updateEqSingle: MockUpdateSingle =
     overrides.updateEqSingle ?? { data: null, error: null };
-  const sessionSettingsSelect: MockMaybeSingle =
-    overrides.sessionSettingsSelect ?? { data: null, error: null };
-  const sessionSettingsUpsert: MockUpsert =
-    overrides.sessionSettingsUpsert ?? { error: null };
   const updateCapture = overrides.updateCapture;
   const chain = {
     insert: vi.fn().mockReturnValue({
@@ -71,7 +58,6 @@ function mockSupabaseClient(overrides: {
       eq: vi.fn().mockReturnValue({
         order: vi.fn().mockResolvedValue(selectEqOrder),
         single: vi.fn().mockResolvedValue(selectEqSingle),
-        maybeSingle: vi.fn().mockResolvedValue(sessionSettingsSelect),
       }),
     }),
     update: vi.fn().mockImplementation((fields: unknown) => {
@@ -88,18 +74,7 @@ function mockSupabaseClient(overrides: {
       eq: vi.fn().mockResolvedValue(overrides.deleteEq ?? { error: null }),
     }),
   };
-  const sessionSettingsChain = {
-    select: vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        maybeSingle: vi.fn().mockResolvedValue(sessionSettingsSelect),
-      }),
-    }),
-    upsert: vi.fn().mockResolvedValue(sessionSettingsUpsert),
-  };
-  const from = vi.fn().mockImplementation((table: string) => {
-    if (table === "session_settings") return sessionSettingsChain;
-    return chain;
-  });
+  const from = vi.fn().mockReturnValue(chain);
   return asServerSupabaseClient({ from });
 }
 
@@ -304,62 +279,5 @@ describe("deleteSession", () => {
     });
     const result = await runEffect(deleteSession(client, "sess-1"));
     expect(Either.isRight(result)).toBe(true);
-  });
-});
-
-describe("getSessionSettings", () => {
-  it("returns empty settings when no row exists", async () => {
-    const client = mockSupabaseClient({
-      sessionSettingsSelect: { data: null, error: null },
-    });
-    const result = await runEffect(getSessionSettings(client, "sess-1"));
-    expect(Either.isRight(result)).toBe(true);
-    whenRight(result, (s) => {
-      expect(s).toEqual({});
-    });
-  });
-
-  it("returns empty settings when row exists", async () => {
-    const client = mockSupabaseClient({
-      sessionSettingsSelect: {
-        data: {
-          session_id: "sess-1",
-          auto_review_enabled: true,
-          updated_at: "2026-01-01T00:00:00Z",
-        },
-        error: null,
-      },
-    });
-    const result = await runEffect(getSessionSettings(client, "sess-1"));
-    expect(Either.isRight(result)).toBe(true);
-    whenRight(result, (s) => {
-      expect(s).toEqual({});
-    });
-  });
-
-  it("returns err when select fails", async () => {
-    const client = mockSupabaseClient({
-      sessionSettingsSelect: { data: null, error: { message: "DB error" } },
-    });
-    const result = await runEffect(getSessionSettings(client, "sess-1"));
-    expect(Either.isLeft(result)).toBe(true);
-  });
-});
-
-describe("saveSessionSettings", () => {
-  it("returns ok(undefined) when upsert succeeds", async () => {
-    const client = mockSupabaseClient({
-      sessionSettingsUpsert: { error: null },
-    });
-    const result = await runEffect(saveSessionSettings(client, "sess-1", {}));
-    expect(Either.isRight(result)).toBe(true);
-  });
-
-  it("returns err when upsert fails", async () => {
-    const client = mockSupabaseClient({
-      sessionSettingsUpsert: { error: { message: "DB error" } },
-    });
-    const result = await runEffect(saveSessionSettings(client, "sess-1", {}));
-    expect(Either.isLeft(result)).toBe(true);
   });
 });

@@ -14,10 +14,3 @@ export function transcriptToPublic(db: DbSessionTranscript): TranscriptEntry {
     createdAt: db.created_at,
   };
 }
-
-export function mergeTranscript(
-  prev: ReadonlyArray<TranscriptEntry>,
-  next: TranscriptEntry
-): TranscriptEntry[] {
-  return [...prev, next];
-}

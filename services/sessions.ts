@@ -4,7 +4,6 @@ import type {
   Session,
   TranscriptEntry,
   CanvasState,
-  SessionSettings,
 } from "@/lib/types";
 import { sessionToPublic } from "@/lib/session";
 import { transcriptToPublic } from "@/lib/transcript";
@@ -15,9 +14,6 @@ import type {
   DbSessionTranscript,
   DbSessionTranscriptInsert,
   DbCanvasState,
-  DbSessionSettings,
-  DbSessionSettingsInsert,
-  DbSessionSettingsUpdate,
 } from "@/lib/database.aliases";
 
 export type SessionError = { message: string };
@@ -254,52 +250,3 @@ export function getCanvasState(
   );
 }
 
-function sessionSettingsFromDb(_row: DbSessionSettings): SessionSettings {
-  return {};
-}
-
-const DEFAULT_SESSION_SETTINGS: SessionSettings = {};
-
-export function getSessionSettings(
-  client: ServerSupabaseClient,
-  sessionId: string
-): Effect.Effect<SessionSettings, SessionError> {
-  return pipe(
-    Effect.promise(() =>
-      client
-        .from("session_settings")
-        .select()
-        .eq("session_id", sessionId)
-        .maybeSingle()
-    ),
-    Effect.flatMap(({ data, error }) =>
-      error
-        ? Effect.fail(toSessionError(error))
-        : Effect.succeed(
-            data
-              ? sessionSettingsFromDb(data as DbSessionSettings)
-              : DEFAULT_SESSION_SETTINGS
-          )
-    )
-  );
-}
-
-export function saveSessionSettings(
-  client: ServerSupabaseClient,
-  sessionId: string,
-  _settings: SessionSettings
-): Effect.Effect<undefined, SessionError> {
-  const row: DbSessionSettingsInsert & DbSessionSettingsUpdate = {
-    session_id: sessionId,
-    auto_review_enabled: false,
-    updated_at: new Date().toISOString(),
-  };
-  return pipe(
-    Effect.promise(() =>
-      client.from("session_settings").upsert(row as never, { onConflict: "session_id" })
-    ),
-    Effect.flatMap(({ error }) =>
-      error ? Effect.fail(toSessionError(error)) : Effect.succeed(undefined)
-    )
-  );
-}

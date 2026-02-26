@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { canvasFromDb, replaceCanvasState, getSampleCanvasState, resolveEdgeHandles } from "./canvas";
+import { canvasFromDb, replaceCanvasState, resolveEdgeHandles } from "./canvas";
+import { getSampleCanvasState } from "./__fixtures__/canvas";
 import type { DbCanvasState } from "@/lib/database.aliases";
 import type { CanvasState, ReactFlowNode, ReactFlowEdge, Viewport } from "@/lib/types";
 

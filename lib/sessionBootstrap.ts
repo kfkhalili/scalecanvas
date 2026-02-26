@@ -10,8 +10,7 @@ export type BootstrapContext = {
 
 export type BootstrapAction =
   | { type: "redirect_login" }
-  | { type: "resume_or_idle" }
-  | { type: "deduct_and_handoff" };
+  | { type: "resume_or_idle" };
 
 /**
  * Pure decision function: given the bootstrap context, returns the action
@@ -19,20 +18,16 @@ export type BootstrapAction =
  */
 export function decideBootstrapAction(
   hasSession: boolean,
-  ctx: BootstrapContext
+  _ctx: BootstrapContext
 ): BootstrapAction {
   if (!hasSession) {
     return { type: "redirect_login" };
   }
-  if (!ctx.hasAnonymousChat) {
-    return { type: "resume_or_idle" };
-  }
-  return { type: "deduct_and_handoff" };
+  return { type: "resume_or_idle" };
 }
 
 export type BootstrapDeps = {
   fetchSessions: () => Effect.Effect<ReadonlyArray<Session>, { message: string }>;
-  deductTokenAndCreateSession: () => Effect.Effect<string, { message: string }>;
   renameSession: (id: string, title: string) => Promise<void>;
   setPendingAuthHandoff: (sessionId: Option.Option<string>) => void;
   setHasAttemptedEval: (value: boolean) => void;
@@ -54,18 +49,6 @@ export async function executeBootstrapAction(
       );
       whenRight(fetchEither, (list) => {
         if (list.length > 0) deps.redirectTo(`/${list[0].id}`);
-      });
-      return;
-    }
-    case "deduct_and_handoff": {
-      deps.setHasAttemptedEval(false);
-      const deductEither = await Effect.runPromise(
-        Effect.either(deps.deductTokenAndCreateSession())
-      );
-      whenRight(deductEither, (sessionId) => {
-        if (Option.isSome(ctx.questionTitle))
-          void deps.renameSession(sessionId, ctx.questionTitle.value);
-        deps.setPendingAuthHandoff(Option.some(sessionId));
       });
       return;
     }

@@ -32,7 +32,6 @@ function mockSession(id: string): Session {
 function mockDeps(overrides: Partial<BootstrapDeps> = {}): BootstrapDeps {
   return {
     fetchSessions: vi.fn().mockReturnValue(Effect.succeed([])),
-    deductTokenAndCreateSession: vi.fn().mockReturnValue(Effect.succeed("deducted-1")),
     renameSession: vi.fn().mockResolvedValue(undefined),
     setPendingAuthHandoff: vi.fn(),
     setHasAttemptedEval: vi.fn(),
@@ -46,20 +45,17 @@ describe("decideBootstrapAction", () => {
     expect(decideBootstrapAction(false, ctx()).type).toBe("redirect_login");
   });
 
-  it("returns resume_or_idle when no anonymous chat", () => {
+  it("returns resume_or_idle when session exists (with or without anonymous chat)", () => {
     expect(decideBootstrapAction(true, ctx()).type).toBe("resume_or_idle");
-  });
-
-  it("returns deduct_and_handoff when anonymous chat (with or without eval)", () => {
     expect(
       decideBootstrapAction(
         true,
         ctx({ hasAnonymousChat: true, hasAttemptedEval: true })
       ).type
-    ).toBe("deduct_and_handoff");
+    ).toBe("resume_or_idle");
     expect(
       decideBootstrapAction(true, ctx({ hasAnonymousChat: true })).type
-    ).toBe("deduct_and_handoff");
+    ).toBe("resume_or_idle");
   });
 });
 
@@ -92,40 +88,5 @@ describe("executeBootstrapAction", () => {
     });
     await executeBootstrapAction({ type: "resume_or_idle" }, ctx(), deps);
     expect(deps.redirectTo).not.toHaveBeenCalled();
-  });
-
-  it("deduct_and_handoff: clears eval flag, deducts, renames, and hands off", async () => {
-    const deps = mockDeps();
-    const c = ctx({
-      hasAnonymousChat: true,
-      hasAttemptedEval: true,
-      questionTitle: Option.some("Design X"),
-    });
-    await executeBootstrapAction({ type: "deduct_and_handoff" }, c, deps);
-    expect(deps.setHasAttemptedEval).toHaveBeenCalledWith(false);
-    expect(deps.renameSession).toHaveBeenCalledWith("deducted-1", "Design X");
-    expect(deps.setPendingAuthHandoff).toHaveBeenCalledWith(Option.some("deducted-1"));
-  });
-
-  it("deduct_and_handoff: skips rename when no questionTitle", async () => {
-    const deps = mockDeps();
-    const c = ctx({
-      hasAnonymousChat: true,
-      hasAttemptedEval: true,
-      questionTitle: Option.none(),
-    });
-    await executeBootstrapAction({ type: "deduct_and_handoff" }, c, deps);
-    expect(deps.renameSession).not.toHaveBeenCalled();
-    expect(deps.setPendingAuthHandoff).toHaveBeenCalledWith(Option.some("deducted-1"));
-  });
-
-  it("deduct_and_handoff: does nothing on deduction error", async () => {
-    const deps = mockDeps({
-      deductTokenAndCreateSession: vi.fn().mockReturnValue(Effect.fail({ message: "no tokens" })),
-    });
-    const c = ctx({ hasAnonymousChat: true, hasAttemptedEval: true });
-    await executeBootstrapAction({ type: "deduct_and_handoff" }, c, deps);
-    expect(deps.setHasAttemptedEval).toHaveBeenCalledWith(false);
-    expect(deps.setPendingAuthHandoff).not.toHaveBeenCalled();
   });
 });

@@ -29,9 +29,6 @@ export type CanvasState = {
   viewport?: Viewport;
 };
 
-/** Per-session settings (persisted in Supabase). Reserved for future use. */
-export type SessionSettings = Record<string, never>;
-
 export type NodeData = {
   label?: string;
 };
