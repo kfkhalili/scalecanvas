@@ -1,10 +1,10 @@
 import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
+import { NodeLibraryProvidersSchema } from "@/lib/api.schemas";
 import { createServerClientInstance } from "@/lib/supabase/server";
-import { NodeLibraryProviderSchema } from "@/lib/api.schemas";
 import {
-  getNodeLibraryProvider,
-  setNodeLibraryProvider,
+  getNodeLibraryProviders,
+  setNodeLibraryProviders,
 } from "@/lib/userPreferences";
 
 export async function GET(): Promise<NextResponse> {
@@ -15,11 +15,11 @@ export async function GET(): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const providerOption = await Effect.runPromise(
-    getNodeLibraryProvider(supabase, user.id)
+  const providerOpt = await Effect.runPromise(
+    getNodeLibraryProviders(supabase, user.id)
   );
-  const provider = Option.getOrNull(providerOption);
-  return NextResponse.json({ provider });
+  const providers = Option.getOrElse(providerOpt, () => []);
+  return NextResponse.json({ providers });
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
@@ -30,7 +30,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  let body: { provider?: string };
+  let body: { providers?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -39,15 +39,18 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       { status: 400 }
     );
   }
-  const parsed = NodeLibraryProviderSchema.safeParse(body.provider);
+  const parsed = NodeLibraryProvidersSchema.safeParse(body.providers);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "provider must be one of: all, aws, gcp, azure, generic" },
+      {
+        error:
+          "providers must be an array; each item must be aws, gcp, azure, or generic (no 'all')",
+      },
       { status: 400 }
     );
   }
   const either = await Effect.runPromise(
-    Effect.either(setNodeLibraryProvider(supabase, user.id, parsed.data))
+    Effect.either(setNodeLibraryProviders(supabase, user.id, parsed.data))
   );
   return Either.match(either, {
     onLeft: (e) =>
