@@ -251,7 +251,27 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const helpBtnRef = useRef<HTMLButtonElement>(null);
-  const _helpPanelRef = useRef<HTMLDivElement>(null);
+  const helpPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!shortcutsOpen) return;
+    const close = (e: MouseEvent): void => {
+      if (helpBtnRef.current?.contains(e.target as globalThis.Node)) return;
+      if (helpPanelRef.current?.contains(e.target as globalThis.Node)) return;
+      setShortcutsOpen(false);
+    };
+    document.addEventListener("click", close, true);
+    return () => document.removeEventListener("click", close, true);
+  }, [shortcutsOpen]);
+
+  useEffect(() => {
+    if (!shortcutsOpen) return;
+    const close = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") setShortcutsOpen(false);
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [shortcutsOpen]);
 
   return (
     <div
