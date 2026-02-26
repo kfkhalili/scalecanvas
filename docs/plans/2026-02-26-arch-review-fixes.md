@@ -27,9 +27,10 @@ pnpm vitest run services/sessions.test
 
 ---
 
-## Commit 2 — `fix: stop fitView from overriding saved viewport on mount`
+## ✅ Commit 2 — `fix: stop fitView from overriding saved viewport on mount`
 **Findings:** 1.1
 **Risk:** P1 — user-visible viewport loss on every session load
+**Status:** Done — committed as `9e76fd4`
 **Files changed:**
 
 | File | Change |
@@ -266,7 +267,7 @@ Commits 6–10 form a linear chain that should land in order.
 | Commit | Size | Estimated time |
 |--------|------|----------------|
 | 1 | XS | ✅ Done |
-| 2 | S | 30 min |
+| 2 | S | ✅ Done |
 | 3 | M | 1–2 hr (migration + RPC + test rewrite) |
 | 4 | XS | 10 min |
 | 5 | L | 1–2 hr (touches many files, needs careful type-checking) |
