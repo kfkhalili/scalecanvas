@@ -11,6 +11,11 @@ out
 .env.prod
 .env.production
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
 # Debug / OS
 *.log
 .DS_Store
