@@ -85,9 +85,10 @@ pnpm vitest run app/api/checkout
 
 ---
 
-## Commit 5 — `refactor: consolidate NodeLibraryProvider validation & schema duplication`
+## ✅ Commit 5 — `refactor: consolidate NodeLibraryProvider validation & schema duplication`
 **Findings:** 7.1, 3.1, 3.2
 **Risk:** P2 — three separate sources of truth for the same enum; two separate sources of truth for API schemas
+**Status:** Done — committed as `666c889`
 **Files changed:**
 
 | File | Change |
@@ -272,7 +273,7 @@ Commits 6–10 form a linear chain that should land in order.
 | 2 | S | ✅ Done |
 | 3 | M | ✅ Done |
 | 4 | XS | ✅ Done |
-| 5 | L | 1–2 hr (touches many files, needs careful type-checking) |
+| 5 | L | ✅ Done |
 | 6 | M | 45 min (many files but mostly deletion) |
 | 7 | S | 20 min |
 | 8 | M | 45 min (new preferencesClient + sidebarStore rewrite) |

@@ -391,8 +391,8 @@ Total findings: **31** across 8 categories.
 | ✅ ~~**P2**~~ | ~~5.2~~ | ~~Bug~~ | ~~Replace `"http://localhost:3000"` fallback in checkout with `NEXT_PUBLIC_SITE_URL`~~ — **Done** (commit `52a19f4`) |
 | **P4** | 8.6 | Smell | Move `CheckoutFeedback` to root layout for immediate rendering (toast is not actually lost) |
 | **P2** | 4.7 | Smell | Split shared `loadingSessionIdRef` into canvas and transcript refs |
-| **P2** | 3.2 | Duplication | Use `ChatBodySchema` in the chat route; delete hand-written `parseChatBody` |
-| **P2** | 7.1 | Duplication | Consolidate `NodeLibraryProvider` validation into a single `z.enum` in `lib/api.schemas.ts` |
+| ✅ ~~**P2**~~ | ~~3.2~~ | ~~Duplication~~ | ~~Use `ChatBodySchema` in the chat route; delete hand-written `parseChatBody`~~ — **Done** (commit `666c889`) |
+| ✅ ~~**P2**~~ | ~~7.1~~ | ~~Duplication~~ | ~~Consolidate `NodeLibraryProvider` validation into a single `z.enum` in `lib/api.schemas.ts`~~ — **Done** (commit `666c889`) |
 | **P2** | 2.4 | Dead code | Remove dead `deduct_and_handoff` from `sessionBootstrap` |
 | **P2** | 6.2 | Dead code | Delete unused `BuyTokensButton` or promote it to replace the duplicated inline UIs |
 | **P2** | 4.4 | Smell | Delete or complete `SessionSettings` CRUD infrastructure |
@@ -400,7 +400,7 @@ Total findings: **31** across 8 categories.
 | **P3** | 8.1 | Smell | Wrap `NodeLibrary` preferences calls in `services/preferencesClient.ts` |
 | **P3** | 8.3 | Smell | Replace hand-rolled localStorage in `sidebarStore` with Zustand `persist` middleware |
 | **P3** | 2.1 | Dead code | Consolidate CSRF logic — delete `lib/csrf.ts` or import it from `middleware.ts` |
-| **P3** | 3.1 | Duplication | Delete `lib/api.types.ts`; import inferred types from `lib/api.schemas.ts` |
+| ✅ ~~**P3**~~ | ~~3.1~~ | ~~Duplication~~ | ~~Delete `lib/api.types.ts`; import inferred types from `lib/api.schemas.ts`~~ — **Done** (commit `666c889`) |
 | **P3** | 4.2 | Smell | Extract `apiPatch` helper in `sessionsClient.ts` |
 | **P3** | 1.3 | Bug | Remove redundant `renameSessionApi` call after handoff |
 | **P3** | 8.4 | Smell | Rename `getOrCreateStripeCustomerId` → `findStripeCustomerId` |
