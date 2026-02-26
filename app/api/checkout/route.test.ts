@@ -68,7 +68,7 @@ describe("POST /api/checkout", () => {
 
   it("returns 400 for invalid pack_id", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetPack.mockReturnValue(undefined);
+    mockedGetPack.mockReturnValue(Option.none());
     const res = await POST(makeRequest({ pack_id: "invalid" }));
     expect(res.status).toBe(400);
     const json = await res.json();
@@ -77,8 +77,8 @@ describe("POST /api/checkout", () => {
 
   it("returns 503 when price is not configured", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetPack.mockReturnValue(PACK);
-    mockedGetPrice.mockReturnValue(undefined);
+    mockedGetPack.mockReturnValue(Option.some(PACK));
+    mockedGetPrice.mockReturnValue(Option.none());
     const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(503);
   });
@@ -91,8 +91,8 @@ describe("POST /api/checkout", () => {
 
   it("returns checkout URL for existing Stripe customer", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1", email: "a@b.com" }));
-    mockedGetPack.mockReturnValue(PACK);
-    mockedGetPrice.mockReturnValue("price_abc");
+    mockedGetPack.mockReturnValue(Option.some(PACK));
+    mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
     const stripe = fakeStripe();
     mockedGetStripeClient.mockReturnValue(stripe as never);
@@ -112,8 +112,8 @@ describe("POST /api/checkout", () => {
 
   it("creates a new Stripe customer when none exists", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1", email: "a@b.com" }));
-    mockedGetPack.mockReturnValue(PACK);
-    mockedGetPrice.mockReturnValue("price_abc");
+    mockedGetPack.mockReturnValue(Option.some(PACK));
+    mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.none()));
     mockedSaveCustomer.mockReturnValue(Effect.succeed(undefined));
     const stripe = fakeStripe();
@@ -129,8 +129,8 @@ describe("POST /api/checkout", () => {
 
   it("returns 500 when getOrCreateStripeCustomerId fails", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetPack.mockReturnValue(PACK);
-    mockedGetPrice.mockReturnValue("price_abc");
+    mockedGetPack.mockReturnValue(Option.some(PACK));
+    mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.fail({ message: "DB error" }));
     mockedGetStripeClient.mockReturnValue(fakeStripe() as never);
 
@@ -142,8 +142,8 @@ describe("POST /api/checkout", () => {
 
   it("returns 500 when saveStripeCustomerId fails", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetPack.mockReturnValue(PACK);
-    mockedGetPrice.mockReturnValue("price_abc");
+    mockedGetPack.mockReturnValue(Option.some(PACK));
+    mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.none()));
     mockedSaveCustomer.mockReturnValue(Effect.fail({ message: "save failed" }));
     const stripe = fakeStripe();
@@ -157,8 +157,8 @@ describe("POST /api/checkout", () => {
 
   it("returns 500 when Stripe session has no URL", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetPack.mockReturnValue(PACK);
-    mockedGetPrice.mockReturnValue("price_abc");
+    mockedGetPack.mockReturnValue(Option.some(PACK));
+    mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
     const stripe = fakeStripe(null);
     mockedGetStripeClient.mockReturnValue(stripe as never);

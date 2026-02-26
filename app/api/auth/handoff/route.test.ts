@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -52,7 +52,7 @@ describe("POST /api/auth/handoff", () => {
     expect(mockedClaimTrial).toHaveBeenCalledWith(
       expect.anything(),
       "user-1",
-      "URL Shortener"
+      Option.some("URL Shortener")
     );
   });
 
@@ -83,6 +83,10 @@ describe("POST /api/auth/handoff", () => {
     mockedClaimTrial.mockReturnValue(Effect.succeed("session-456"));
     const res = await POST(makeRequest({}));
     expect(res.status).toBe(201);
-    expect(mockedClaimTrial).toHaveBeenCalledWith(expect.anything(), "user-1", null);
+    expect(mockedClaimTrial).toHaveBeenCalledWith(
+      expect.anything(),
+      "user-1",
+      Option.none()
+    );
   });
 });

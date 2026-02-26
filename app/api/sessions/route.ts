@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { createSession, listSessions } from "@/services/sessions";
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   }
   const either = await Effect.runPromise(
     Effect.either(
-      createSession(supabase, user.id, parsed.data.title ?? null)
+      createSession(supabase, user.id, Option.fromNullable(parsed.data.title))
     )
   );
   return Either.match(either, {

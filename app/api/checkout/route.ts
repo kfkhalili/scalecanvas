@@ -27,18 +27,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const pack = getPackById(parsed.data.pack_id);
-  if (!pack) {
+  const packOpt = getPackById(parsed.data.pack_id);
+  if (Option.isNone(packOpt)) {
     return NextResponse.json({ error: "Invalid pack_id" }, { status: 400 });
   }
+  const pack = packOpt.value;
 
-  const priceId = getStripePriceId(pack);
-  if (!priceId) {
+  const priceOpt = getStripePriceId(pack);
+  if (Option.isNone(priceOpt)) {
     return NextResponse.json(
       { error: "Stripe price not configured for this pack" },
       { status: 503 }
     );
   }
+  const priceId = priceOpt.value;
 
   const stripe = getStripeClient();
 
@@ -90,9 +92,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     cancel_url: `${origin}/?checkout=cancel`,
   });
 
-  if (!session.url) {
+  const urlOpt = Option.fromNullable(session.url);
+  if (Option.isNone(urlOpt)) {
     return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 });
   }
-
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: urlOpt.value });
 }

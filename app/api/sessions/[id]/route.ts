@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getSession, updateSession, deleteSession } from "@/services/sessions";
@@ -47,7 +47,11 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
   const either = await Effect.runPromise(
-    Effect.either(updateSession(supabase, id, { title: parsed.data.title }))
+    Effect.either(
+      updateSession(supabase, id, {
+        titleOpt: Option.fromNullable(parsed.data.title),
+      })
+    )
   );
   return Either.match(either, {
     onLeft: (e) =>

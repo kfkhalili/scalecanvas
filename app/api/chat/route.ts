@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
 import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
 import { streamText, convertToCoreMessages, tool } from "ai";
@@ -45,50 +45,55 @@ function extractContent(content: unknown): string {
   return "";
 }
 
-function parseChatBody(
-  raw: unknown
-): { messages: ParsedMessage[]; nodes: ParsedNode[]; edges: ParsedEdge[]; session_id?: string } | null {
-  if (!raw || typeof raw !== "object") return null;
+type ParsedChatBody = {
+  messages: ParsedMessage[];
+  nodes: ParsedNode[];
+  edges: ParsedEdge[];
+  session_id: Option.Option<string>;
+};
+
+function parseChatBody(raw: unknown): Option.Option<ParsedChatBody> {
+  if (!raw || typeof raw !== "object") return Option.none();
   const o = raw as Record<string, unknown>;
   const rawMessages = Array.isArray(o.messages)
     ? o.messages
     : o.data && typeof o.data === "object" && Array.isArray((o.data as Record<string, unknown>).messages)
       ? (o.data as Record<string, unknown[]>).messages
       : undefined;
-  if (!rawMessages || rawMessages.length === 0) return null;
+  if (!rawMessages || rawMessages.length === 0) return Option.none();
   const messages: ParsedMessage[] = [];
   for (const m of rawMessages) {
-    if (!m || typeof m !== "object") return null;
+    if (!m || typeof m !== "object") return Option.none();
     const msg = m as Record<string, unknown>;
     const role = msg.role;
     const content = extractContent(msg.content);
-    if (role !== "user" && role !== "assistant" && role !== "system") return null;
+    if (role !== "user" && role !== "assistant" && role !== "system") return Option.none();
     messages.push({ role, content });
   }
   const nodes = parseNodeArray(o.nodes);
   const edges = parseEdgeArray(o.edges);
   const session_id =
     typeof o.session_id === "string" && o.session_id.length > 0
-      ? o.session_id
-      : undefined;
-  return { messages, nodes, edges, session_id };
+      ? Option.some(o.session_id)
+      : Option.none();
+  return Option.some({ messages, nodes, edges, session_id });
 }
 
-function validateChatBoundaries(parsed: {
-  messages: ParsedMessage[];
-  nodes: ParsedNode[];
-  edges: ParsedEdge[];
-  session_id?: string;
-}): string | null {
-  if (parsed.session_id != null) {
-    if (parsed.session_id.length > SESSION_ID_MAX_LENGTH) return "session_id too long.";
-    const uuidResult = z.string().uuid().safeParse(parsed.session_id);
-    if (!uuidResult.success) return "session_id must be a valid UUID.";
-  }
-  if (parsed.messages.length > MAX_MESSAGES) return "Too many messages.";
-  if (parsed.nodes.length > MAX_NODES) return "Too many nodes.";
-  if (parsed.edges.length > MAX_EDGES) return "Too many edges.";
-  return null;
+/** Returns Some(error message) when invalid, None when valid. */
+function validateChatBoundaries(parsed: ParsedChatBody): Option.Option<string> {
+  const sessionIdError = Option.match(parsed.session_id, {
+    onNone: () => Option.none() as Option.Option<string>,
+    onSome: (id) => {
+      if (id.length > SESSION_ID_MAX_LENGTH) return Option.some("session_id too long.");
+      const uuidResult = z.string().uuid().safeParse(id);
+      return uuidResult.success ? Option.none() : Option.some("session_id must be a valid UUID.");
+    },
+  });
+  if (Option.isSome(sessionIdError)) return sessionIdError;
+  if (parsed.messages.length > MAX_MESSAGES) return Option.some("Too many messages.");
+  if (parsed.nodes.length > MAX_NODES) return Option.some("Too many nodes.");
+  if (parsed.edges.length > MAX_EDGES) return Option.some("Too many edges.");
+  return Option.none();
 }
 
 function parseNodeArray(v: unknown): ParsedNode[] {
@@ -184,7 +189,7 @@ export async function POST(
     modelId = "global.anthropic.claude-sonnet-4-6";
   }
 
-  let body: { messages: ParsedMessage[]; nodes: ParsedNode[]; edges: ParsedEdge[]; session_id?: string };
+  let body: ParsedChatBody;
   try {
     const text = await request.text();
     if (text.length > MAX_CHAT_BODY_BYTES) {
@@ -194,22 +199,23 @@ export async function POST(
       );
     }
     const raw = JSON.parse(text) as unknown;
-    const parsed = parseChatBody(raw);
-    if (!parsed) {
-      console.error("[chat] 400 Invalid body. Keys:", raw && typeof raw === "object" ? Object.keys(raw as object) : "not object");
-      return NextResponse.json(
-        { error: "Invalid request body: messages required." },
-        { status: 400 }
-      );
-    }
-    const boundaryError = validateChatBoundaries(parsed);
-    if (boundaryError != null) {
-      return NextResponse.json(
-        { error: boundaryError },
-        { status: 400 }
-      );
-    }
-    body = parsed;
+    const bodyOrBadRequest = Option.match(parseChatBody(raw), {
+      onNone: () => {
+        console.error("[chat] 400 Invalid body. Keys:", raw && typeof raw === "object" ? Object.keys(raw as object) : "not object");
+        return NextResponse.json(
+          { error: "Invalid request body: messages required." },
+          { status: 400 }
+        ) as NextResponse;
+      },
+      onSome: (parsed) =>
+        Option.match(validateChatBoundaries(parsed), {
+          onNone: () => parsed as ParsedChatBody | NextResponse,
+          onSome: (boundaryError) =>
+            NextResponse.json({ error: boundaryError }, { status: 400 }) as ParsedChatBody | NextResponse,
+        }),
+    });
+    if (bodyOrBadRequest instanceof NextResponse) return bodyOrBadRequest;
+    body = bodyOrBadRequest;
   } catch (e) {
     console.error("[chat] 400 Parse error:", e);
     return NextResponse.json(
@@ -270,7 +276,10 @@ export async function POST(
           execute: async ({ reason }) => {
             await Effect.runPromise(
               Effect.either(
-                updateSession(supabaseAuth, sessionId, { status: "terminated" })
+                updateSession(supabaseAuth, sessionId, {
+                  titleOpt: Option.none(),
+                  statusOpt: Option.some("terminated"),
+                })
               )
             );
             return reason;

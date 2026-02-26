@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripeClient } from "@/lib/stripe";
@@ -32,38 +32,45 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const metadata = session.metadata as unknown as CheckoutMetadata | null;
-
-    if (!metadata?.user_id || !metadata?.pack_id || !metadata?.tokens) {
-      console.error("[stripe-webhook] Missing metadata on session:", session.id);
-      return NextResponse.json({ received: true });
-    }
-
-    const tokens = parseInt(metadata.tokens, 10);
-    if (isNaN(tokens) || tokens <= 0) {
-      console.error("[stripe-webhook] Invalid tokens metadata:", metadata.tokens);
-      return NextResponse.json({ received: true });
-    }
-
-    const supabase = await createServerClientInstance();
-    const either = await Effect.runPromise(
-      Effect.either(
-        creditTokensForPurchase(
-          supabase,
-          metadata.user_id,
-          session.id,
-          metadata.pack_id,
-          tokens
-        )
-      )
+    const metadataOpt = Option.fromNullable(
+      session.metadata as unknown as CheckoutMetadata | null
     );
-    Either.match(either, {
-      onLeft: (e) =>
-        console.error("[stripe-webhook] Failed to credit tokens:", e.message),
-      onRight: (newBalance) =>
-        console.log(
-          `[stripe-webhook] Credited ${tokens} tokens to ${metadata.user_id}. New balance: ${newBalance}`
-        ),
+
+    await Option.match(metadataOpt, {
+      onNone: async () => {
+        console.error("[stripe-webhook] Missing metadata on session:", session.id);
+      },
+      onSome: async (metadata) => {
+        if (!metadata.user_id || !metadata.pack_id || !metadata.tokens) {
+          console.error("[stripe-webhook] Missing metadata on session:", session.id);
+          return;
+        }
+        const tokens = parseInt(metadata.tokens, 10);
+        if (isNaN(tokens) || tokens <= 0) {
+          console.error("[stripe-webhook] Invalid tokens metadata:", metadata.tokens);
+          return;
+        }
+        const supabase = await createServerClientInstance();
+        const either = await Effect.runPromise(
+          Effect.either(
+            creditTokensForPurchase(
+              supabase,
+              metadata.user_id,
+              session.id,
+              metadata.pack_id,
+              tokens
+            )
+          )
+        );
+        Either.match(either, {
+          onLeft: (e) =>
+            console.error("[stripe-webhook] Failed to credit tokens:", e.message),
+          onRight: (newBalance) =>
+            console.log(
+              `[stripe-webhook] Credited ${tokens} tokens to ${metadata.user_id}. New balance: ${newBalance}`
+            ),
+        });
+      },
     });
   }
 

@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { claimTrialAndCreateSession } from "@/services/handoff";
@@ -30,7 +30,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       claimTrialAndCreateSession(
         supabase,
         user.id,
-        parsed.data.question_title ?? null
+        Option.fromNullable(parsed.data.question_title)
       )
     )
   );
