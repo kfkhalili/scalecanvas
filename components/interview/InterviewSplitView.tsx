@@ -46,13 +46,26 @@ export function InterviewSplitView({
   const previousSessionIdRef = useRef<string | null>(null);
   const loadingSessionIdRef = useRef<string | null>(null);
 
-  const [canvasReady, setCanvasReady] = useState(!sessionId);
+  const [canvasReady, setCanvasReady] = useState(false);
   const [transcriptForSessionOpt, setTranscriptForSessionOpt] = useState<
     Option.Option<TranscriptEntry[]>
   >(sessionId ? Option.none() : Option.some([]));
 
   useEffect(() => {
-    rehydrateCanvasStore();
+    // Rehydrate the canvas store from localStorage.  For anonymous users
+    // (no sessionId) localStorage IS the only persistence, so we must
+    // finish rehydration before FlowCanvas mounts — otherwise the
+    // local→store sync effect in FlowCanvasInner writes [] to the store
+    // and the persist middleware overwrites localStorage before we read it.
+    const promise = rehydrateCanvasStore();
+    if (!sessionId) {
+      if (promise) {
+        void promise.then(() => setCanvasReady(true));
+      } else {
+        setCanvasReady(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -69,8 +82,11 @@ export function InterviewSplitView({
     previousSessionIdRef.current = sessionId ?? null;
 
     if (!sessionId) {
-      if (!isAnonymous) setCanvasState(empty);
-      setCanvasReady(true);
+      if (!isAnonymous) {
+        setCanvasState(empty);
+        setCanvasReady(true);
+      }
+      // Anonymous canvasReady is set by the rehydration effect above.
       return;
     }
 
@@ -153,9 +169,9 @@ export function InterviewSplitView({
         <SplitScreen
           left={
             <div className="flex h-full min-w-0">
-              <NodeLibrary className="w-52 shrink-0 border-r border-foreground/5 bg-background" />
+              <NodeLibrary className="w-52 shrink-0 border-r border-foreground/5 bg-background" isAnonymous={isAnonymous} />
               <div className="min-h-0 min-w-[200px] flex-1">
-                {sessionReady ? (
+                {sessionReady && canvasReady ? (
                   <FlowCanvas
                     key={sessionId ?? "ephemeral"}
                     sessionIdOpt={Option.some(sessionId ?? "ephemeral")}

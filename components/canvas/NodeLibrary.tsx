@@ -114,11 +114,14 @@ function CategoryGroup({
   );
 }
 
+const ANON_PROVIDER_KEY = "scalecanvas-provider";
+
 type NodeLibraryProps = {
   className?: string;
+  isAnonymous?: boolean;
 };
 
-export function NodeLibrary({ className = "" }: NodeLibraryProps): React.ReactElement {
+export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibraryProps): React.ReactElement {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -135,6 +138,25 @@ export function NodeLibrary({ className = "" }: NodeLibraryProps): React.ReactEl
 
   useEffect(() => {
     if (Option.isSome(Option.fromNullable(searchParams.get("provider")))) return;
+
+    if (isAnonymous) {
+      // Anonymous users: read provider preference from localStorage only
+      try {
+        const stored = localStorage.getItem(ANON_PROVIDER_KEY);
+        if (stored) {
+          const parsed = parseProviderFromUrl(Option.some(stored));
+          if (parsed !== "all") {
+            setProviderState(parsed);
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.set("provider", stored);
+            router.replace(`${pathname}?${nextParams.toString()}`);
+          }
+        }
+      } catch { /* private browsing / quota */ }
+      return;
+    }
+
+    // Signed-in users: fetch from backend
     fetch("/api/preferences")
       .then((r) =>
         r.ok
@@ -154,7 +176,7 @@ export function NodeLibrary({ className = "" }: NodeLibraryProps): React.ReactEl
         });
       })
       .catch(() => {});
-  }, [pathname, router, searchParams]);
+  }, [pathname, router, searchParams, isAnonymous]);
 
   const setProvider = useCallback(
     (next: NodeLibraryProvider) => {
@@ -164,13 +186,18 @@ export function NodeLibrary({ className = "" }: NodeLibraryProps): React.ReactEl
       else nextParams.set("provider", next);
       const qs = nextParams.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
-      fetch("/api/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: next }),
-      }).catch(() => {});
+
+      if (isAnonymous) {
+        try { localStorage.setItem(ANON_PROVIDER_KEY, next); } catch { /* ignore */ }
+      } else {
+        fetch("/api/preferences", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: next }),
+        }).catch(() => {});
+      }
     },
-    [pathname, router, searchParams]
+    [pathname, router, searchParams, isAnonymous]
   );
 
   const isSearching = query.trim().length > 0;
