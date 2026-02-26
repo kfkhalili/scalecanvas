@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Effect, Either, Option } from "effect";
 import {
-  fetchNodeLibraryProvider,
-  saveNodeLibraryProvider,
+  fetchNodeLibraryProviders,
+  saveNodeLibraryProviders,
 } from "./preferencesClient";
 
 const originalFetch = globalThis.fetch;
@@ -17,47 +17,52 @@ async function runEffect<A, E>(
   return Effect.runPromise(Effect.either(effect));
 }
 
-describe("fetchNodeLibraryProvider", () => {
-  it("returns Option.some(provider) when backend has a valid preference", async () => {
+describe("fetchNodeLibraryProviders", () => {
+  it("returns Option.some([\"aws\",\"gcp\"]) when GET returns { providers: [\"aws\",\"gcp\"] }", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ provider: "aws" }), {
+      new Response(JSON.stringify({ providers: ["aws", "gcp"] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await runEffect(fetchNodeLibraryProvider());
+    const result = await runEffect(fetchNodeLibraryProviders());
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) {
       expect(Option.isSome(result.right)).toBe(true);
-      expect(Option.getOrNull(result.right)).toBe("aws");
+      expect(Option.getOrNull(result.right)).toEqual(["aws", "gcp"]);
     }
   });
 
-  it("returns Option.none() when provider is null", async () => {
+  it("returns Option.some([]) when GET returns {} or { providers: [] }", async () => {
+    const emptyPayloads = [{}, { providers: [] }];
+    for (const payload of emptyPayloads) {
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      const result = await runEffect(fetchNodeLibraryProviders());
+      expect(Either.isRight(result)).toBe(true);
+      if (Either.isRight(result)) {
+        expect(Option.isSome(result.right)).toBe(true);
+        expect(Option.getOrNull(result.right)).toEqual([]);
+      }
+    }
+  });
+
+  it("returns Option.some([]) when payload is invalid or missing providers", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ provider: null }), {
+      new Response(JSON.stringify({ providers: ["bogus"] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await runEffect(fetchNodeLibraryProvider());
+    const result = await runEffect(fetchNodeLibraryProviders());
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) {
-      expect(Option.isNone(result.right)).toBe(true);
-    }
-  });
-
-  it("returns Option.none() when provider is an invalid string", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ provider: "bogus" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
-    );
-    const result = await runEffect(fetchNodeLibraryProvider());
-    expect(Either.isRight(result)).toBe(true);
-    if (Either.isRight(result)) {
-      expect(Option.isNone(result.right)).toBe(true);
+      expect(Option.isSome(result.right)).toBe(true);
+      expect(Option.getOrNull(result.right)).toEqual([]);
     }
   });
 
@@ -68,7 +73,7 @@ describe("fetchNodeLibraryProvider", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await runEffect(fetchNodeLibraryProvider());
+    const result = await runEffect(fetchNodeLibraryProviders());
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
       expect(result.left.message).toBe("Unauthorized");
@@ -76,20 +81,20 @@ describe("fetchNodeLibraryProvider", () => {
   });
 });
 
-describe("saveNodeLibraryProvider", () => {
-  it("returns ok on success", async () => {
+describe("saveNodeLibraryProviders", () => {
+  it("returns { ok: true } on success", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       })
     );
-    const result = await runEffect(saveNodeLibraryProvider("gcp"));
+    const result = await runEffect(saveNodeLibraryProviders(["gcp"]));
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) expect(result.right).toEqual({ ok: true });
   });
 
-  it("sends provider in PATCH body", async () => {
+  it("calls PATCH with body JSON.stringify({ providers: [\"aws\"] }) or [\"aws\",\"gcp\"]", async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -97,28 +102,28 @@ describe("saveNodeLibraryProvider", () => {
       })
     );
     globalThis.fetch = mockFetch;
-    await runEffect(saveNodeLibraryProvider("azure"));
+    await runEffect(saveNodeLibraryProviders(["aws", "gcp"]));
     expect(mockFetch).toHaveBeenCalledWith("/api/preferences", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider: "azure" }),
+      body: JSON.stringify({ providers: ["aws", "gcp"] }),
       credentials: "include",
     });
   });
 
-  it("returns ApiError on 400", async () => {
+  it("returns ApiError on 400 (message can reference providers array validation)", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          error: "provider must be one of: all, aws, gcp, azure, generic",
+          error: "providers must be an array of valid providers",
         }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       )
     );
-    const result = await runEffect(saveNodeLibraryProvider("all"));
+    const result = await runEffect(saveNodeLibraryProviders(["aws"]));
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
-      expect(result.left.message).toContain("provider must be one of");
+      expect(result.left.message).toContain("providers");
     }
   });
 });
