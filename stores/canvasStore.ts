@@ -7,7 +7,7 @@ import type {
   Viewport,
   CanvasState,
 } from "@/lib/types";
-import { replaceCanvasState } from "@/lib/canvas";
+import { replaceCanvasState, resolveEdgeHandles } from "@/lib/canvas";
 
 export type EvaluateAction = {
   evaluate: () => void;
@@ -70,7 +70,7 @@ export const useCanvasStore = create<CanvasStore>()(
       setCanvasState: (state) =>
         set({
           nodes: state.nodes,
-          edges: state.edges,
+          edges: resolveEdgeHandles(state.nodes, state.edges),
           viewport: Option.fromNullable(state.viewport),
         }),
       getCanvasState: () => {

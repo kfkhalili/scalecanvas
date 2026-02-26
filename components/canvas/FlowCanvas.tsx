@@ -53,13 +53,25 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactFlowInstance = useReactFlow();
-  /** Skip store→local sync when we just wrote to the store to avoid update loop. */
-  const storeUpdatedFromLocalRef = useRef(false);
+
+  /**
+   * Track the exact node/edge references we last pushed to the store so we can
+   * tell whether a store change was caused by us (local→store) or externally
+   * (fetchCanvas, session switch, rehydrate). A simple boolean flag doesn't
+   * work because it can't survive interleaved async updates (e.g. fetchCanvas
+   * resolving after the initial local→store sync on mount).
+   */
+  const lastPushedNodesRef = useRef<readonly Node[] | null>(null);
+  const lastPushedEdgesRef = useRef<readonly Edge[] | null>(null);
 
   // Sync store -> local only when store was updated externally (e.g. fetchCanvas, session switch)
   useEffect(() => {
-    if (storeUpdatedFromLocalRef.current) {
-      storeUpdatedFromLocalRef.current = false;
+    // Skip when the store still holds exactly what we wrote — avoids
+    // store→local→store echo loop while letting external updates through.
+    if (
+      storeNodes === lastPushedNodesRef.current &&
+      storeEdges === lastPushedEdgesRef.current
+    ) {
       return;
     }
     setNodes(storeNodes as Node[]);
@@ -68,13 +80,19 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
 
   // Push local state to store (for save, Evaluate, getCanvasState)
   useEffect(() => {
-    storeUpdatedFromLocalRef.current = true;
+    lastPushedNodesRef.current = nodes;
+    lastPushedEdgesRef.current = edges;
     setCanvasState({
       nodes,
       edges,
       viewport: Option.getOrUndefined(viewport),
     });
-  }, [nodes, edges, viewport, setCanvasState]);
+    // Note: `viewport` is intentionally excluded from deps — it is pushed to
+    // the store via its own `setViewport` call in `onMoveEnd`.  Including it
+    // here creates an infinite loop because `setCanvasState` wraps the value
+    // with `Option.fromNullable`, producing a new reference on every call.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges, setCanvasState]);
 
   const onMoveEnd = useCallback(
     (_ev: MouseEvent | TouchEvent | null, vp: RfViewport) => {

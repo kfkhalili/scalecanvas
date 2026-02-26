@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canvasFromDb, replaceCanvasState, getSampleCanvasState } from "./canvas";
+import { canvasFromDb, replaceCanvasState, getSampleCanvasState, resolveEdgeHandles } from "./canvas";
 import type { DbCanvasState } from "@/lib/database.aliases";
 import type { CanvasState, ReactFlowNode, ReactFlowEdge, Viewport } from "@/lib/types";
 
@@ -101,5 +101,165 @@ describe("getSampleCanvasState", () => {
       expect(n.position).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
       expect(n.data).toBeDefined();
     }
+  });
+});
+
+describe("resolveEdgeHandles", () => {
+  it("sets bottom-out / top when target is below source", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 100, y: 0 }, data: {} },
+      { id: "b", position: { x: 100, y: 200 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "b" }];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0].sourceHandle).toBe("bottom-out");
+    expect(result[0].targetHandle).toBe("top");
+  });
+
+  it("sets top-out / bottom when target is above source", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 100, y: 200 }, data: {} },
+      { id: "b", position: { x: 100, y: 0 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "b" }];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0].sourceHandle).toBe("top-out");
+    expect(result[0].targetHandle).toBe("bottom");
+  });
+
+  it("sets right-out / left when target is to the right", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 100 }, data: {} },
+      { id: "b", position: { x: 300, y: 100 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "b" }];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0].sourceHandle).toBe("right-out");
+    expect(result[0].targetHandle).toBe("left");
+  });
+
+  it("sets left-out / right when target is to the left", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 300, y: 100 }, data: {} },
+      { id: "b", position: { x: 0, y: 100 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "b" }];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0].sourceHandle).toBe("left-out");
+    expect(result[0].targetHandle).toBe("right");
+  });
+
+  it("prefers vertical handles when displacement is equal (45°)", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 0 }, data: {} },
+      { id: "b", position: { x: 100, y: 100 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "b" }];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0].sourceHandle).toBe("bottom-out");
+    expect(result[0].targetHandle).toBe("top");
+  });
+
+  it("leaves edge unchanged when source node is missing", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "b", position: { x: 0, y: 100 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "missing", target: "b" }];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0]).toEqual(edges[0]);
+  });
+
+  it("leaves edge unchanged when target node is missing", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 0 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "missing" }];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0]).toEqual(edges[0]);
+  });
+
+  it("handles co-located nodes (dx=0, dy=0) with bottom-out / top", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 50, y: 50 }, data: {} },
+      { id: "b", position: { x: 50, y: 50 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "b" }];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0].sourceHandle).toBe("bottom-out");
+    expect(result[0].targetHandle).toBe("top");
+  });
+
+  it("preserves other edge properties (id, data, etc.)", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 0 }, data: {} },
+      { id: "b", position: { x: 0, y: 200 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [
+      { id: "e1", source: "a", target: "b", data: { label: "hello" } },
+    ];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result[0].id).toBe("e1");
+    expect(result[0].source).toBe("a");
+    expect(result[0].target).toBe("b");
+    expect(result[0].data?.label).toBe("hello");
+  });
+
+  it("resolves multiple edges independently", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 100, y: 0 }, data: {} },
+      { id: "b", position: { x: 100, y: 200 }, data: {} },
+      { id: "c", position: { x: 400, y: 0 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [
+      { id: "e1", source: "a", target: "b" },
+      { id: "e2", source: "a", target: "c" },
+    ];
+    const result = resolveEdgeHandles(nodes, edges);
+    // a → b is vertical (below)
+    expect(result[0].sourceHandle).toBe("bottom-out");
+    expect(result[0].targetHandle).toBe("top");
+    // a → c is horizontal (right)
+    expect(result[1].sourceHandle).toBe("right-out");
+    expect(result[1].targetHandle).toBe("left");
+  });
+
+  it("returns the same array reference when all handles already match", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 0 }, data: {} },
+      { id: "b", position: { x: 0, y: 200 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [
+      { id: "e1", source: "a", target: "b", sourceHandle: "bottom-out", targetHandle: "top" },
+    ];
+    const result = resolveEdgeHandles(nodes, edges);
+    expect(result).toBe(edges); // same reference — no unnecessary re-render
+  });
+
+  it("returns the same edge object reference when its handles already match", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 0 }, data: {} },
+      { id: "b", position: { x: 0, y: 200 }, data: {} },
+      { id: "c", position: { x: 300, y: 0 }, data: {} },
+    ];
+    const edgeOk: ReactFlowEdge = { id: "e1", source: "a", target: "b", sourceHandle: "bottom-out", targetHandle: "top" };
+    const edgeNeedsUpdate: ReactFlowEdge = { id: "e2", source: "a", target: "c" };
+    const edges = [edgeOk, edgeNeedsUpdate];
+    const result = resolveEdgeHandles(nodes, edges);
+    // Array is new (because one edge changed), but the unchanged edge keeps its reference
+    expect(result).not.toBe(edges);
+    expect(result[0]).toBe(edgeOk);
+    expect(result[1]).not.toBe(edgeNeedsUpdate);
+    expect(result[1].sourceHandle).toBe("right-out");
+  });
+
+  it("returns the same array reference when calling twice with already-resolved edges", () => {
+    const nodes: ReactFlowNode[] = [
+      { id: "a", position: { x: 0, y: 0 }, data: {} },
+      { id: "b", position: { x: 0, y: 200 }, data: {} },
+    ];
+    const edges: ReactFlowEdge[] = [{ id: "e1", source: "a", target: "b" }];
+    const first = resolveEdgeHandles(nodes, edges);
+    const second = resolveEdgeHandles(nodes, first);
+    expect(second).toBe(first); // idempotent — no infinite loop
   });
 });
