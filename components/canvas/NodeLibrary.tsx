@@ -2,44 +2,74 @@
 
 import { Option } from "effect";
 import { Effect, Either } from "effect";
-import { useState, useCallback, useEffect, type DragEvent } from "react";
+import { useState, useCallback, useEffect, useMemo, type DragEvent } from "react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronRight, GripVertical, StickyNote } from "lucide-react";
-import { whenSome } from "@/lib/optionHelpers";
 import { NodeLibraryProviderSchema } from "@/lib/api.schemas";
 import {
-  fetchNodeLibraryProvider,
-  saveNodeLibraryProvider,
+  fetchNodeLibraryProviders,
+  saveNodeLibraryProviders,
 } from "@/services/preferencesClient";
+import { parseProvidersValue, serializeProviders } from "@/lib/userPreferences";
 import {
   CATEGORY_ORDER,
   CATEGORY_LABELS,
-  getProviderFromType,
   getServicesByCategory,
   searchServices,
   type ServiceCategory,
   type ServiceEntry,
 } from "@/lib/serviceCatalog";
 import { getNodeIconUrl, getNodeIconComponent } from "@/lib/nodeIconResolver";
+import { getProviderIcon } from "@/lib/providerIcons";
 import type { NodeLibraryProvider } from "@/lib/types";
 
 const PROVIDER_OPTIONS: { value: NodeLibraryProvider; label: string }[] = [
-  { value: "all", label: "All" },
   { value: "aws", label: "AWS" },
   { value: "gcp", label: "GCP" },
   { value: "azure", label: "Azure" },
   { value: "generic", label: "Generic" },
 ];
 
-function parseProviderFromUrl(param: Option.Option<string>): NodeLibraryProvider {
+function parseProvidersFromUrl(param: Option.Option<string>): NodeLibraryProvider[] {
   return Option.match(param, {
-    onNone: () => "all" as const,
-    onSome: (p) => {
-      const result = NodeLibraryProviderSchema.safeParse(p);
-      return result.success ? result.data : ("all" as const);
+    onNone: () => [],
+    onSome: (s) => {
+      const trimmed = s.trim();
+      if (trimmed === "") return [];
+      const parts = trimmed.split(",").map((p) => p.trim()).filter(Boolean);
+      const parsed: NodeLibraryProvider[] = [];
+      const seen = new Set<NodeLibraryProvider>();
+      for (const part of parts) {
+        const result = NodeLibraryProviderSchema.safeParse(part);
+        if (result.success && !seen.has(result.data)) {
+          seen.add(result.data);
+          parsed.push(result.data);
+        }
+      }
+      return parsed;
     },
   });
+}
+
+function parseProviderSingularCompat(value: string | null): NodeLibraryProvider[] {
+  if (value === null || value === undefined) return [];
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed === "all") return [];
+  const result = NodeLibraryProviderSchema.safeParse(trimmed);
+  return result.success ? [result.data] : [];
+}
+
+function deriveProvidersFromSearchParams(searchParams: URLSearchParams): NodeLibraryProvider[] {
+  const providersParam = searchParams.get("providers");
+  const providerParam = searchParams.get("provider");
+  if (providersParam !== null && providersParam !== undefined) {
+    return parseProvidersFromUrl(Option.some(providersParam));
+  }
+  if (providerParam !== null && providerParam !== undefined) {
+    return parseProviderSingularCompat(providerParam);
+  }
+  return [];
 }
 
 function onDragStart(e: DragEvent, entry: ServiceEntry): void {
@@ -131,105 +161,134 @@ export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibrary
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [query, setQuery] = useState("");
 
-  const providerFromUrl = parseProviderFromUrl(
-    Option.fromNullable(searchParams.get("provider"))
+  const providerSetFromUrl = useMemo(
+    () => deriveProvidersFromSearchParams(searchParams),
+    [searchParams]
   );
-  const [provider, setProviderState] = useState<NodeLibraryProvider>(providerFromUrl);
+  const [providers, setProviders] = useState<NodeLibraryProvider[]>(providerSetFromUrl);
 
   useEffect(() => {
-    setProviderState(providerFromUrl);
-  }, [providerFromUrl]);
+    setProviders(providerSetFromUrl);
+  }, [providerSetFromUrl]);
 
+  // Backward compatibility: URL has "provider" (singular) but no "providers" → replace with "providers"
   useEffect(() => {
-    if (Option.isSome(Option.fromNullable(searchParams.get("provider")))) return;
+    const providersParam = searchParams.get("providers");
+    const providerParam = searchParams.get("provider");
+    if (providerParam !== null && providerParam !== undefined && providersParam === null) {
+      const arr = parseProviderSingularCompat(providerParam);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("provider");
+      if (arr.length > 0) nextParams.set("providers", arr.join(","));
+      const qs = nextParams.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    }
+  }, [pathname, router, searchParams]);
+
+  // Load preference when URL has no providers
+  useEffect(() => {
+    const providersParam = searchParams.get("providers");
+    if (providersParam !== null && providersParam !== "") return;
 
     if (isAnonymous) {
-      // Anonymous users: read provider preference from localStorage only
       try {
         const stored = localStorage.getItem(ANON_PROVIDER_KEY);
         if (stored) {
-          const parsed = parseProviderFromUrl(Option.some(stored));
-          if (parsed !== "all") {
-            setProviderState(parsed);
-            const nextParams = new URLSearchParams(searchParams);
-            nextParams.set("provider", stored);
-            router.replace(`${pathname}?${nextParams.toString()}`);
-          }
+          const parsed = parseProvidersValue(stored);
+          setProviders(parsed);
+          const nextParams = new URLSearchParams(searchParams);
+          if (parsed.length > 0) nextParams.set("providers", serializeProviders(parsed));
+          const qs = nextParams.toString();
+          router.replace(qs ? `${pathname}?${qs}` : pathname);
         }
-      } catch { /* private browsing / quota */ }
+      } catch {
+        // private browsing / quota
+      }
       return;
     }
 
-    // Signed-in users: fetch from backend
-    void Effect.runPromise(Effect.either(fetchNodeLibraryProvider())).then(
-      (either) => {
-        Either.match(either, {
-          onLeft: () => {},
-          onRight: (providerOpt) => {
-            whenSome(providerOpt, (raw) => {
-              if (raw === "all") return;
-              setProviderState(raw);
-              const nextParams = new URLSearchParams(searchParams);
-              nextParams.set("provider", raw);
-              router.replace(`${pathname}?${nextParams.toString()}`);
-            });
-          },
-        });
-      }
-    );
+    void Effect.runPromise(Effect.either(fetchNodeLibraryProviders())).then((either) => {
+      Either.match(either, {
+        onLeft: () => {},
+        onRight: (providerOpt) => {
+          const arr = Option.getOrElse(providerOpt, () => []);
+          setProviders(arr);
+          const nextParams = new URLSearchParams(searchParams);
+          if (arr.length > 0) nextParams.set("providers", serializeProviders(arr));
+          const qs = nextParams.toString();
+          router.replace(qs ? `${pathname}?${qs}` : pathname);
+        },
+      });
+    });
   }, [pathname, router, searchParams, isAnonymous]);
 
-  const setProvider = useCallback(
-    (next: NodeLibraryProvider) => {
-      setProviderState(next);
+  const toggleProvider = useCallback(
+    (p: NodeLibraryProvider) => {
+      const next = providers.includes(p)
+        ? providers.filter((x) => x !== p)
+        : [...providers, p];
+      setProviders(next);
       const nextParams = new URLSearchParams(searchParams);
-      if (next === "all") nextParams.delete("provider");
-      else nextParams.set("provider", next);
+      if (next.length === 0) nextParams.delete("providers");
+      else nextParams.set("providers", next.join(","));
       const qs = nextParams.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
 
       if (isAnonymous) {
-        try { localStorage.setItem(ANON_PROVIDER_KEY, next); } catch { /* ignore */ }
+        try {
+          localStorage.setItem(ANON_PROVIDER_KEY, serializeProviders(next));
+        } catch {
+          // ignore
+        }
       } else {
-        void Effect.runPromise(
-          Effect.either(saveNodeLibraryProvider(next))
-        );
+        void Effect.runPromise(Effect.either(saveNodeLibraryProviders(next)));
       }
     },
-    [pathname, router, searchParams, isAnonymous]
+    [pathname, router, searchParams, isAnonymous, providers]
   );
 
+  const [query, setQuery] = useState("");
   const isSearching = query.trim().length > 0;
-  const catalogByCategory = getServicesByCategory(provider);
-  const searchResults = isSearching
-    ? (() => {
-        const raw = searchServices(query);
-        if (provider === "all") return raw;
-        return raw.filter((s) => getProviderFromType(s.type) === provider);
-      })()
-    : [];
+  const catalogByCategory = getServicesByCategory(providers);
+  const searchResults = isSearching ? searchServices(query, providers) : [];
 
   return (
     <div className={`flex h-full flex-col ${className}`}>
-      {/* Provider filter */}
+      {/* Provider filter: icon-only toggles */}
       <div className="shrink-0 border-b border-foreground/5 px-2 py-1.5">
         <div className="flex flex-wrap gap-1">
-          {PROVIDER_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setProvider(value)}
-              className={`rounded px-2 py-1 text-xs font-medium transition-colors focus:outline-none ${
-                provider === value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground/70 hover:bg-muted/80 hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          {PROVIDER_OPTIONS.map(({ value, label }) => {
+            const icon = getProviderIcon(value);
+            const selected = providers.includes(value);
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => toggleProvider(value)}
+                title={label}
+                aria-label={label}
+                className={`rounded p-1 transition-colors focus:outline-none ${
+                  selected
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground/70 hover:bg-muted/80 hover:text-foreground"
+                }`}
+              >
+                {icon.type === "image" ? (
+                  <Image
+                    src={icon.src}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="h-5 w-5 object-contain"
+                    unoptimized
+                  />
+                ) : (
+                  <icon.Icon className="h-5 w-5" aria-hidden />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
