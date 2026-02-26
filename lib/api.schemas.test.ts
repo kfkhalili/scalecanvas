@@ -8,18 +8,23 @@ import {
   CheckoutBodySchema,
   HandoffBodySchema,
   NodeLibraryProviderSchema,
+  NodeLibraryProvidersSchema,
   MAX_NODES,
   MAX_EDGES,
   MAX_MESSAGES,
 } from "./api.schemas";
 
 describe("NodeLibraryProviderSchema", () => {
-  it.each(["all", "aws", "gcp", "azure", "generic"] as const)(
+  it.each(["aws", "gcp", "azure", "generic"] as const)(
     "accepts '%s'",
     (value) => {
       expect(NodeLibraryProviderSchema.safeParse(value).success).toBe(true);
     }
   );
+
+  it("rejects 'all'", () => {
+    expect(NodeLibraryProviderSchema.safeParse("all").success).toBe(false);
+  });
 
   it("rejects unknown provider", () => {
     expect(NodeLibraryProviderSchema.safeParse("oracle").success).toBe(false);
@@ -27,6 +32,24 @@ describe("NodeLibraryProviderSchema", () => {
 
   it("rejects non-string", () => {
     expect(NodeLibraryProviderSchema.safeParse(42).success).toBe(false);
+  });
+});
+
+describe("NodeLibraryProvidersSchema", () => {
+  it("accepts ['aws', 'gcp']", () => {
+    expect(NodeLibraryProvidersSchema.safeParse(["aws", "gcp"]).success).toBe(true);
+  });
+
+  it("accepts []", () => {
+    expect(NodeLibraryProvidersSchema.safeParse([]).success).toBe(true);
+  });
+
+  it("rejects ['all']", () => {
+    expect(NodeLibraryProvidersSchema.safeParse(["all"]).success).toBe(false);
+  });
+
+  it("rejects invalid element (e.g. 'oracle')", () => {
+    expect(NodeLibraryProvidersSchema.safeParse(["oracle"]).success).toBe(false);
   });
 });
 

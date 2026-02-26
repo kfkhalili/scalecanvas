@@ -1,13 +1,15 @@
 import { z } from "zod";
 
-/** Node library filter: All or a single cloud provider / generic. */
+/** Node library filter: single cloud provider or generic. */
 export const NodeLibraryProviderSchema = z.enum([
-  "all",
   "aws",
   "gcp",
   "azure",
   "generic",
 ]);
+
+/** Node library filter: set of providers (empty = show all). */
+export const NodeLibraryProvidersSchema = z.array(NodeLibraryProviderSchema);
 
 export const CreateSessionBodySchema = z.object({
   title: z.string().nullable().optional(),

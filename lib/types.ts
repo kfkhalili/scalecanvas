@@ -71,7 +71,7 @@ export type ReadonlyTranscriptEntry = Readonly<TranscriptEntry>;
 /** Readonly canvas state */
 export type ReadonlyCanvasState = Readonly<CanvasState>;
 
-/** Node library filter: All or a single cloud provider / generic. */
+/** Node library filter: single cloud provider or generic. */
 export type NodeLibraryProvider = z.infer<typeof NodeLibraryProviderSchema>;
 
 /** Key for the node library provider preference in user_preferences. */
