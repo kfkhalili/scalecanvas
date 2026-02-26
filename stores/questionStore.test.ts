@@ -1,10 +1,21 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Option } from "effect";
 import { useQuestionStore } from "./questionStore";
-import { QUESTION_BANK } from "@/lib/questions";
+import { INTERVIEW_TOPICS } from "@/lib/questions";
 import type { SystemDesignQuestion } from "@/lib/questions";
 
-const sampleQuestion: SystemDesignQuestion = QUESTION_BANK[0];
+function toQuestion(
+  t: (typeof INTERVIEW_TOPICS)[number]
+): SystemDesignQuestion {
+  return {
+    id: t.id,
+    title: t.title,
+    prompt: t.comprehensivePrompt,
+    hints: [],
+  };
+}
+
+const sampleQuestion: SystemDesignQuestion = toQuestion(INTERVIEW_TOPICS[0]!);
 
 beforeEach(() => {
   useQuestionStore.setState({ activeQuestion: Option.none(), hintIndex: 0 });
@@ -38,7 +49,7 @@ describe("questionStore", () => {
     useQuestionStore.getState().setInitialQuestion(sampleQuestion);
     useQuestionStore.getState().incrementHint();
     useQuestionStore.getState().incrementHint();
-    const other = QUESTION_BANK[1];
+    const other = toQuestion(INTERVIEW_TOPICS[1]!);
     useQuestionStore.getState().setInitialQuestion(other);
     expect(
       Option.getOrNull(useQuestionStore.getState().activeQuestion)
