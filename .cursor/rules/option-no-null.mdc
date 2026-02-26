@@ -1,0 +1,67 @@
+---
+description: Use Effect Option for optional/absent values; think some/none, not null
+alwaysApply: true
+---
+
+# Option Instead of Null (Hard Rule)
+
+## Core Principles
+
+1. **Option belongs in domain logic; null belongs at boundaries.** Use `Option<T>` in stores, lib, and services for absent-or-present semantics. Keep `string | null` in DTOs, wire formats, and DB rows.
+2. **Match must produce a value; side-effects use `whenSome`/`whenRight`.** Use `Option.match`/`Either.match` only when both branches return a value (JSX, strings, booleans). For imperative fire-and-forget, use `whenSome(opt, fn)` or `whenRight(either, fn)` from `@/lib/optionHelpers`.
+3. **`getOrNull` only at true boundaries.** DOM attributes, JSON body, Supabase insert/update, and third-party API contracts. Never in the middle of business logic.
+4. **No `getOrNull(x) ?? undefined`.** Use `Option.getOrUndefined(x)` instead.
+5. **No `Option.fromNullable(x) → immediate match/getOrElse`.** If you have a nullable value and want to branch, use a plain ternary or `??`. Reserve `Option.fromNullable` for *storing* the value as an Option.
+6. **No Option for private mutable refs.** `useRef<T | null>(null)` is correct for timers, DOM refs, and staleness-tracking refs. Use Option only for refs that cross component boundaries or are part of derived state.
+7. **Use `Option.all` to flatten.** When combining multiple Options, use `Option.all([a, b])` + `Option.map` or `Option.flatMap`. Never nest `Option.match` inside `Option.match`.
+
+## Patterns
+
+```ts
+// ✅ Domain logic: match for value production
+const label = Option.match(titleOpt, {
+  onNone: () => "Untitled",
+  onSome: (t) => t,
+});
+
+// ✅ Imperative side-effect: whenSome
+whenSome(sessionIdOpt, (id) => router.push(`/${id}`));
+
+// ✅ Boundary: getOrNull for DB/JSON write
+const insertRow = { title: Option.getOrNull(titleOpt) };
+
+// ✅ Boundary: getOrUndefined for optional JS property
+const viewport = Option.getOrUndefined(viewportOpt);
+
+// ✅ Store setter: accept Option
+setCurrentSessionId(Option.some(id));
+setEvaluateAction(Option.none());
+
+// ✅ Combining multiple Options
+pipe(
+  Option.all([originOpt, hostOpt]),
+  Option.map(([origin, host]) => new URL(origin).host === host),
+  Option.getOrElse(() => false)
+);
+
+// ❌ getOrNull in logic (not a boundary)
+const title = Option.getOrNull(titleOpt); // wrong — use getOrElse
+
+// ❌ getOrNull ?? undefined
+Option.getOrNull(x) ?? undefined; // wrong — use getOrUndefined(x)
+
+// ❌ fromNullable → immediate match (round-trip)
+Option.match(Option.fromNullable(data), { ... }); // wrong — use data ? ... : ...
+
+// ❌ Option.match for imperative no-op
+Option.match(opt, { onNone: () => {}, onSome: fn }); // wrong — use whenSome(opt, fn)
+
+// ❌ Either.match for imperative no-op
+Either.match(either, { onLeft: () => {}, onRight: fn }); // wrong — use whenRight(either, fn)
+
+// ❌ Option for private mutable ref
+useRef<Option.Option<Timer>>(Option.none()); // wrong — use useRef<Timer | null>(null)
+
+// ❌ Nested Option.match
+Option.match(a, { onSome: () => Option.match(b, ...) }); // wrong — use Option.all
+```

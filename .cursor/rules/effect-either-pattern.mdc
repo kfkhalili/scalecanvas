@@ -1,0 +1,32 @@
+---
+description: Effect for fallible ops; Either at boundaries; exhaustive handling
+alwaysApply: true
+---
+
+# Effect & Either (Hard Rule)
+
+- Fallible ops in `lib/` and `services/` return `Effect.Effect<T, E>`: use `Effect.succeed`, `Effect.fail`, `Effect.tryPromise`, `Effect.flatMap`; no throwing in business logic.
+- Call sites at boundaries (routes, components): run with `Effect.runPromise(Effect.either(effect))` (or `Effect.runSync` for sync), then handle with `Either.match({ onLeft, onRight })` or `Either.isLeft` / `.left` / `.right`; handle both paths.
+- **Do NOT wrap raw nullable Supabase `data` in `Option.fromNullable` then immediately `Option.match`.** When Supabase returns `{ data, error }`, use a simple ternary: `data ? Effect.succeed(convert(data)) : Effect.fail(...)`. Reserve `Option.fromNullable` for *storing* the result as Option state.
+- Use `ts-pattern` or exhaustive `.match()` for discriminated unions; every case handled.
+
+```ts
+// ✅ Boundary: run Effect and handle Either
+const either = await Effect.runPromise(Effect.either(myEffect));
+Either.match(either, { onLeft: (e) => ..., onRight: (v) => ... });
+
+// ✅ Service: Supabase data check with ternary
+Effect.flatMap(({ data, error }) =>
+  error
+    ? Effect.fail(toError(error))
+    : data
+      ? Effect.succeed(convert(data))
+      : Effect.fail({ message: "Not found" })
+);
+
+// ❌ Service: fromNullable → immediate match (unnecessary round-trip)
+Option.match(Option.fromNullable(data), {
+  onNone: () => Effect.fail(...),
+  onSome: (d) => Effect.succeed(convert(d)),
+});
+```
