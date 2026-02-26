@@ -11,7 +11,7 @@ type SplitScreenProps = {
   right: ReactNode;
   leftClassName?: string;
   rightClassName?: string;
-  /** Initial left panel width as fraction 0–1 (default 0.55). */
+  /** Initial left panel width as fraction 0–1 (default 0.68 → chat ~32%). */
   defaultLeftRatio?: number;
 };
 
@@ -20,7 +20,7 @@ export function SplitScreen({
   right,
   leftClassName = "min-w-0",
   rightClassName = "min-w-0",
-  defaultLeftRatio = 0.55,
+  defaultLeftRatio = 0.68,
 }: SplitScreenProps): ReactNode {
   const [leftRatio, setLeftRatio] = useState(defaultLeftRatio);
   const [isDragging, setIsDragging] = useState(false);
