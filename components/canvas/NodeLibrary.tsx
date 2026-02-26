@@ -2,7 +2,7 @@
 
 import { Option } from "effect";
 import { Effect, Either } from "effect";
-import { useState, useCallback, useEffect, useMemo, type DragEvent } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type DragEvent } from "react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronRight, GripVertical, StickyNote } from "lucide-react";
@@ -21,6 +21,7 @@ import {
   type ServiceEntry,
 } from "@/lib/serviceCatalog";
 import { getNodeIconUrl, getNodeIconComponent } from "@/lib/nodeIconResolver";
+import { shouldFetchPreferencesWhenNoProviders } from "@/lib/nodeLibraryPreferencesLoad";
 import { getProviderIcon } from "@/lib/providerIcons";
 import type { NodeLibraryProvider } from "@/lib/types";
 
@@ -186,10 +187,16 @@ export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibrary
     }
   }, [pathname, router, searchParams]);
 
+  // Only fetch preferences once when URL has no providers (avoids loop when auth/session re-renders)
+  const hasFetchedWhenNoProviders = useRef(false);
+
   // Load preference when URL has no providers
   useEffect(() => {
     const providersParam = searchParams.get("providers");
-    if (providersParam !== null && providersParam !== "") return;
+    if (providersParam !== null && providersParam !== "") {
+      hasFetchedWhenNoProviders.current = false;
+      return;
+    }
 
     if (isAnonymous) {
       try {
@@ -208,9 +215,15 @@ export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibrary
       return;
     }
 
+    if (!shouldFetchPreferencesWhenNoProviders(false, isAnonymous, hasFetchedWhenNoProviders.current))
+      return;
+    hasFetchedWhenNoProviders.current = true;
+
     void Effect.runPromise(Effect.either(fetchNodeLibraryProviders())).then((either) => {
       Either.match(either, {
-        onLeft: () => {},
+        onLeft: () => {
+          hasFetchedWhenNoProviders.current = false;
+        },
         onRight: (providerOpt) => {
           const arr = Option.getOrElse(providerOpt, () => []);
           setProviders(arr);
