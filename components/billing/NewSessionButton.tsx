@@ -14,7 +14,6 @@ import { TOKEN_PACKS } from "@/lib/stripe";
 
 type DialogState =
   | { kind: "closed" }
-  | { kind: "loading" }
   | { kind: "confirm"; balance: number }
   | { kind: "no_tokens" }
   | { kind: "creating" }
@@ -43,23 +42,16 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
     refreshBalance();
   }, [refreshBalance]);
 
-  const handleClick = async (): Promise<void> => {
-    setDialog({ kind: "loading" });
-    const either = await Effect.runPromise(Effect.either(fetchTokenBalance()));
-    Either.match(either, {
-      onLeft: () => {
-        toast.error("Failed to check token balance");
-        setDialog({ kind: "closed" });
-      },
-      onRight: (tokens) => {
-        setBalanceOpt(Option.some(tokens));
-        if (tokens > 0) {
-          setDialog({ kind: "confirm", balance: tokens });
-        } else {
-          setDialog({ kind: "no_tokens" });
-        }
-      },
+  const handleClick = (): void => {
+    Option.match(balanceOpt, {
+      onNone: () => setDialog({ kind: "no_tokens" }),
+      onSome: (tokens) =>
+        tokens > 0
+          ? setDialog({ kind: "confirm", balance: tokens })
+          : setDialog({ kind: "no_tokens" }),
     });
+    // Refresh balance in the background so the dialog value stays fresh
+    refreshBalance();
   };
 
   const handleConfirm = async (): Promise<void> => {
@@ -124,7 +116,7 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
         <button
           type="button"
           onClick={handleClick}
-          disabled={dialog.kind === "loading" || dialog.kind === "creating"}
+          disabled={dialog.kind === "creating"}
           aria-label="New session"
           className="flex h-10 min-w-0 flex-1 items-center gap-3 whitespace-nowrap rounded-full px-2.5 text-sm text-foreground/80 transition-colors hover:bg-muted focus:outline-none disabled:opacity-60"
         >

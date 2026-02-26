@@ -10,7 +10,6 @@ import { postHandoff } from "@/services/handoffClient";
 import { fetchSessions } from "@/services/sessionsClient";
 import { whenRight } from "@/lib/optionHelpers";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
-import { CheckoutFeedback } from "@/components/billing/CheckoutFeedback";
 
 /**
  * Renders the workspace at / when the user is logged in. After rehydrating
@@ -100,7 +99,6 @@ export function PostAuthRoot(): React.ReactElement {
 
   return (
     <main className="flex h-screen flex-col">
-      <CheckoutFeedback />
       <div className="min-h-0 flex-1">
         <InterviewSplitView isAnonymous={false} />
       </div>

@@ -47,24 +47,9 @@ export const useCanvasStore = create<CanvasStore>()(
       viewport: Option.none(),
       evaluateAction: Option.none(),
       hasAttemptedEval: false,
-      setNodes: (nodes) =>
-        set((state) => ({
-          nodes,
-          edges: state.edges,
-          viewport: state.viewport,
-        })),
-      setEdges: (edges) =>
-        set((state) => ({
-          nodes: state.nodes,
-          edges,
-          viewport: state.viewport,
-        })),
-      setViewport: (viewport) =>
-        set((state) => ({
-          nodes: state.nodes,
-          edges: state.edges,
-          viewport,
-        })),
+      setNodes: (nodes) => set({ nodes }),
+      setEdges: (edges) => set({ edges }),
+      setViewport: (viewport) => set({ viewport }),
       setEvaluateAction: (action) => set({ evaluateAction: action }),
       setHasAttemptedEval: (hasAttemptedEval) => set({ hasAttemptedEval }),
       setCanvasState: (state) =>

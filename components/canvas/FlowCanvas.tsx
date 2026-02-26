@@ -27,12 +27,6 @@ import { saveCanvasApi } from "@/services/sessionsClient";
 
 const SAVE_DEBOUNCE_MS = 800;
 
-let nodeIdCounter = 0;
-function nextNodeId(): string {
-  nodeIdCounter += 1;
-  return `node-${Date.now()}-${nodeIdCounter}`;
-}
-
 type FlowCanvasInnerProps = {
   sessionIdOpt: Option.Option<string>;
 };
@@ -162,7 +156,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
       });
       setNodes((prev) => [
         ...prev,
-        { id: nextNodeId(), type, position, data: { label } } as Node,
+        { id: crypto.randomUUID(), type, position, data: { label } } as Node,
       ]);
     },
     [reactFlowInstance, setNodes]

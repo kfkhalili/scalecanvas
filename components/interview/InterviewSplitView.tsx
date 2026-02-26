@@ -4,7 +4,6 @@ import { Effect, Either, Option } from "effect";
 import { useEffect, useRef, useState } from "react";
 import { SplitScreen } from "@/components/layout/SplitScreen";
 import { CollapsibleSidebar } from "@/components/layout/CollapsibleSidebar";
-import { AuthBar } from "@/components/layout/AuthBar";
 import { FlowCanvas } from "@/components/canvas/FlowCanvas";
 import { NodeLibrary } from "@/components/canvas/NodeLibrary";
 import { ChatPanel } from "@/components/chat/ChatPanel";
@@ -165,7 +164,6 @@ export function InterviewSplitView({
     <div className="flex h-full w-full">
       <CollapsibleSidebar isAnonymous={isAnonymous} />
       <div className="relative min-h-0 min-w-0 flex-1">
-        <AuthBar isAnonymous={isAnonymous} />
         <SplitScreen
           left={
             <div className="flex h-full min-w-0">

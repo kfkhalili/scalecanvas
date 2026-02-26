@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { CheckoutFeedback } from "@/components/billing/CheckoutFeedback";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +19,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider>{children}</ThemeProvider>
+        <Suspense>
+          <CheckoutFeedback />
+        </Suspense>
         <Toaster richColors position="top-center" />
       </body>
     </html>
