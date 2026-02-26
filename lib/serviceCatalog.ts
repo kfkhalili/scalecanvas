@@ -129,12 +129,12 @@ export function getProviderFromType(type: string): NodeLibraryProvider {
 }
 
 export function getServicesByCategory(
-  provider?: NodeLibraryProvider
+  providers: readonly NodeLibraryProvider[]
 ): Map<ServiceCategory, ServiceEntry[]> {
   const catalog =
-    provider === undefined || provider === "all"
+    providers.length === 0
       ? [...SERVICE_CATALOG]
-      : SERVICE_CATALOG.filter((s) => getProviderFromType(s.type) === provider);
+      : SERVICE_CATALOG.filter((s) => providers.includes(getProviderFromType(s.type)));
 
   const map = new Map<ServiceCategory, ServiceEntry[]>();
   for (const cat of CATEGORY_ORDER) {
@@ -154,14 +154,23 @@ export function getServicesByCategory(
   return out;
 }
 
-export function searchServices(query: string): ServiceEntry[] {
+export function searchServices(
+  query: string,
+  providers?: readonly NodeLibraryProvider[]
+): ServiceEntry[] {
   const q = query.toLowerCase().trim();
-  if (!q) return [...SERVICE_CATALOG];
-  return SERVICE_CATALOG.filter(
-    (s) =>
-      s.label.toLowerCase().includes(q) ||
-      s.type.toLowerCase().includes(q) ||
-      s.description.toLowerCase().includes(q) ||
-      s.category.toLowerCase().includes(q)
-  );
+  let results: ServiceEntry[] =
+    !q
+      ? [...SERVICE_CATALOG]
+      : SERVICE_CATALOG.filter(
+          (s) =>
+            s.label.toLowerCase().includes(q) ||
+            s.type.toLowerCase().includes(q) ||
+            s.description.toLowerCase().includes(q) ||
+            s.category.toLowerCase().includes(q)
+        );
+  if (providers !== undefined && providers.length > 0) {
+    results = results.filter((s) => providers.includes(getProviderFromType(s.type)));
+  }
+  return results;
 }
