@@ -268,7 +268,7 @@ export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibrary
                 onClick={() => toggleProvider(value)}
                 title={label}
                 aria-label={label}
-                className={`rounded p-1 transition-colors focus:outline-none ${
+                className={`rounded p-2 transition-colors focus:outline-none ${
                   selected
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-foreground/70 hover:bg-muted/80 hover:text-foreground"
@@ -278,13 +278,13 @@ export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibrary
                   <Image
                     src={icon.src}
                     alt=""
-                    width={20}
-                    height={20}
-                    className="h-5 w-5 object-contain"
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 object-contain"
                     unoptimized
                   />
                 ) : (
-                  <icon.Icon className="h-5 w-5" aria-hidden />
+                  <icon.Icon className="h-7 w-7" aria-hidden />
                 )}
               </button>
             );
