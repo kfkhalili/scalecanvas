@@ -9,9 +9,16 @@ async function seedCanvasStore(
   page: Page,
   nodes: unknown[],
   edges: unknown[] = [],
+  viewport?: { x: number; y: number; zoom: number },
 ): Promise<void> {
+  const state: Record<string, unknown> = { nodes, edges, hasAttemptedEval: false };
+  if (viewport) {
+    // effect-ts Option.some serialised form — Zustand persist merges this on
+    // rehydration so the canvas store sees a proper Option.some(viewport).
+    state.viewport = { _id: "Option", _tag: "Some", value: viewport };
+  }
   const payload = JSON.stringify({
-    state: { nodes, edges, hasAttemptedEval: false },
+    state,
     version: 0,
   });
   await page.addInitScript((data) => {
@@ -120,5 +127,31 @@ test.describe("Anonymous canvas persistence", () => {
 
     // Still no nodes
     await expect(page.locator(".react-flow__node")).toHaveCount(0, { timeout: 5_000 });
+  });
+
+  test("saved viewport is applied instead of auto-fitting", async ({ page }) => {
+    const savedViewport = { x: 100, y: 50, zoom: 0.75 };
+    await seedCanvasStore(page, SINGLE_NODE, [], savedViewport);
+    await page.goto("/");
+
+    await expect(nodeByLabel(page, "PW Test Node")).toBeVisible({ timeout: 10_000 });
+
+    // ReactFlow applies the viewport via a CSS transform on .react-flow__viewport.
+    // The transform encodes translate(x, y) scale(zoom).
+    const viewport = page.locator(".react-flow__viewport");
+    const transform = await viewport.getAttribute("style", { timeout: 5_000 });
+
+    // Extract the transform values — format: "transform: translate(Xpx, Ypx) scale(Z);"
+    const match = transform?.match(
+      /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)\s*scale\(([\d.]+)\)/
+    );
+    expect(match).toBeTruthy();
+    const [, tx, ty, scale] = match!;
+
+    // The saved viewport should be honoured — not auto-fitted to nodes.
+    // We allow a small tolerance for sub-pixel rendering.
+    expect(Number(tx)).toBeCloseTo(savedViewport.x, 0);
+    expect(Number(ty)).toBeCloseTo(savedViewport.y, 0);
+    expect(Number(scale)).toBeCloseTo(savedViewport.zoom, 1);
   });
 });

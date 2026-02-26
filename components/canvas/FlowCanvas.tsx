@@ -222,7 +222,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
         }}
         edgeTypes={edgeTypes}
         nodeTypes={awsNodeTypes}
-        fitView
+        fitView={Option.isNone(viewport)}
         fitViewOptions={{ padding: 0.2, maxZoom: 1.5 }}
         proOptions={{ hideAttribution: true }}
       >
