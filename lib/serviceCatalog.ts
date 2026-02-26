@@ -141,8 +141,8 @@ export function getServicesByCategory(
     map.set(cat, []);
   }
   for (const svc of catalog) {
-    const list = map.get(svc.category);
-    if (list) list.push(svc);
+    const cat = svc.category;
+    map.set(cat, [...(map.get(cat) ?? []), svc]);
   }
   const out = new Map<ServiceCategory, ServiceEntry[]>();
   for (const [cat, list] of map) {
