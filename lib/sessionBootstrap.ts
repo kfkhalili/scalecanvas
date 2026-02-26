@@ -41,7 +41,7 @@ export async function executeBootstrapAction(
 ): Promise<void> {
   switch (action.type) {
     case "redirect_login":
-      deps.redirectTo("/login");
+      deps.redirectTo("/");
       return;
     case "resume_or_idle": {
       const fetchEither = await Effect.runPromise(

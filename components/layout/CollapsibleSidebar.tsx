@@ -2,14 +2,15 @@
 
 import { Option } from "effect";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { Menu, SquarePen, Settings, Monitor, Sun, Moon, Check, LogIn, LogOut, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { User } from "@supabase/supabase-js";
 import { useSidebarStore, rehydrateSidebarStore } from "@/stores/sidebarStore";
 import { SessionSelector } from "@/components/chat/SessionSelector";
+import { SignInButtons } from "@/components/chat/SignInButtons";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { getAvatarUrl, getDisplayName, getInitials } from "@/lib/userProfile";
 import { NewSessionButton } from "@/components/billing/NewSessionButton";
@@ -33,16 +34,22 @@ export function CollapsibleSidebar({
   isAnonymous = false,
 }: CollapsibleSidebarProps): React.ReactElement {
   const { open, toggle } = useSidebarStore();
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menuPosOpt, setMenuPosOpt] = useState<Option.Option<{ bottom: number; left: number }>>(Option.none());
   const [userOpt, setUserOpt] = useState<Option.Option<User>>(Option.none());
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountPosOpt, setAccountPosOpt] = useState<Option.Option<{ bottom: number; left: number }>>(Option.none());
+  const [signInExpanded, setSignInExpanded] = useState(false);
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const accountBtnRef = useRef<HTMLButtonElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const redirectTo = searchParams.get("redirect") ?? "/";
+  const authError = searchParams.get("error") === "auth_callback_error";
+
+  const showSignInButtons = signInExpanded || (authError && isAnonymous);
 
   useEffect(() => {
     rehydrateSidebarStore();
@@ -160,13 +167,30 @@ export function CollapsibleSidebar({
 
       <div className="shrink-0 pl-1.5 pr-2.5 py-1">
         {isAnonymous ? (
-          <Link
-            href="/login"
-            className="flex h-10 w-full items-center gap-3 whitespace-nowrap rounded-full px-2.5 text-sm text-foreground/80 transition-colors hover:bg-muted focus:outline-none"
-          >
-            <LogIn className="h-5 w-5 shrink-0" />
-            {open && <span className="overflow-hidden">Sign in</span>}
-          </Link>
+          showSignInButtons ? (
+            <div className="flex flex-col gap-1">
+              {authError && (
+                <p className="px-2 text-destructive text-xs" role="alert">
+                  Sign-in failed. Please try again.
+                </p>
+              )}
+              {open ? (
+                <SignInButtons redirectTo={redirectTo} />
+              ) : (
+                <SignInButtons compact redirectTo={redirectTo} />
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSignInExpanded(true)}
+              aria-label="Sign in to start a session"
+              className="flex h-10 w-full items-center gap-3 whitespace-nowrap rounded-full px-2.5 text-sm text-foreground/80 transition-colors hover:bg-muted focus:outline-none"
+            >
+              <LogIn className="h-5 w-5 shrink-0" />
+              {open && <span className="overflow-hidden">Sign in</span>}
+            </button>
+          )
         ) : Option.match(userOpt, {
             onNone: () => null,
             onSome: (user) => (

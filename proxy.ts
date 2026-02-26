@@ -100,7 +100,7 @@ export default async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (isProtectedPath(request.nextUrl.pathname) && !user) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
+    redirectUrl.pathname = "/";
     redirectUrl.searchParams.set("redirect", request.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }

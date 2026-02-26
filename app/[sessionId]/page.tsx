@@ -18,7 +18,7 @@ export default async function SessionPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/login");
+    redirect("/");
   }
 
   return (

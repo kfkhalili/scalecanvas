@@ -60,10 +60,10 @@ describe("decideBootstrapAction", () => {
 });
 
 describe("executeBootstrapAction", () => {
-  it("redirect_login: redirects to /login", async () => {
+  it("redirect_login: redirects to /", async () => {
     const deps = mockDeps();
     await executeBootstrapAction({ type: "redirect_login" }, ctx(), deps);
-    expect(deps.redirectTo).toHaveBeenCalledWith("/login");
+    expect(deps.redirectTo).toHaveBeenCalledWith("/");
   });
 
   it("resume_or_idle: redirects to most recent session when sessions exist", async () => {

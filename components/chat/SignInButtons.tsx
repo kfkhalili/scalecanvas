@@ -40,7 +40,9 @@ function GitHubIcon({ className }: { className?: string }): React.ReactElement {
   );
 }
 
-export function SignInButtons({ redirectTo = "/" }: { redirectTo?: string }): React.ReactElement {
+type SignInButtonsProps = { redirectTo?: string; compact?: boolean };
+
+export function SignInButtons({ redirectTo = "/", compact = false }: SignInButtonsProps): React.ReactElement {
   const supabase = createBrowserClientInstance();
 
   async function signInWithGitHub() {
@@ -55,6 +57,32 @@ export function SignInButtons({ redirectTo = "/" }: { redirectTo?: string }): Re
       provider: "google",
       options: { redirectTo: getCallbackUrl(redirectTo) },
     });
+  }
+
+  if (compact) {
+    return (
+      <div className="flex items-center justify-center gap-1.5 p-1.5">
+        <Button
+          onClick={signInWithGoogle}
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="Sign in with Google"
+        >
+          <GoogleIcon className="h-4 w-4" />
+        </Button>
+        <Button
+          onClick={signInWithGitHub}
+          type="button"
+          size="icon"
+          className="h-8 w-8 bg-[#24292e] text-white hover:bg-[#24292e]/90"
+          aria-label="Sign in with GitHub"
+        >
+          <GitHubIcon className="h-4 w-4" />
+        </Button>
+      </div>
+    );
   }
 
   return (

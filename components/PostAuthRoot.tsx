@@ -16,7 +16,7 @@ import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
  * persisted stores it decides how to bootstrap the session:
  *
  *  1. Anonymous chat exists → POST /api/auth/handoff: if eligible (trial not claimed), creates trial session and handoff; else created: false, clear state and resume
- *  2. No anonymous chat (fresh /login visit) → redirect to most recent session, or show empty workspace
+ *  2. No anonymous chat (fresh visit) → redirect to most recent session, or show empty workspace
  */
 export function PostAuthRoot(): React.ReactElement {
   const router = useRouter();
@@ -41,7 +41,7 @@ export function PostAuthRoot(): React.ReactElement {
     supabase.auth.getUser().then((res) => {
       const user = res.data.user;
       if (!user) {
-        router.replace("/login");
+        router.replace("/");
         return;
       }
 
