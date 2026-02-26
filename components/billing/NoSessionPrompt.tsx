@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { useEffect, useState, useCallback } from "react";
 import { SquarePen, ShoppingCart } from "lucide-react";
 import { fetchTokenBalance, initiateCheckout } from "@/services/checkoutClient";
@@ -11,7 +11,7 @@ type PromptState = "loading" | "has_tokens" | "no_tokens";
 
 export function NoSessionPrompt(): React.ReactElement {
   const [state, setState] = useState<PromptState>("loading");
-  const [buying, setBuying] = useState<string | null>(null);
+  const [buyingOpt, setBuyingOpt] = useState<Option.Option<string>>(Option.none());
 
   const refresh = useCallback(() => {
     void Effect.runPromise(Effect.either(fetchTokenBalance())).then((either) =>
@@ -27,12 +27,12 @@ export function NoSessionPrompt(): React.ReactElement {
   }, [refresh]);
 
   const handleBuy = async (packId: string): Promise<void> => {
-    setBuying(packId);
+    setBuyingOpt(Option.some(packId));
     const either = await Effect.runPromise(Effect.either(initiateCheckout(packId)));
     Either.match(either, {
       onLeft: (e) => {
         toast.error(e.message);
-        setBuying(null);
+        setBuyingOpt(Option.none());
       },
       onRight: (url) => {
         window.location.href = url;
@@ -70,7 +70,7 @@ export function NoSessionPrompt(): React.ReactElement {
           <button
             key={pack.id}
             type="button"
-            disabled={buying !== null}
+            disabled={Option.isSome(buyingOpt)}
             onClick={() => handleBuy(pack.id)}
             className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm transition-colors hover:bg-muted focus:outline-none disabled:opacity-50"
           >

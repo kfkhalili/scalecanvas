@@ -1,5 +1,6 @@
 "use client";
 
+import { Option } from "effect";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -34,10 +35,10 @@ export function CollapsibleSidebar({
   const { open, toggle, hydrate } = useSidebarStore();
   const { theme, setTheme } = useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ bottom: number; left: number } | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [menuPosOpt, setMenuPosOpt] = useState<Option.Option<{ bottom: number; left: number }>>(Option.none());
+  const [userOpt, setUserOpt] = useState<Option.Option<User>>(Option.none());
   const [accountOpen, setAccountOpen] = useState(false);
-  const [accountPos, setAccountPos] = useState<{ bottom: number; left: number } | null>(null);
+  const [accountPosOpt, setAccountPosOpt] = useState<Option.Option<{ bottom: number; left: number }>>(Option.none());
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const accountBtnRef = useRef<HTMLButtonElement>(null);
@@ -50,10 +51,12 @@ export function CollapsibleSidebar({
   useEffect(() => {
     if (isAnonymous) return;
     const supabase = createBrowserClientInstance();
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabase.auth.getUser().then(({ data }) => setUserOpt(Option.fromNullable(data.user)));
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
+    } = supabase.auth.onAuthStateChange((_event, session) =>
+      setUserOpt(Option.flatMap(Option.fromNullable(session), (s) => Option.fromNullable(s.user)))
+    );
     return () => subscription.unsubscribe();
   }, [isAnonymous]);
 
@@ -82,11 +85,12 @@ export function CollapsibleSidebar({
   const toggleSettings = (): void => {
     if (settingsOpen) {
       setSettingsOpen(false);
+      setMenuPosOpt(Option.none());
       return;
     }
     if (settingsBtnRef.current) {
       const rect = settingsBtnRef.current.getBoundingClientRect();
-      setMenuPos({ bottom: window.innerHeight - rect.top + 8, left: rect.left });
+      setMenuPosOpt(Option.some({ bottom: window.innerHeight - rect.top + 8, left: rect.left }));
     }
     setSettingsOpen(true);
   };
@@ -94,18 +98,19 @@ export function CollapsibleSidebar({
   const toggleAccount = (): void => {
     if (accountOpen) {
       setAccountOpen(false);
+      setAccountPosOpt(Option.none());
       return;
     }
     if (accountBtnRef.current) {
       const rect = accountBtnRef.current.getBoundingClientRect();
-      setAccountPos({ bottom: window.innerHeight - rect.top + 8, left: rect.left });
+      setAccountPosOpt(Option.some({ bottom: window.innerHeight - rect.top + 8, left: rect.left }));
     }
     setAccountOpen(true);
   };
 
   const handleSignOut = async (): Promise<void> => {
     useAuthHandoffStore.getState().setAnonymousMessages([]);
-    useAuthHandoffStore.getState().setQuestionTitle(null);
+    useAuthHandoffStore.getState().setQuestionTitle(Option.none());
     useCanvasStore.getState().setHasAttemptedEval(false);
     const supabase = createBrowserClientInstance();
     await supabase.auth.signOut();
@@ -162,77 +167,83 @@ export function CollapsibleSidebar({
             <LogIn className="h-5 w-5 shrink-0" />
             {open && <span className="overflow-hidden">Sign in</span>}
           </Link>
-        ) : user ? (
-          <>
-            <button
-              ref={accountBtnRef}
-              type="button"
-              onClick={toggleAccount}
-              className="flex h-10 w-full items-center gap-3 whitespace-nowrap rounded-full px-2.5 text-sm text-foreground/80 transition-colors hover:bg-muted focus:outline-none"
-              aria-label="Account menu"
-            >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full ring-2 ring-foreground/10">
-                {(() => {
-                  const avatarUrl = getAvatarUrl(user);
-                  return avatarUrl ? (
-                    <Image
-                      src={avatarUrl}
-                      alt=""
-                      width={20}
-                      height={20}
-                      className="h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                      unoptimized
-                    />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center bg-blue-600 text-[10px] font-semibold text-white">
-                      {getInitials(user)}
-                    </span>
-                  );
-                })()}
-              </span>
-              {open && (
-                <span className="min-w-0 truncate text-left text-foreground/80">
-                  {getDisplayName(user) ?? user.email ?? "Account"}
-                </span>
-              )}
-            </button>
-            {accountOpen &&
-              accountPos != null &&
-              typeof document !== "undefined" &&
-              createPortal(
-                <div
-                  ref={accountMenuRef}
-                  className="fixed z-[200] w-56 rounded-xl border bg-popover py-1.5 shadow-xl"
-                  style={{ bottom: accountPos.bottom, left: accountPos.left }}
+        ) : Option.match(userOpt, {
+            onNone: () => null,
+            onSome: (user) => (
+              <>
+                <button
+                  ref={accountBtnRef}
+                  type="button"
+                  onClick={toggleAccount}
+                  className="flex h-10 w-full items-center gap-3 whitespace-nowrap rounded-full px-2.5 text-sm text-foreground/80 transition-colors hover:bg-muted focus:outline-none"
+                  aria-label="Account menu"
                 >
-                  <div className="flex items-center justify-between border-b px-3 py-2">
-                    <span className="truncate text-sm text-foreground/70">{user.email}</span>
-                    <button
-                      type="button"
-                      onClick={() => setAccountOpen(false)}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus:outline-none"
-                      aria-label="Close"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAccountOpen(false);
-                      handleSignOut();
-                    }}
-                    className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground/80 transition-colors hover:bg-muted focus:outline-none"
-                  >
-                    <LogOut className="h-4 w-4 shrink-0" />
-                    Sign out
-                  </button>
-                </div>,
-                document.body
-              )}
-          </>
-        ) : null}
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full ring-2 ring-foreground/10">
+                    {Option.match(getAvatarUrl(user), {
+                      onNone: () => (
+                        <span className="flex h-full w-full items-center justify-center bg-blue-600 text-[10px] font-semibold text-white">
+                          {getInitials(user)}
+                        </span>
+                      ),
+                      onSome: (avatarUrl) => (
+                        <Image
+                          src={avatarUrl}
+                          alt=""
+                          width={20}
+                          height={20}
+                          className="h-full w-full object-cover"
+                          referrerPolicy="no-referrer"
+                          unoptimized
+                        />
+                      ),
+                    })}
+                  </span>
+                  {open && (
+                    <span className="min-w-0 truncate text-left text-foreground/80">
+                      {Option.getOrElse(getDisplayName(user), () => user.email ?? "Account")}
+                    </span>
+                  )}
+                </button>
+                {accountOpen &&
+                  typeof document !== "undefined" &&
+                  Option.match(accountPosOpt, {
+                    onNone: () => null,
+                    onSome: (pos) =>
+                      createPortal(
+                        <div
+                          ref={accountMenuRef}
+                          className="fixed z-[200] w-56 rounded-xl border bg-popover py-1.5 shadow-xl"
+                          style={{ bottom: pos.bottom, left: pos.left }}
+                        >
+                          <div className="flex items-center justify-between border-b px-3 py-2">
+                            <span className="truncate text-sm text-foreground/70">{user.email}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAccountOpen(false)}
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus:outline-none"
+                              aria-label="Close"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAccountOpen(false);
+                              handleSignOut();
+                            }}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground/80 transition-colors hover:bg-muted focus:outline-none"
+                          >
+                            <LogOut className="h-4 w-4 shrink-0" />
+                            Sign out
+                          </button>
+                        </div>,
+                        document.body
+                      ),
+                  })}
+              </>
+            ),
+          })}
       </div>
 
       <div className="shrink-0 pl-1.5 pr-2.5 py-2">
@@ -248,14 +259,16 @@ export function CollapsibleSidebar({
       </div>
 
       {settingsOpen &&
-        menuPos != null &&
         typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={settingsMenuRef}
-            className="fixed z-[200] w-56 rounded-xl border bg-popover py-1.5 shadow-xl"
-            style={{ bottom: menuPos.bottom, left: menuPos.left }}
-          >
+        Option.match(menuPosOpt, {
+          onNone: () => null,
+          onSome: (pos) =>
+            createPortal(
+              <div
+                ref={settingsMenuRef}
+                className="fixed z-[200] w-56 rounded-xl border bg-popover py-1.5 shadow-xl"
+                style={{ bottom: pos.bottom, left: pos.left }}
+              >
             <div className="px-3 py-2 text-xs font-medium text-foreground/50">Theme</div>
             {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
               <button
@@ -272,9 +285,10 @@ export function CollapsibleSidebar({
                 {theme === value && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
               </button>
             ))}
-          </div>,
-          document.body
-        )}
+              </div>,
+              document.body
+            ),
+        })}
     </nav>
   );
 }

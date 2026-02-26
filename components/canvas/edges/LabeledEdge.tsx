@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { whenSome } from "@/lib/optionHelpers";
 import {
   BaseEdge,
   getBezierPath,
@@ -42,19 +43,15 @@ export function LabeledEdge({
   const updateEdgeLabelPosition = useUpdateEdgeLabelPosition();
 
   const [isEditing, setIsEditing] = useState(false);
-  const label = (data?.label as string) ?? "";
+  const label = (data?.label as string | undefined) ?? "";
   const [value, setValue] = useState(label);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const baseOffsetX = (data?.labelOffsetX as number | undefined) ?? 0;
   const baseOffsetY = (data?.labelOffsetY as number | undefined) ?? 0;
 
-  const dragStartRef = useRef<{
-    clientX: number;
-    clientY: number;
-    offsetX: number;
-    offsetY: number;
-  } | null>(null);
+  type DragStart = { clientX: number; clientY: number; offsetX: number; offsetY: number };
+  const dragStartRef = useRef<DragStart | null>(null);
   const isDraggingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -73,7 +70,7 @@ export function LabeledEdge({
   const handleSave = useCallback((): void => {
     setIsEditing(false);
     const trimmed = value.trim();
-    if (updateEdgeLabel) updateEdgeLabel(id, trimmed);
+    whenSome(updateEdgeLabel, (fn) => fn(id, trimmed));
   }, [id, value, updateEdgeLabel]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -134,13 +131,15 @@ export function LabeledEdge({
       setIsDragging(false);
       setDragOffset({ x: 0, y: 0 });
 
-      if (start && wasDragging) {
-        const zoom = getZoom();
-        const nx = start.offsetX + (e.clientX - start.clientX) / zoom;
-        const ny = start.offsetY + (e.clientY - start.clientY) / zoom;
-        if (updateEdgeLabelPosition) updateEdgeLabelPosition(id, nx, ny);
-      } else if (start && !wasDragging) {
-        setIsEditing(true);
+      if (start) {
+        if (wasDragging) {
+          const zoom = getZoom();
+          const nx = start.offsetX + (e.clientX - start.clientX) / zoom;
+          const ny = start.offsetY + (e.clientY - start.clientY) / zoom;
+          whenSome(updateEdgeLabelPosition, (fn) => fn(id, nx, ny));
+        } else {
+          setIsEditing(true);
+        }
       }
       setLabelPointerDown(false);
     };

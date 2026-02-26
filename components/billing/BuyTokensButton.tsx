@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,15 +14,15 @@ type BuyTokensButtonProps = {
 
 export function BuyTokensButton({ className }: BuyTokensButtonProps): React.ReactElement {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState<string | null>(null);
+  const [loadingOpt, setLoadingOpt] = useState<Option.Option<string>>(Option.none());
 
   async function handlePurchase(packId: string): Promise<void> {
-    setLoading(packId);
+    setLoadingOpt(Option.some(packId));
     const either = await Effect.runPromise(Effect.either(initiateCheckout(packId)));
     Either.match(either, {
       onLeft: (e) => {
         toast.error(e.message);
-        setLoading(null);
+        setLoadingOpt(Option.none());
       },
       onRight: (url) => {
         window.location.href = url;
@@ -48,11 +48,16 @@ export function BuyTokensButton({ className }: BuyTokensButtonProps): React.Reac
               key={pack.id}
               variant="ghost"
               size="sm"
-              disabled={loading !== null}
+              disabled={Option.isSome(loadingOpt)}
               onClick={() => handlePurchase(pack.id)}
               className="justify-between"
             >
-              <span>{loading === pack.id ? "Redirecting..." : pack.label}</span>
+              <span>
+                {Option.match(loadingOpt, {
+                  onNone: () => pack.label,
+                  onSome: (id) => (id === pack.id ? "Redirecting..." : pack.label),
+                })}
+              </span>
               <span className="text-muted-foreground">${pack.priceUsd}</span>
             </Button>
           ))}

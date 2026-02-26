@@ -1,9 +1,11 @@
 "use client";
 
+import { Option } from "effect";
 import { useState, useCallback, useEffect, type DragEvent } from "react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronRight, GripVertical, StickyNote } from "lucide-react";
+import { whenSome } from "@/lib/optionHelpers";
 import {
   CATEGORY_ORDER,
   CATEGORY_LABELS,
@@ -24,10 +26,14 @@ const PROVIDER_OPTIONS: { value: NodeLibraryProvider; label: string }[] = [
   { value: "generic", label: "Generic" },
 ];
 
-function parseProviderFromUrl(param: string | null): NodeLibraryProvider {
-  if (param === "all" || param === "aws" || param === "gcp" || param === "azure" || param === "generic")
-    return param;
-  return "all";
+function parseProviderFromUrl(param: Option.Option<string>): NodeLibraryProvider {
+  return Option.match(param, {
+    onNone: () => "all" as const,
+    onSome: (p) =>
+      p === "all" || p === "aws" || p === "gcp" || p === "azure" || p === "generic"
+        ? p
+        : ("all" as const),
+  });
 }
 
 function onDragStart(e: DragEvent, entry: ServiceEntry): void {
@@ -37,9 +43,6 @@ function onDragStart(e: DragEvent, entry: ServiceEntry): void {
 }
 
 function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
-  const iconUrl =
-    entry.type === "text" ? null : getNodeIconUrl(entry.type);
-  const GenericIcon = entry.type === "text" ? null : getNodeIconComponent(entry.type);
   return (
     <div
       draggable
@@ -50,19 +53,26 @@ function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-foreground/20 group-hover:text-foreground/40" />
       {entry.type === "text" ? (
         <StickyNote className="h-5 w-5 shrink-0 text-foreground/80" />
-      ) : iconUrl ? (
-        <Image
-          src={iconUrl}
-          alt=""
-          width={20}
-          height={20}
-          className="h-5 w-5 shrink-0 object-contain"
-          unoptimized
-        />
-      ) : GenericIcon ? (
-        <GenericIcon className="h-5 w-5 shrink-0 text-foreground/70" aria-hidden />
       ) : (
-        <div className="h-5 w-5 shrink-0" />
+        Option.match(getNodeIconUrl(entry.type), {
+          onNone: () =>
+            Option.match(getNodeIconComponent(entry.type), {
+              onNone: () => <div className="h-5 w-5 shrink-0" />,
+              onSome: (GenericIcon) => (
+                <GenericIcon className="h-5 w-5 shrink-0 text-foreground/70" aria-hidden />
+              ),
+            }),
+          onSome: (iconUrl) => (
+            <Image
+              src={iconUrl}
+              alt=""
+              width={20}
+              height={20}
+              className="h-5 w-5 shrink-0 object-contain"
+              unoptimized
+            />
+          ),
+        })
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm text-foreground/80">{entry.label}</div>
@@ -114,7 +124,9 @@ export function NodeLibrary({ className = "" }: NodeLibraryProps): React.ReactEl
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
 
-  const providerFromUrl = parseProviderFromUrl(searchParams.get("provider"));
+  const providerFromUrl = parseProviderFromUrl(
+    Option.fromNullable(searchParams.get("provider"))
+  );
   const [provider, setProviderState] = useState<NodeLibraryProvider>(providerFromUrl);
 
   useEffect(() => {
@@ -122,16 +134,24 @@ export function NodeLibrary({ className = "" }: NodeLibraryProps): React.ReactEl
   }, [providerFromUrl]);
 
   useEffect(() => {
-    if (searchParams.get("provider") !== null) return;
+    if (Option.isSome(Option.fromNullable(searchParams.get("provider")))) return;
     fetch("/api/preferences")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { provider?: string } | null) => {
-        if (data?.provider && parseProviderFromUrl(data.provider) !== "all") {
-          setProviderState(parseProviderFromUrl(data.provider));
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<{ provider?: string }>).then((d) => Option.some(d))
+          : Promise.resolve(Option.none())
+      )
+      .then((dataOpt) => {
+        const providerOpt = Option.flatMap(dataOpt, (d) =>
+          Option.fromNullable(d.provider)
+        );
+        whenSome(providerOpt, (raw) => {
+          if (parseProviderFromUrl(Option.some(raw)) === "all") return;
+          setProviderState(parseProviderFromUrl(Option.some(raw)));
           const nextParams = new URLSearchParams(searchParams);
-          nextParams.set("provider", data.provider);
+          nextParams.set("provider", raw);
           router.replace(`${pathname}?${nextParams.toString()}`);
-        }
+        });
       })
       .catch(() => {});
   }, [pathname, router, searchParams]);

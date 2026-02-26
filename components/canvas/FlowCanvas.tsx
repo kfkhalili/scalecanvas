@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { useCallback, useEffect, useMemo, useRef, type DragEvent } from "react";
 import {
   ReactFlow,
@@ -19,6 +19,7 @@ import {
 import "reactflow/dist/style.css";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import { whenSome } from "@/lib/optionHelpers";
 import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
@@ -33,10 +34,10 @@ function nextNodeId(): string {
 }
 
 type FlowCanvasInnerProps = {
-  sessionId: string | null;
+  sessionIdOpt: Option.Option<string>;
 };
 
-function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElement {
+function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactElement {
   const storeNodes = useCanvasStore((s) => s.nodes);
   const storeEdges = useCanvasStore((s) => s.edges);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -68,12 +69,16 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
   // Push local state to store (for save, Evaluate, getCanvasState)
   useEffect(() => {
     storeUpdatedFromLocalRef.current = true;
-    setCanvasState({ nodes, edges, viewport });
+    setCanvasState({
+      nodes,
+      edges,
+      viewport: Option.getOrUndefined(viewport),
+    });
   }, [nodes, edges, viewport, setCanvasState]);
 
   const onMoveEnd = useCallback(
     (_ev: MouseEvent | TouchEvent | null, vp: RfViewport) => {
-      setViewport({ x: vp.x, y: vp.y, zoom: vp.zoom });
+      setViewport(Option.some({ x: vp.x, y: vp.y, zoom: vp.zoom }));
     },
     [setViewport]
   );
@@ -146,24 +151,30 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
   );
 
   useEffect(() => {
-    if (!sessionId || sessionId === "ephemeral") return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveTimeoutRef.current = null;
-      const state = getCanvasState();
-      void Effect.runPromise(
-        Effect.either(saveCanvasApi(sessionId, state))
-      ).then(() => {});
-    }, SAVE_DEBOUNCE_MS);
+    whenSome(sessionIdOpt, (sessionId) => {
+      if (sessionId === "ephemeral") return;
+      if (saveTimeoutRef.current !== null) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTimeoutRef.current = setTimeout(() => {
+        saveTimeoutRef.current = null;
+        const state = getCanvasState();
+        void Effect.runPromise(
+          Effect.either(saveCanvasApi(sessionId, state))
+        ).then(() => {});
+      }, SAVE_DEBOUNCE_MS);
+    });
     return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (saveTimeoutRef.current !== null) {
+        clearTimeout(saveTimeoutRef.current);
+      }
     };
-  }, [sessionId, nodes, edges, viewport, getCanvasState]);
+  }, [sessionIdOpt, nodes, edges, viewport, getCanvasState]);
 
-  const defaultViewport: RfViewport =
-    viewport != null
-      ? { x: viewport.x, y: viewport.y, zoom: viewport.zoom }
-      : { x: 0, y: 0, zoom: 1 };
+  const defaultViewport: RfViewport = Option.match(viewport, {
+    onNone: () => ({ x: 0, y: 0, zoom: 1 }),
+    onSome: (vp) => ({ x: vp.x, y: vp.y, zoom: vp.zoom }),
+  });
 
   const edgeTypes = useMemo(
     () => ({ default: LabeledEdge }),
@@ -176,7 +187,7 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
         updateEdgeLabelPosition={updateEdgeLabelPosition}
       >
       <ReactFlow
-        key={sessionId ?? "no-session"}
+        key={Option.getOrElse(sessionIdOpt, () => "no-session")}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -204,11 +215,11 @@ function FlowCanvasInner({ sessionId }: FlowCanvasInnerProps): React.ReactElemen
 }
 
 type FlowCanvasProps = {
-  sessionId: string | null;
+  sessionIdOpt: Option.Option<string>;
 };
 
-export function FlowCanvas({ sessionId }: FlowCanvasProps): React.ReactElement {
-  const evaluateAction = useCanvasStore((s) => s.evaluateAction);
+export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElement {
+  const evaluateActionOpt = useCanvasStore((s) => s.evaluateAction);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
 
   return (
@@ -217,27 +228,30 @@ export function FlowCanvas({ sessionId }: FlowCanvasProps): React.ReactElement {
       style={{ minHeight: 400, minWidth: 300 }}
     >
       <ReactFlowProvider>
-        <FlowCanvasInner sessionId={sessionId} />
+        <FlowCanvasInner sessionIdOpt={sessionIdOpt} />
       </ReactFlowProvider>
-      {evaluateAction && (
-        <div className="absolute bottom-2 right-2 z-10">
-          <button
-            type="button"
-            onClick={evaluateAction.evaluate}
-            disabled={!evaluateAction.canEvaluate || evaluateAction.isEvaluating || !isSessionActive}
-            className="rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            title={
-              !isSessionActive
-                ? "Interview ended"
-                : evaluateAction.canEvaluate
-                  ? "Request feedback on the current diagram"
-                  : "Add or change diagram content to enable"
-            }
-          >
-            {evaluateAction.isEvaluating ? "Evaluating…" : "Evaluate"}
-          </button>
-        </div>
-      )}
+      {Option.match(evaluateActionOpt, {
+        onNone: () => null,
+        onSome: (evaluateAction) => (
+          <div className="absolute bottom-2 right-2 z-10">
+            <button
+              type="button"
+              onClick={evaluateAction.evaluate}
+              disabled={!evaluateAction.canEvaluate || evaluateAction.isEvaluating || !isSessionActive}
+              className="rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              title={
+                !isSessionActive
+                  ? "Interview ended"
+                  : evaluateAction.canEvaluate
+                    ? "Request feedback on the current diagram"
+                    : "Add or change diagram content to enable"
+              }
+            >
+              {evaluateAction.isEvaluating ? "Evaluating…" : "Evaluate"}
+            </button>
+          </div>
+        ),
+      })}
     </div>
   );
 }

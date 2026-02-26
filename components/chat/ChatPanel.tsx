@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either } from "effect";
+import { Effect, Option } from "effect";
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { TranscriptView } from "./TranscriptView";
 import { SignInButtons } from "./SignInButtons";
 import { cn } from "@/lib/utils";
+import { whenSome, whenRight } from "@/lib/optionHelpers";
 import type { TranscriptEntry } from "@/lib/types";
 
 const CHAT_INPUT_MIN_HEIGHT_PX = 40;
@@ -50,14 +51,14 @@ export function ChatPanel({
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
   const setHasAttemptedEval = useCanvasStore((s) => s.setHasAttemptedEval);
   const hasAttemptedEval = useCanvasStore((s) => s.hasAttemptedEval);
-  const pendingSessionId = useAuthHandoffStore((s) => s.pendingSessionId);
+  const pendingSessionIdOpt = useAuthHandoffStore((s) => s.pendingSessionId);
   const setPendingAuthHandoff = useAuthHandoffStore((s) => s.setPendingAuthHandoff);
   const setHandoffTranscript = useAuthHandoffStore((s) => s.setHandoffTranscript);
   const setAnonymousMessages = useAuthHandoffStore((s) => s.setAnonymousMessages);
   const setQuestionTitle = useAuthHandoffStore((s) => s.setQuestionTitle);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
   const setSessionActive = useSessionStore((s) => s.setSessionActive);
-  const activeQuestion = useQuestionStore((s) => s.activeQuestion);
+  const activeQuestionOpt = useQuestionStore((s) => s.activeQuestion);
   const hintIndex = useQuestionStore((s) => s.hintIndex);
   const setInitialQuestion = useQuestionStore((s) => s.setInitialQuestion);
   const incrementHint = useQuestionStore((s) => s.incrementHint);
@@ -65,14 +66,15 @@ export function ChatPanel({
   const canvasNodes = useCanvasStore((s) => s.nodes);
   const canvasEdges = useCanvasStore((s) => s.edges);
   const chatBody = useMemo(
-    () => ({
-      nodes: canvasNodes,
-      edges: canvasEdges,
-      ...(sessionId ?? pendingSessionId
-        ? { session_id: sessionId ?? pendingSessionId ?? undefined }
-        : {}),
-    }),
-    [canvasNodes, canvasEdges, sessionId, pendingSessionId]
+    () => {
+      const resolvedSessionId = sessionId ?? Option.getOrUndefined(pendingSessionIdOpt);
+      return {
+        nodes: canvasNodes,
+        edges: canvasEdges,
+        ...(resolvedSessionId ? { session_id: resolvedSessionId } : {}),
+      };
+    },
+    [canvasNodes, canvasEdges, sessionId, pendingSessionIdOpt]
   );
 
   const { messages, setMessages, input, setInput, handleSubmit, isLoading } =
@@ -82,37 +84,48 @@ export function ChatPanel({
       initialMessages: initialEntries.map(toMessage),
       body: chatBody,
       onFinish: (message) => {
-        const handoffId = useAuthHandoffStore.getState().pendingSessionId;
-        if (handoffId && message.role === "assistant") {
-          setPendingAuthHandoff(null);
-          router.replace(`/${handoffId}`);
-          return;
-        }
+        const handoffIdOpt = useAuthHandoffStore.getState().pendingSessionId;
+        let handoffHandled = false;
+        whenSome(handoffIdOpt, (handoffId) => {
+          if (message.role === "assistant") {
+            setPendingAuthHandoff(Option.none());
+            router.replace(`/${handoffId}`);
+            handoffHandled = true;
+          }
+        });
+        if (handoffHandled) return;
         if (message.role === "assistant" && message.content && sessionId) {
           void Effect.runPromise(
             Effect.either(
               appendTranscriptApi(sessionId, "assistant", message.content)
             )
           ).then((either) =>
-            Either.match(either, {
-              onLeft: () => {},
-              onRight: (entry) => appendEntry(entry),
-            })
+            whenRight(either, (entry) => appendEntry(entry))
           );
         }
       },
       onError: (err) => {
-        const statusCode = err && typeof err === "object" && "statusCode" in err ? (err as Error & { statusCode: number }).statusCode : undefined;
-        if (statusCode === 403) {
-          toast.error("Interview time has expired.");
-          setSessionActive(false);
-          return;
-        }
-        if (statusCode === 401) {
-          toast.error("Unauthorized.");
-          setSessionActive(false);
-          return;
-        }
+        const statusCodeOpt = Option.fromNullable(
+          err &&
+            typeof err === "object" &&
+            "statusCode" in err
+            ? (err as Error & { statusCode: number }).statusCode
+            : null
+        );
+        let handled = false;
+        whenSome(statusCodeOpt, (statusCode) => {
+          if (statusCode === 403) {
+            toast.error("Interview time has expired.");
+            setSessionActive(false);
+            handled = true;
+          }
+          if (statusCode === 401) {
+            toast.error("Unauthorized.");
+            setSessionActive(false);
+            handled = true;
+          }
+        });
+        if (handled) return;
         const fallback =
           "Sorry, the assistant couldn't respond. Check your connection and try again.";
         const rawMessage =
@@ -130,10 +143,7 @@ export function ChatPanel({
               appendTranscriptApi(sessionId, "assistant", message)
             )
           ).then((either) =>
-            Either.match(either, {
-              onLeft: () => {},
-              onRight: (entry) => appendEntry(entry),
-            })
+            whenRight(either, (entry) => appendEntry(entry))
           );
         }
         setMessages((prev) => [
@@ -151,7 +161,7 @@ export function ChatPanel({
     messages,
     setMessages,
     isLoading,
-    sessionId: sessionId ?? pendingSessionId ?? null,
+    sessionId: Option.orElse(Option.fromNullable(sessionId), () => pendingSessionIdOpt),
   });
   const setEvaluateAction = useCanvasStore((s) => s.setEvaluateAction);
 
@@ -164,8 +174,8 @@ export function ChatPanel({
     const action = isAnonymous
       ? { evaluate: anonymousHandoff, canEvaluate, isEvaluating: false }
       : { evaluate, canEvaluate, isEvaluating };
-    setEvaluateAction(action);
-    return () => setEvaluateAction(null);
+    setEvaluateAction(Option.some(action));
+    return () => setEvaluateAction(Option.none());
   }, [isAnonymous, anonymousHandoff, evaluate, canEvaluate, isEvaluating, setEvaluateAction]);
 
   useEffect(() => {
@@ -173,14 +183,15 @@ export function ChatPanel({
   }, [initialEntries.length, setMessages]);
 
   useEffect(() => {
-    if (messages.length === 0 && !activeQuestion) {
+    const noActiveQuestion = Option.isNone(activeQuestionOpt);
+    if (messages.length === 0 && noActiveQuestion) {
       if (!isAnonymous) {
         const stored = useAuthHandoffStore.getState().anonymousMessages;
         if (stored.length > 0) return;
       }
       const question = getRandomQuestion();
       setInitialQuestion(question);
-      setQuestionTitle(question.title);
+      setQuestionTitle(Option.some(question.title));
       setMessages([
         {
           id: generateId(),
@@ -190,14 +201,14 @@ export function ChatPanel({
       ]);
       return;
     }
-    // After handoff we have messages but question store was reset; set question so Hint button works.
-    if (messages.length > 0 && !activeQuestion && !isAnonymous) {
+    if (messages.length > 0 && noActiveQuestion && !isAnonymous) {
       const question = getRandomQuestion();
       setInitialQuestion(question);
-      const currentTitle = useAuthHandoffStore.getState().questionTitle;
-      if (!currentTitle) setQuestionTitle(question.title);
+      const currentTitleOpt = useAuthHandoffStore.getState().questionTitle;
+      if (Option.isNone(currentTitleOpt))
+        setQuestionTitle(Option.some(question.title));
     }
-  }, [messages.length, activeQuestion, isAnonymous, setInitialQuestion, setQuestionTitle, setMessages]);
+  }, [messages.length, activeQuestionOpt, isAnonymous, setInitialQuestion, setQuestionTitle, setMessages]);
 
   useEffect(() => {
     if (sessionId) setSessionActive(true);
@@ -218,14 +229,22 @@ export function ChatPanel({
   const terminateHandledRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     for (const m of messages) {
-      const invs = (m as { toolInvocations?: Array<{ toolName?: string; args?: { reason?: string }; result?: unknown }> }).toolInvocations ?? [];
+      const raw = (m as { toolInvocations?: Array<{ toolName?: string; args?: { reason?: string }; result?: unknown }> }).toolInvocations;
+      const invs = raw ?? [];
       for (let i = 0; i < invs.length; i++) {
         const inv = invs[i];
         if (inv?.toolName === "terminate_interview") {
           const key = `${m.id ?? ""}-${i}`;
           if (terminateHandledRef.current.has(key)) continue;
           terminateHandledRef.current.add(key);
-          const reason = typeof inv.args?.reason === "string" ? inv.args.reason : typeof inv.result === "string" ? inv.result : "Interview ended.";
+          const reason = Option.getOrElse(
+            typeof inv.args?.reason === "string"
+              ? Option.some(inv.args.reason)
+              : typeof inv.result === "string"
+                ? Option.some(inv.result)
+                : Option.none(),
+            () => "Interview ended."
+          );
           toast.error(reason);
           setSessionActive(false);
         }
@@ -235,52 +254,54 @@ export function ChatPanel({
 
   const handoffDoneRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!pendingSessionId || pendingSessionId === handoffDoneRef.current) return;
-    handoffDoneRef.current = pendingSessionId;
-    const sessionIdForHandoff = pendingSessionId;
-    const currentFromChat = messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: typeof m.content === "string" ? m.content : "",
-    }));
-    const messagesToUse =
-      currentFromChat.length > 0
-        ? currentFromChat
-        : useAuthHandoffStore.getState().anonymousMessages;
-    runBffHandoff({
-      sessionId: sessionIdForHandoff,
-      messages: messagesToUse,
-      getCanvasState,
-      saveCanvasApi,
-      setMessages: setMessages as unknown as RunBffHandoffParams["setMessages"],
-      persistTranscript: async (sid, entries) => {
-        for (const { role, content } of entries) {
-          await Effect.runPromise(
-            Effect.either(appendTranscriptApi(sid, role, content))
-          );
-        }
-      },
-      onCanvasSaveError: () =>
-        toast.error(
-          "Your diagram couldn't be saved. You can keep working; try refreshing later to see if it's there."
-        ),
-      onHandoffComplete: (sid, filteredMsgs) => {
-        const now = new Date().toISOString();
-        const entries: TranscriptEntry[] = filteredMsgs.map((m) => ({
-          id: m.id,
-          sessionId: sid,
-          role: (m.role === "user" || m.role === "assistant" ? m.role : "assistant") as "user" | "assistant",
-          content: typeof m.content === "string" ? m.content : "",
-          createdAt: now,
-        }));
-        setHandoffTranscript({ sessionId: sid, entries });
-        setPendingAuthHandoff(null);
-        setAnonymousMessages([]);
-        setQuestionTitle(null);
-        router.replace(`/${sid}`);
-      },
+    whenSome(pendingSessionIdOpt, (pendingSessionId) => {
+      if (handoffDoneRef.current === pendingSessionId) return;
+      handoffDoneRef.current = pendingSessionId;
+      const sessionIdForHandoff = pendingSessionId;
+      const currentFromChat = messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: typeof m.content === "string" ? m.content : "",
+      }));
+      const messagesToUse =
+        currentFromChat.length > 0
+          ? currentFromChat
+          : useAuthHandoffStore.getState().anonymousMessages;
+      runBffHandoff({
+        sessionId: sessionIdForHandoff,
+        messages: messagesToUse,
+        getCanvasState,
+        saveCanvasApi,
+        setMessages: setMessages as unknown as RunBffHandoffParams["setMessages"],
+        persistTranscript: async (sid, entries) => {
+          for (const { role, content } of entries) {
+            await Effect.runPromise(
+              Effect.either(appendTranscriptApi(sid, role, content))
+            );
+          }
+        },
+        onCanvasSaveError: () =>
+          toast.error(
+            "Your diagram couldn't be saved. You can keep working; try refreshing later to see if it's there."
+          ),
+        onHandoffComplete: (sid, filteredMsgs) => {
+          const now = new Date().toISOString();
+          const entries: TranscriptEntry[] = filteredMsgs.map((m) => ({
+            id: m.id,
+            sessionId: sid,
+            role: (m.role === "user" || m.role === "assistant" ? m.role : "assistant") as "user" | "assistant",
+            content: typeof m.content === "string" ? m.content : "",
+            createdAt: now,
+          }));
+          setHandoffTranscript(Option.some({ sessionId: sid, entries }));
+          setPendingAuthHandoff(Option.none());
+          setAnonymousMessages([]);
+          setQuestionTitle(Option.none());
+          router.replace(`/${sid}`);
+        },
+      });
     });
-  }, [pendingSessionId, messages, getCanvasState, setMessages, router, setPendingAuthHandoff, setHandoffTranscript, setAnonymousMessages, setQuestionTitle]);
+  }, [pendingSessionIdOpt, messages, getCanvasState, setMessages, router, setPendingAuthHandoff, setHandoffTranscript, setAnonymousMessages, setQuestionTitle]);
 
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -339,10 +360,7 @@ export function ChatPanel({
       void Effect.runPromise(
         Effect.either(appendTranscriptApi(sessionId, "user", content))
       ).then((either) =>
-        Either.match(either, {
-          onLeft: () => {},
-          onRight: (entry) => appendEntry(entry),
-        })
+        whenRight(either, (entry) => appendEntry(entry))
       );
     }
     handleSubmit(e);
@@ -357,20 +375,24 @@ export function ChatPanel({
   };
 
   const isInputEmpty = input.trim() === "";
-  const hasMoreHints =
-    activeQuestion && hintIndex < activeQuestion.hints.length;
-  const showHintButton = isInputEmpty && !!hasMoreHints;
+  const hasMoreHints = Option.match(activeQuestionOpt, {
+    onNone: () => false,
+    onSome: (q) => hintIndex < q.hints.length,
+  });
+  const showHintButton = isInputEmpty && hasMoreHints;
 
   const handleHintClick = (e: React.MouseEvent): void => {
     e.preventDefault();
-    if (!activeQuestion || !hasMoreHints) return;
-    const hintMessage = {
-      id: generateId(),
-      role: "assistant" as const,
-      content: activeQuestion.hints[hintIndex],
-    };
-    setMessages((prev) => [...prev, hintMessage]);
-    incrementHint();
+    whenSome(activeQuestionOpt, (activeQuestion) => {
+      if (!hasMoreHints) return;
+      const hintMessage = {
+        id: generateId(),
+        role: "assistant" as const,
+        content: activeQuestion.hints[hintIndex],
+      };
+      setMessages((prev) => [...prev, hintMessage]);
+      incrementHint();
+    });
   };
 
   const displayMessages = messages.map((m) => ({

@@ -1,5 +1,6 @@
 "use client";
 
+import { Option } from "effect";
 import { createContext, useContext, type ReactNode } from "react";
 
 export type UpdateEdgeLabelFn = (edgeId: string, label: string) => void;
@@ -14,7 +15,7 @@ type EdgeLabelContextValue = {
   updateEdgeLabelPosition: UpdateEdgeLabelPositionFn;
 };
 
-const EdgeLabelContext = createContext<EdgeLabelContextValue | null>(null);
+const EdgeLabelContext = createContext<Option.Option<EdgeLabelContextValue>>(Option.none());
 
 export function EdgeLabelProvider({
   children,
@@ -27,19 +28,19 @@ export function EdgeLabelProvider({
 }): React.ReactElement {
   return (
     <EdgeLabelContext.Provider
-      value={{ updateEdgeLabel, updateEdgeLabelPosition }}
+      value={Option.some({ updateEdgeLabel, updateEdgeLabelPosition })}
     >
       {children}
     </EdgeLabelContext.Provider>
   );
 }
 
-export function useUpdateEdgeLabel(): UpdateEdgeLabelFn | null {
+export function useUpdateEdgeLabel(): Option.Option<UpdateEdgeLabelFn> {
   const ctx = useContext(EdgeLabelContext);
-  return ctx?.updateEdgeLabel ?? null;
+  return Option.map(ctx, (c) => c.updateEdgeLabel);
 }
 
-export function useUpdateEdgeLabelPosition(): UpdateEdgeLabelPositionFn | null {
+export function useUpdateEdgeLabelPosition(): Option.Option<UpdateEdgeLabelPositionFn> {
   const ctx = useContext(EdgeLabelContext);
-  return ctx?.updateEdgeLabelPosition ?? null;
+  return Option.map(ctx, (c) => c.updateEdgeLabelPosition);
 }

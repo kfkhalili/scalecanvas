@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { useEffect, useRef, useState } from "react";
 import { SplitScreen } from "@/components/layout/SplitScreen";
 import { CollapsibleSidebar } from "@/components/layout/CollapsibleSidebar";
@@ -20,6 +20,7 @@ import {
 } from "@/services/sessionsClient";
 import { rehydrateCanvasStore } from "@/stores/canvasStore";
 import { isSessionContentReady } from "@/lib/sessionLoading";
+import { whenSome } from "@/lib/optionHelpers";
 import type { TranscriptEntry } from "@/lib/types";
 
 type InterviewSplitViewProps = {
@@ -46,9 +47,9 @@ export function InterviewSplitView({
   const loadingSessionIdRef = useRef<string | null>(null);
 
   const [canvasReady, setCanvasReady] = useState(!sessionId);
-  const [transcriptForSession, setTranscriptForSession] = useState<
-    TranscriptEntry[] | null
-  >(sessionId ? null : []);
+  const [transcriptForSessionOpt, setTranscriptForSessionOpt] = useState<
+    Option.Option<TranscriptEntry[]>
+  >(sessionId ? Option.none() : Option.some([]));
 
   useEffect(() => {
     rehydrateCanvasStore();
@@ -56,10 +57,10 @@ export function InterviewSplitView({
 
   useEffect(() => {
     if (sessionId) {
-      setCurrentSessionId(sessionId);
-      return () => setCurrentSessionId(null);
+      setCurrentSessionId(Option.some(sessionId));
+      return () => setCurrentSessionId(Option.none());
     }
-    setCurrentSessionId(null);
+    setCurrentSessionId(Option.none());
   }, [sessionId, setCurrentSessionId]);
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export function InterviewSplitView({
       return;
     }
 
-    if (prevId != null && prevId !== sessionId) {
+    if (prevId !== null && prevId !== sessionId) {
       const state = getCanvasState();
       void Effect.runPromise(
         Effect.either(saveCanvasApi(prevId, state))
@@ -85,7 +86,8 @@ export function InterviewSplitView({
 
     void Effect.runPromise(Effect.either(fetchCanvas(sessionId))).then(
       (canvasEither) => {
-        if (loadingSessionIdRef.current !== sessionId) return;
+        const stale = loadingSessionIdRef.current !== sessionId;
+        if (stale) return;
         Either.match(canvasEither, {
           onLeft: () => setCanvasState(empty),
           onRight: (state) =>
@@ -98,31 +100,37 @@ export function InterviewSplitView({
 
   useEffect(() => {
     if (!sessionId) {
-      setTranscriptForSession([]);
+      setTranscriptForSessionOpt(Option.some([]));
       setEntries([]);
       return;
     }
-    const handoff = useAuthHandoffStore.getState().handoffTranscript;
-    if (handoff?.sessionId === sessionId) {
-      setTranscriptForSession(handoff.entries);
+    const handoffOpt = useAuthHandoffStore.getState().handoffTranscript;
+    const matched = Option.flatMap(handoffOpt, (handoff) =>
+      handoff.sessionId === sessionId
+        ? Option.some(handoff)
+        : Option.none()
+    );
+    let cleanup: (() => void) | undefined;
+    whenSome(matched, (handoff) => {
+      setTranscriptForSessionOpt(Option.some(handoff.entries));
       setEntries(handoff.entries);
-      // Clear handoff after a tick so a second effect run (e.g. Strict Mode) still sees it
-      // and sets transcript again instead of overwriting with null + fetch
-      const t = setTimeout(() => setHandoffTranscript(null), 0);
-      return () => clearTimeout(t);
-    }
+      const t = setTimeout(() => setHandoffTranscript(Option.none()), 0);
+      cleanup = () => clearTimeout(t);
+    });
+    if (Option.isSome(matched)) return cleanup;
     loadingSessionIdRef.current = sessionId;
-    setTranscriptForSession(null);
+    setTranscriptForSessionOpt(Option.none());
     void Effect.runPromise(Effect.either(fetchTranscript(sessionId))).then(
       (result) => {
-        if (loadingSessionIdRef.current !== sessionId) return;
+        const stale = loadingSessionIdRef.current !== sessionId;
+        if (stale) return;
         Either.match(result, {
           onLeft: () => {
-            setTranscriptForSession([]);
+            setTranscriptForSessionOpt(Option.some([]));
             setEntries([]);
           },
           onRight: (list) => {
-            setTranscriptForSession(list);
+            setTranscriptForSessionOpt(Option.some(list));
             setEntries(list);
           },
         });
@@ -133,9 +141,9 @@ export function InterviewSplitView({
   const sessionReady = isSessionContentReady(
     sessionId,
     canvasReady,
-    transcriptForSession !== null
+    Option.isSome(transcriptForSessionOpt)
   );
-  const initialEntries = transcriptForSession ?? entries;
+  const initialEntries = Option.getOrElse(transcriptForSessionOpt, () => entries);
 
   return (
     <div className="flex h-full w-full">
@@ -150,7 +158,7 @@ export function InterviewSplitView({
                 {sessionReady ? (
                   <FlowCanvas
                     key={sessionId ?? "ephemeral"}
-                    sessionId={sessionId ?? "ephemeral"}
+                    sessionIdOpt={Option.some(sessionId ?? "ephemeral")}
                   />
                 ) : (
                   <div className="h-full min-h-[400px] w-full bg-muted/30" />

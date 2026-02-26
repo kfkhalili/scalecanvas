@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
@@ -8,6 +8,7 @@ import { rehydrateCanvasStore, useCanvasStore } from "@/stores/canvasStore";
 import { useAuthHandoffStore, rehydrateAuthHandoffStore } from "@/stores/authHandoffStore";
 import { postHandoff } from "@/services/handoffClient";
 import { renameSessionApi, fetchSessions } from "@/services/sessionsClient";
+import { whenSome, whenRight } from "@/lib/optionHelpers";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
 import { CheckoutFeedback } from "@/components/billing/CheckoutFeedback";
 
@@ -47,11 +48,8 @@ export function PostAuthRoot(): React.ReactElement {
 
       if (!hasAnonymousChat) {
         void Effect.runPromise(Effect.either(fetchSessions())).then((either) =>
-          Either.match(either, {
-            onLeft: () => {},
-            onRight: (list) => {
-              if (list.length > 0) router.replace(`/${list[0].id}`);
-            },
+          whenRight(either, (list) => {
+            if (list.length > 0) router.replace(`/${list[0].id}`);
           })
         );
         return;
@@ -64,37 +62,32 @@ export function PostAuthRoot(): React.ReactElement {
         Either.match(handoffEither, {
           onLeft: () => {
             useAuthHandoffStore.getState().setAnonymousMessages([]);
-            useAuthHandoffStore.getState().setQuestionTitle(null);
+            useAuthHandoffStore.getState().setQuestionTitle(Option.none());
             void Effect.runPromise(Effect.either(fetchSessions())).then(
               (either) =>
-                Either.match(either, {
-                  onLeft: () => {},
-                  onRight: (list) => {
-                    if (list.length > 0) router.replace(`/${list[0].id}`);
-                  },
+                whenRight(either, (list) => {
+                  if (list.length > 0) router.replace(`/${list[0].id}`);
                 })
             );
           },
           onRight: (payload) => {
             if (payload.created && payload.session_id) {
-              if (questionTitle)
+              whenSome(questionTitle, (title) =>
                 void Effect.runPromise(
                   Effect.either(
-                    renameSessionApi(payload.session_id, questionTitle)
+                    renameSessionApi(payload.session_id, title)
                   )
-                );
-              setPendingAuthHandoff(payload.session_id);
+                )
+              );
+              setPendingAuthHandoff(Option.some(payload.session_id));
               router.replace(`/${payload.session_id}`);
             } else {
               useAuthHandoffStore.getState().setAnonymousMessages([]);
-              useAuthHandoffStore.getState().setQuestionTitle(null);
+              useAuthHandoffStore.getState().setQuestionTitle(Option.none());
               void Effect.runPromise(Effect.either(fetchSessions())).then(
                 (either) =>
-                  Either.match(either, {
-                    onLeft: () => {},
-                    onRight: (list) => {
-                      if (list.length > 0) router.replace(`/${list[0].id}`);
-                    },
+                  whenRight(either, (list) => {
+                    if (list.length > 0) router.replace(`/${list[0].id}`);
                   })
               );
             }

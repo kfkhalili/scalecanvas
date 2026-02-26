@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -28,13 +28,13 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
   const router = useRouter();
   const { setCurrentSessionId } = useSessionStore();
   const [dialog, setDialog] = useState<DialogState>({ kind: "closed" });
-  const [balance, setBalance] = useState<number | null>(null);
+  const [balanceOpt, setBalanceOpt] = useState<Option.Option<number>>(Option.none());
 
   const refreshBalance = useCallback(() => {
     void Effect.runPromise(Effect.either(fetchTokenBalance())).then((either) =>
       Either.match(either, {
-        onLeft: () => setBalance(null),
-        onRight: (tokens) => setBalance(tokens),
+        onLeft: () => setBalanceOpt(Option.none()),
+        onRight: (tokens) => setBalanceOpt(Option.some(tokens)),
       })
     );
   }, []);
@@ -52,7 +52,7 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
         setDialog({ kind: "closed" });
       },
       onRight: (tokens) => {
-        setBalance(tokens);
+        setBalanceOpt(Option.some(tokens));
         if (tokens > 0) {
           setDialog({ kind: "confirm", balance: tokens });
         } else {
@@ -74,8 +74,13 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
         setDialog({ kind: "closed" });
       },
       onRight: (sessionId) => {
-        setCurrentSessionId(sessionId);
-        setBalance((prev) => (prev !== null ? prev - 1 : null));
+        setCurrentSessionId(Option.some(sessionId));
+        setBalanceOpt((prev) =>
+          Option.match(prev, {
+            onNone: () => Option.none(),
+            onSome: (n) => Option.some(n - 1),
+          })
+        );
         setDialog({ kind: "closed" });
         router.push(`/${sessionId}`);
       },
@@ -126,12 +131,16 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
           <SquarePen className="h-5 w-5 shrink-0" />
           {sidebarOpen && <span className="overflow-hidden">New session</span>}
         </button>
-        {sidebarOpen && balance !== null && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
-            <Coins className="size-3.5" />
-            {balance}
-          </span>
-        )}
+        {sidebarOpen &&
+          Option.match(balanceOpt, {
+            onNone: () => null,
+            onSome: (balance) => (
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
+                <Coins className="size-3.5" />
+                {balance}
+              </span>
+            ),
+          })}
       </div>
 
       {isDialogOpen &&

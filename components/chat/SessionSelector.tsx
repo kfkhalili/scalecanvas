@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either } from "effect";
+import { Effect, Either, Option } from "effect";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
@@ -10,6 +10,8 @@ import {
   deleteSessionApi,
   renameSessionApi,
 } from "@/services/sessionsClient";
+import { getSessionDisplayTitle } from "@/lib/session";
+import { whenSome, whenRight } from "@/lib/optionHelpers";
 import { shouldRefetchSessionsForCurrentSession } from "@/lib/sessionSelectorRefetch";
 import { useEffect, useCallback, useState, useRef } from "react";
 
@@ -36,10 +38,14 @@ export function SessionSelector({
   isAnonymous = false,
 }: SessionSelectorProps): React.ReactElement {
   const router = useRouter();
-  const { currentSessionId, sessions, setCurrentSessionId, setSessions } =
-    useSessionStore();
+  const {
+    currentSessionId: currentSessionIdOpt,
+    sessions,
+    setCurrentSessionId,
+    setSessions,
+  } = useSessionStore();
   const [loading, setLoading] = useState(!isAnonymous);
-  const lastRefetchedForSessionId = useRef<string | null>(null);
+  const lastRefetchedForSessionIdRef = useRef<Option.Option<string>>(Option.none());
 
   const loadSessions = useCallback(() => {
     if (isAnonymous) return;
@@ -57,151 +63,138 @@ export function SessionSelector({
   }, [loadSessions]);
 
   useEffect(() => {
+    const currentIdOpt = useSessionStore.getState().currentSessionId;
     if (
       !shouldRefetchSessionsForCurrentSession(
-        currentSessionId,
+        currentIdOpt,
         sessions,
-        lastRefetchedForSessionId.current,
+        lastRefetchedForSessionIdRef.current,
         isAnonymous
       )
     )
       return;
-    lastRefetchedForSessionId.current = currentSessionId;
+    lastRefetchedForSessionIdRef.current = currentIdOpt;
     loadSessions();
-  }, [isAnonymous, currentSessionId, sessions, loadSessions]);
+  }, [isAnonymous, currentSessionIdOpt, sessions, loadSessions]);
 
   const handleSelect = (sessionId: string): void => {
-    setCurrentSessionId(sessionId);
+    setCurrentSessionId(Option.some(sessionId));
     router.push(`/${sessionId}`);
   };
 
   /* ---- inline rename state ---- */
-  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renamingIdOpt, setRenamingIdOpt] = useState<Option.Option<string>>(Option.none());
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const startRename = (sessionId: string, currentTitle: string): void => {
-    setMenuSessionId(null);
-    setRenamingId(sessionId);
+    setMenuSessionIdOpt(Option.none());
+    setRenamingIdOpt(Option.some(sessionId));
     setRenameValue(currentTitle);
     setTimeout(() => renameInputRef.current?.select(), 0);
   };
 
   const commitRename = (): void => {
-    if (!renamingId) return;
-    const trimmed = renameValue.trim();
-    const id = renamingId;
-    setRenamingId(null);
-    if (!trimmed) return;
-    void Effect.runPromise(
-      Effect.either(renameSessionApi(id, trimmed))
-    ).then((renameEither) =>
-      Either.match(renameEither, {
-        onLeft: () => {},
-        onRight: () => {
+    whenSome(renamingIdOpt, (id) => {
+      const trimmed = renameValue.trim();
+      setRenamingIdOpt(Option.none());
+      if (!trimmed) return;
+      void Effect.runPromise(
+        Effect.either(renameSessionApi(id, trimmed))
+      ).then((renameEither) =>
+        whenRight(renameEither, () => {
           void Effect.runPromise(Effect.either(fetchSessions())).then(
-            (fr) =>
-              Either.match(fr, {
-                onLeft: () => {},
-                onRight: (list) => setSessions(list),
-              })
+            (fr) => whenRight(fr, (list) => setSessions(list))
           );
-        },
-      })
-    );
+        })
+      );
+    });
   };
 
   const cancelRename = (): void => {
-    setRenamingId(null);
+    setRenamingIdOpt(Option.none());
   };
 
   /* ---- three-dot menu state ---- */
-  const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
+  const [menuSessionIdOpt, setMenuSessionIdOpt] = useState<Option.Option<string>>(Option.none());
+  const [menuPosition, setMenuPosition] = useState<Option.Option<{ top: number; left: number }>>(Option.none());
   const menuRef = useRef<HTMLDivElement>(null);
 
   /* ---- delete confirmation dialog ---- */
-  const [deleteConfirmSessionId, setDeleteConfirmSessionId] =
-    useState<string | null>(null);
-  const deleteConfirmSession =
-    deleteConfirmSessionId != null
-      ? sessions.find((s) => s.id === deleteConfirmSessionId)
-      : null;
+  const [deleteConfirmSessionIdOpt, setDeleteConfirmSessionIdOpt] =
+    useState<Option.Option<string>>(Option.none());
+  const deleteConfirmSessionOpt = Option.flatMap(
+    deleteConfirmSessionIdOpt,
+    (id) => Option.fromNullable(sessions.find((s) => s.id === id))
+  );
 
   const confirmDelete = (): void => {
-    if (deleteConfirmSessionId == null) return;
-    const sessionId = deleteConfirmSessionId;
-    setDeleteConfirmSessionId(null);
-    void Effect.runPromise(
-      Effect.either(deleteSessionApi(sessionId))
-    ).then((delEither) =>
-      Either.match(delEither, {
-        onLeft: () => {},
-        onRight: () => {
+    whenSome(deleteConfirmSessionIdOpt, (sessionId) => {
+      setDeleteConfirmSessionIdOpt(Option.none());
+      void Effect.runPromise(
+        Effect.either(deleteSessionApi(sessionId))
+      ).then((delEither) =>
+        whenRight(delEither, () => {
           void Effect.runPromise(Effect.either(fetchSessions())).then(
             (r) =>
-              Either.match(r, {
-                onLeft: () => {},
-                onRight: (list) => {
-                  setSessions(list);
-                  if (sessionId === currentSessionId) {
-                    const next = list[0];
-                    if (next) {
-                      setCurrentSessionId(next.id);
-                      router.push(`/${next.id}`);
-                    } else {
-                      setCurrentSessionId(null);
-                      router.push("/");
-                    }
+              whenRight(r, (list) => {
+                setSessions(list);
+                const currentIdOpt = useSessionStore.getState().currentSessionId;
+                whenSome(currentIdOpt, (cid) => {
+                  if (sessionId !== cid) return;
+                  const next = list[0];
+                  if (next) {
+                    setCurrentSessionId(Option.some(next.id));
+                    router.push(`/${next.id}`);
+                  } else {
+                    setCurrentSessionId(Option.none());
+                    router.push("/");
                   }
-                },
+                });
               })
           );
-        },
-      })
-    );
+        })
+      );
+    });
   };
 
   const openDeleteConfirm = (sessionId: string): void => {
-    setMenuSessionId(null);
-    setDeleteConfirmSessionId(sessionId);
+    setMenuSessionIdOpt(Option.none());
+    setDeleteConfirmSessionIdOpt(Option.some(sessionId));
   };
 
   const openMenu = (sessionId: string, el: HTMLButtonElement): void => {
     const rect = el.getBoundingClientRect();
-    setMenuPosition({ top: rect.bottom + 4, left: rect.right - 160 });
-    setMenuSessionId(sessionId);
+    setMenuPosition(Option.some({ top: rect.bottom + 4, left: rect.right - 160 }));
+    setMenuSessionIdOpt(Option.some(sessionId));
   };
 
   useEffect(() => {
-    if (menuSessionId == null) {
-      setMenuPosition(null);
+    if (Option.isNone(menuSessionIdOpt)) {
+      setMenuPosition(Option.none());
       return;
     }
     const close = (e: MouseEvent): void => {
       if (menuRef.current?.contains(e.target as Node)) return;
-      setMenuSessionId(null);
+      setMenuSessionIdOpt(Option.none());
     };
     document.addEventListener("click", close, true);
     return () => document.removeEventListener("click", close, true);
-  }, [menuSessionId]);
+  }, [menuSessionIdOpt]);
 
   useEffect(() => {
-    if (deleteConfirmSessionId == null) return;
+    if (Option.isNone(deleteConfirmSessionIdOpt)) return;
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") setDeleteConfirmSessionId(null);
+      if (e.key === "Escape") setDeleteConfirmSessionIdOpt(Option.none());
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [deleteConfirmSessionId]);
+  }, [deleteConfirmSessionIdOpt]);
 
-  const menuSession =
-    menuSessionId != null
-      ? sessions.find((s) => s.id === menuSessionId)
-      : null;
+  const menuSessionOpt = Option.flatMap(
+    menuSessionIdOpt,
+    (id) => Option.fromNullable(sessions.find((s) => s.id === id))
+  );
 
   if (isAnonymous) {
     return (
@@ -242,8 +235,14 @@ export function SessionSelector({
           </li>
         ) : (
           sessions.map((s) => {
-            const isCurrent = currentSessionId === s.id;
-            const menuOpen = menuSessionId === s.id;
+            const isCurrent = Option.match(currentSessionIdOpt, {
+              onNone: () => false,
+              onSome: (cid) => cid === s.id,
+            });
+            const menuOpen = Option.match(menuSessionIdOpt, {
+              onNone: () => false,
+              onSome: (id) => id === s.id,
+            });
             return (
               <li
                 key={s.id}
@@ -259,7 +258,10 @@ export function SessionSelector({
                       : "text-foreground/80 hover:bg-muted/60"
                   }`}
                 >
-                  {renamingId === s.id ? (
+                  {Option.match(renamingIdOpt, {
+                    onNone: () => false,
+                    onSome: (id) => id === s.id,
+                  }) ? (
                     <input
                       ref={renameInputRef}
                       type="text"
@@ -278,16 +280,16 @@ export function SessionSelector({
                       onClick={() => handleSelect(s.id)}
                       className="min-w-0 flex-1 truncate whitespace-nowrap px-2.5 py-2.5 text-left text-sm focus:outline-none"
                     >
-                      {s.title ?? "Untitled"}
+                      {getSessionDisplayTitle(s)}
                     </button>
                   )}
-                  {renamingId !== s.id && (
+                  {!Option.match(renamingIdOpt, { onNone: () => false, onSome: (id) => id === s.id }) && (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (menuOpen) {
-                          setMenuSessionId(null);
+                        if (Option.match(menuSessionIdOpt, { onNone: () => false, onSome: (id) => id === s.id })) {
+                          setMenuSessionIdOpt(Option.none());
                         } else {
                           openMenu(s.id, e.currentTarget);
                         }
@@ -308,91 +310,100 @@ export function SessionSelector({
       </ul>
 
       {/* Portal dropdown for three-dot menu */}
-      {menuSession != null &&
-        menuPosition != null &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={menuRef}
-            className="fixed z-[100] min-w-[160px] rounded-xl border bg-popover py-1.5 shadow-lg"
-            role="menu"
-            style={{ top: menuPosition.top, left: menuPosition.left }}
-          >
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() =>
-                startRename(menuSession.id, menuSession.title ?? "Untitled")
-              }
-              className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted focus:outline-none"
-            >
-              <Pencil className="h-4 w-4 shrink-0" />
-              Rename
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => openDeleteConfirm(menuSession.id)}
-              className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted focus:outline-none"
-            >
-              <Trash2 className="h-4 w-4 shrink-0" />
-              Delete
-            </button>
-          </div>,
-          document.body
-        )}
+      {typeof document !== "undefined" &&
+        Option.match(menuSessionOpt, {
+          onNone: () => null,
+          onSome: (menuSession) =>
+            Option.match(menuPosition, {
+              onNone: () => null,
+              onSome: (pos) =>
+                createPortal(
+                  <div
+                    ref={menuRef}
+                    className="fixed z-[100] min-w-[160px] rounded-xl border bg-popover py-1.5 shadow-lg"
+                    role="menu"
+                    style={{ top: pos.top, left: pos.left }}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() =>
+                        startRename(menuSession.id, getSessionDisplayTitle(menuSession))
+                      }
+                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted focus:outline-none"
+                    >
+                      <Pencil className="h-4 w-4 shrink-0" />
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => openDeleteConfirm(menuSession.id)}
+                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-foreground hover:bg-muted focus:outline-none"
+                    >
+                      <Trash2 className="h-4 w-4 shrink-0" />
+                      Delete
+                    </button>
+                  </div>,
+                  document.body
+                ),
+            }),
+        })}
 
       {/* Delete confirmation dialog (Gemini-style) */}
-      {deleteConfirmSession != null &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-dialog-title"
-            aria-describedby="delete-dialog-description"
-            className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh]"
-          >
-            <div
-              className="absolute inset-0 bg-black/50"
-              aria-hidden
-              onClick={() => setDeleteConfirmSessionId(null)}
-            />
-            <div className="relative z-10 w-full max-w-md rounded-xl border bg-popover p-6 shadow-xl">
-              <h2
-                id="delete-dialog-title"
-                className="text-lg font-semibold text-foreground"
+      {typeof document !== "undefined" &&
+        Option.match(deleteConfirmSessionOpt, {
+          onNone: () => null,
+          onSome: () =>
+            createPortal(
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-dialog-title"
+                aria-describedby="delete-dialog-description"
+                className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh]"
               >
-                Delete session?
-              </h2>
-              <p
-                id="delete-dialog-description"
-                className="mt-2 text-sm text-muted-foreground"
-              >
-                This will permanently delete this session, including the
-                conversation, your architecture diagram, and any feedback from
-                the Trainer. This cannot be undone.
-              </p>
-              <div className="mt-6 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeleteConfirmSessionId(null)}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-muted focus:outline-none"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDelete}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 focus:outline-none"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+                <div
+                  className="absolute inset-0 bg-black/50"
+                  aria-hidden
+                  onClick={() => setDeleteConfirmSessionIdOpt(Option.none())}
+                />
+                <div className="relative z-10 w-full max-w-md rounded-xl border bg-popover p-6 shadow-xl">
+                  <h2
+                    id="delete-dialog-title"
+                    className="text-lg font-semibold text-foreground"
+                  >
+                    Delete session?
+                  </h2>
+                  <p
+                    id="delete-dialog-description"
+                    className="mt-2 text-sm text-muted-foreground"
+                  >
+                    This will permanently delete this session, including the
+                    conversation, your architecture diagram, and any feedback from
+                    the Trainer. This cannot be undone.
+                  </p>
+                  <div className="mt-6 flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmSessionIdOpt(Option.none())}
+                      className="rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-muted focus:outline-none"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmDelete}
+                      className="rounded-lg px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 focus:outline-none"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>,
+              document.body
+            ),
+        })}
     </div>
   );
 }

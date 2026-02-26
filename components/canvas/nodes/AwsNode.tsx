@@ -1,5 +1,6 @@
 "use client";
 
+import { Option, pipe } from "effect";
 import { memo } from "react";
 import Image from "next/image";
 import { Handle, type NodeProps, Position } from "reactflow";
@@ -87,9 +88,6 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
     data && "label" in data && typeof data.label === "string"
       ? data.label
       : type ?? "Node";
-  const iconUrl = type ? getNodeIconUrl(type) : null;
-  const GenericIcon = type ? getNodeIconComponent(type) : null;
-
   const handleClass = "!bg-gray-500";
   return (
     <div
@@ -99,17 +97,26 @@ function AwsNodeBase({ data, type }: AwsNodeProps): React.ReactElement {
       <Handle type="source" position={Position.Top} id="top-out" className={handleClass} />
       <Handle type="target" position={Position.Left} id="left" className={handleClass} />
       <Handle type="source" position={Position.Left} id="left-out" className={handleClass} />
-      {iconUrl ? (
-        <Image
-          src={iconUrl}
-          alt=""
-          width={28}
-          height={28}
-          className="h-7 w-7 shrink-0 object-contain"
-          unoptimized
-        />
-      ) : GenericIcon ? (
-        <GenericIcon className="h-7 w-7 shrink-0 text-white/90" aria-hidden />
+      {type ? pipe(
+        getNodeIconUrl(type),
+        Option.map((iconUrl) => (
+          <Image
+            key="icon-url"
+            src={iconUrl}
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 object-contain"
+            unoptimized
+          />
+        )),
+        Option.orElse(() => pipe(
+          getNodeIconComponent(type),
+          Option.map((GenericIcon) => (
+            <GenericIcon key="icon-component" className="h-7 w-7 shrink-0 text-white/90" aria-hidden />
+          )),
+        )),
+        Option.getOrNull,
       ) : null}
       <div className="min-w-0 flex-1 font-medium break-words text-left">{label}</div>
       <Handle type="target" position={Position.Right} id="right" className={handleClass} />
