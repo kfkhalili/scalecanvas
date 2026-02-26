@@ -1,5 +1,7 @@
 # ScaleCanvas — MVP Implementation Plan
 
+**Status:** MVP complete (phases 0–7 delivered). This doc is kept for reference; current work is tracked in `docs/plans/`.
+
 **Stack:** Next.js (App Router), Supabase, AWS Bedrock, Vercel AI SDK (`ai`), `@ai-sdk/amazon-bedrock`, React Flow, Tailwind CSS, TypeScript, shadcn/ui, Zustand, neverthrow, ts-pattern. **Package manager:** pnpm only.
 
 **Architecture:** BFF at `/api/chat`; client never calls AWS. Auth via Supabase (session from cookies); streaming via `streamText`/`toDataStreamResponse()`; canvas in request body, pure `parseCanvasState(nodes, edges)` for LLM context.
@@ -64,7 +66,7 @@ Migrations in **`supabase/migrations/`**; apply via CLI (`supabase db push` / `s
 
 **What you need to enable GitHub & Google auth (local Supabase):**
 
-Local Studio has **no** “URL Configuration” or “Providers” UI. Everything is done in **`supabase/config.toml`** (and a **`.env`** in the same project root for secrets). Use the directory where you run `supabase start` (run `supabase init` there if needed).
+Local Studio has **no** "URL Configuration" or "Providers" UI. Everything is done in **`supabase/config.toml`** (and a **`.env`** in the same project root for secrets). Use the directory where you run `supabase start` (run `supabase init` there if needed).
 
 1. **Redirect URLs and Site URL**  
    In **`supabase/config.toml`** ensure:
@@ -146,7 +148,7 @@ Local Studio has **no** “URL Configuration” or “Providers” UI. Everythin
 
 **Goal:** Left: React Flow with AWS-style nodes; right: chat placeholder. Canvas load/save per session.
 
-**Tasks:** (4.1) Layout: left panel (e.g. 50–60%), right panel; resizable optional. (4.2) React Flow in left panel; custom node types (S3, Lambda, API Gateway, etc.); state in Zustand; immutable updates; selectors. (4.3) On session load: fetch canvas → setNodes/setEdges/setViewport. On change (debounced): serialize and PUT /api/sessions/[id]/canvas. (4.4) Right: chat placeholder + session selector / “New session”.
+**Tasks:** (4.1) Layout: left panel (e.g. 50–60%), right panel; resizable optional. (4.2) React Flow in left panel; custom node types (S3, Lambda, API Gateway, etc.); state in Zustand; immutable updates; selectors. (4.3) On session load: fetch canvas → setNodes/setEdges/setViewport. On change (debounced): serialize and PUT /api/sessions/[id]/canvas. (4.4) Right: chat placeholder + session selector / "New session".
 
 **Acceptance:** Split-screen; React Flow with custom nodes; canvas persists per session.
 
@@ -182,7 +184,7 @@ Local Studio has **no** “URL Configuration” or “Providers” UI. Everythin
 
 **Goal:** New session → draw + chat → leave → resume. Session list; errors and loading handled.
 
-**Tasks:** (7.1) New session: create → navigate to interview/[sessionId]; empty canvas/transcript. (7.2) Resume: list sessions → open by id; load transcript + canvas. (7.3) Auth redirects, loading states, API error handling (toast/inline). (7.4) Optional: session title edit; auto-title from first message. (7.5) README: env, pnpm install / pnpm dev, link to MVP_PLAN.md.
+**Tasks:** (7.1) New session: create → navigate to interview/[sessionId]; empty canvas/transcript. (7.2) Resume: list sessions → open by id; load transcript + canvas. (7.3) Auth redirects, loading states, API error handling (toast/inline). (7.4) Optional: session title edit; auto-title from first message. (7.5) README: env, pnpm install / pnpm dev, link to docs/MVP_PLAN.md.
 
 **Acceptance:** Full flow: sign in → new session → chat + draw → resume later; data persists; RLS enforced.
 

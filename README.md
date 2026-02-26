@@ -1,6 +1,6 @@
 # ScaleCanvas
 
-System design interview practice: React Flow canvas (left) + AI interviewer chat (right). See [MVP_PLAN.md](./MVP_PLAN.md) for the implementation plan.
+System design interview practice: React Flow canvas (left) + AI interviewer chat (right). See [docs/MVP_PLAN.md](./docs/MVP_PLAN.md) for the implementation plan.
 
 **All coding rules in [`.cursor/rules/`](.cursor/rules/) are mandatory** — not optional. CI and pre-commit enforce lint, typecheck, and tests so the rules are followed.
 
