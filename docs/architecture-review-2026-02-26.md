@@ -387,10 +387,10 @@ Total findings: **31** across 8 categories.
 | ✅ ~~**P1**~~ | ~~1.2~~ | ~~Bug~~ | ~~Replace in-memory rate limiter with a persistent store (Supabase table)~~ — **Done** (commit `72b445b`) |
 | ✅ ~~**P1**~~ | ~~5.1~~ | ~~Bug~~ | ~~Fix `toSessionUpdateDbFields` — conditionally include fields to stop NULLing title on terminate and status on rename~~ — **Done** (commit `672ce69`) |
 | ✅ ~~**P1**~~ | ~~1.1~~ | ~~Bug~~ | ~~Fix `fitView` overriding saved viewport on every mount~~ — **Done** (commit `9e76fd4`) |
-| **P3** | 5.3 | UX | Replace `getSession()` with `getUser()` in `PostAuthRoot` (not a security issue — server routes already validate) |
+| ✅ ~~**P3**~~ | ~~5.3~~ | ~~UX~~ | ~~Replace `getSession()` with `getUser()` in `PostAuthRoot`~~ — **Done** (commit `89a64eb`) |
 | ✅ ~~**P2**~~ | ~~5.2~~ | ~~Bug~~ | ~~Replace `"http://localhost:3000"` fallback in checkout with `NEXT_PUBLIC_SITE_URL`~~ — **Done** (commit `52a19f4`) |
 | **P4** | 8.6 | Smell | Move `CheckoutFeedback` to root layout for immediate rendering (toast is not actually lost) |
-| **P2** | 4.7 | Smell | Split shared `loadingSessionIdRef` into canvas and transcript refs |
+| ✅ ~~**P2**~~ | ~~4.7~~ | ~~Smell~~ | ~~Split shared `loadingSessionIdRef` into canvas and transcript refs~~ — **Done** (commit `89a64eb`) |
 | ✅ ~~**P2**~~ | ~~3.2~~ | ~~Duplication~~ | ~~Use `ChatBodySchema` in the chat route; delete hand-written `parseChatBody`~~ — **Done** (commit `666c889`) |
 | ✅ ~~**P2**~~ | ~~7.1~~ | ~~Duplication~~ | ~~Consolidate `NodeLibraryProvider` validation into a single `z.enum` in `lib/api.schemas.ts`~~ — **Done** (commit `666c889`) |
 | ✅ ~~**P2**~~ | ~~2.4~~ | ~~Dead code~~ | ~~Remove dead `deduct_and_handoff` from `sessionBootstrap`~~ — **Done** (commit `84f21c1`) |
@@ -402,7 +402,7 @@ Total findings: **31** across 8 categories.
 | ✅ ~~**P3**~~ | ~~2.1~~ | ~~Dead code~~ | ~~Delete `lib/csrf.ts` (middleware has its own implementation)~~ — **Done** (commit `84f21c1`, deleted) |
 | ✅ ~~**P3**~~ | ~~3.1~~ | ~~Duplication~~ | ~~Delete `lib/api.types.ts`; import inferred types from `lib/api.schemas.ts`~~ — **Done** (commit `666c889`) |
 | **P3** | 4.2 | Smell | Extract `apiPatch` helper in `sessionsClient.ts` |
-| **P3** | 1.3 | Bug | Remove redundant `renameSessionApi` call after handoff |
+| ✅ ~~**P3**~~ | ~~1.3~~ | ~~Bug~~ | ~~Remove redundant `renameSessionApi` call after handoff~~ — **Done** (commit `89a64eb`) |
 | **P3** | 8.4 | Smell | Rename `getOrCreateStripeCustomerId` → `findStripeCustomerId` |
 | ✅ ~~**P4**~~ | ~~2.5~~ | ~~Dead code~~ | ~~Delete `mergeTranscript` export~~ — **Done** (commit `84f21c1`) |
 | ✅ ~~**P4**~~ | ~~2.2~~ | ~~Dead code~~ | ~~Apply or delete `API_RATE_LIMIT`~~ — **Done** (commit `72b445b`, deleted) |

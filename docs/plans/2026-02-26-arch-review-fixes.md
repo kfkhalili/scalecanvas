@@ -155,8 +155,9 @@ pnpm vitest run
 
 ---
 
-## Commit 7 — `refactor: split loadingSessionIdRef, fix PostAuthRoot rename, getSession`
+## ✅ Commit 7 — `refactor: split loadingSessionIdRef, fix PostAuthRoot rename, getSession`
 **Findings:** 4.7, 1.3, 5.3
+**Status:** Done — committed as `89a64eb`
 **Risk:** P2–P3 — race condition fix + redundant call removal + UX correctness
 **Files changed:**
 
@@ -276,7 +277,7 @@ Commits 6–10 form a linear chain that should land in order.
 | 4 | XS | ✅ Done |
 | 5 | L | ✅ Done |
 | 6 | M | ✅ Done |
-| 7 | S | 20 min |
+| 7 | S | ✅ Done |
 | 8 | M | 45 min (new preferencesClient + sidebarStore rewrite) |
 | 9 | S | 20 min (find-and-replace renames) |
 | 10 | S | 30 min |
