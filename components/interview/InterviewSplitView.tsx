@@ -9,7 +9,7 @@ import { FlowCanvas } from "@/components/canvas/FlowCanvas";
 import { NodeLibrary } from "@/components/canvas/NodeLibrary";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { NoSessionPrompt } from "@/components/billing/NoSessionPrompt";
-import { useCanvasStore } from "@/stores/canvasStore";
+import { useCanvasStore, rehydrateCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
@@ -18,7 +18,6 @@ import {
   fetchTranscript,
   saveCanvasApi,
 } from "@/services/sessionsClient";
-import { rehydrateCanvasStore } from "@/stores/canvasStore";
 import { isSessionContentReady } from "@/lib/sessionLoading";
 import { whenSome } from "@/lib/optionHelpers";
 import type { TranscriptEntry } from "@/lib/types";
@@ -44,7 +43,8 @@ export function InterviewSplitView({
   const entries = useTranscriptStore((s) => s.entries);
   const setHandoffTranscript = useAuthHandoffStore((s) => s.setHandoffTranscript);
   const previousSessionIdRef = useRef<string | null>(null);
-  const loadingSessionIdRef = useRef<string | null>(null);
+  const loadingCanvasSessionIdRef = useRef<string | null>(null);
+  const loadingTranscriptSessionIdRef = useRef<string | null>(null);
 
   const [canvasReady, setCanvasReady] = useState(false);
   const [transcriptForSessionOpt, setTranscriptForSessionOpt] = useState<
@@ -97,12 +97,12 @@ export function InterviewSplitView({
       ).then(() => {});
     }
 
-    loadingSessionIdRef.current = sessionId;
+    loadingCanvasSessionIdRef.current = sessionId;
     setCanvasReady(false);
 
     void Effect.runPromise(Effect.either(fetchCanvas(sessionId))).then(
       (canvasEither) => {
-        const stale = loadingSessionIdRef.current !== sessionId;
+        const stale = loadingCanvasSessionIdRef.current !== sessionId;
         if (stale) return;
         Either.match(canvasEither, {
           onLeft: () => setCanvasState(empty),
@@ -134,11 +134,11 @@ export function InterviewSplitView({
       cleanup = () => clearTimeout(t);
     });
     if (Option.isSome(matched)) return cleanup;
-    loadingSessionIdRef.current = sessionId;
+    loadingTranscriptSessionIdRef.current = sessionId;
     setTranscriptForSessionOpt(Option.none());
     void Effect.runPromise(Effect.either(fetchTranscript(sessionId))).then(
       (result) => {
-        const stale = loadingSessionIdRef.current !== sessionId;
+        const stale = loadingTranscriptSessionIdRef.current !== sessionId;
         if (stale) return;
         Either.match(result, {
           onLeft: () => {

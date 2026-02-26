@@ -7,8 +7,8 @@ import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { rehydrateCanvasStore, useCanvasStore } from "@/stores/canvasStore";
 import { useAuthHandoffStore, rehydrateAuthHandoffStore } from "@/stores/authHandoffStore";
 import { postHandoff } from "@/services/handoffClient";
-import { renameSessionApi, fetchSessions } from "@/services/sessionsClient";
-import { whenSome, whenRight } from "@/lib/optionHelpers";
+import { fetchSessions } from "@/services/sessionsClient";
+import { whenRight } from "@/lib/optionHelpers";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
 import { CheckoutFeedback } from "@/components/billing/CheckoutFeedback";
 
@@ -39,9 +39,9 @@ export function PostAuthRoot(): React.ReactElement {
     const hasAnonymousChat = useAuthHandoffStore.getState().anonymousMessages.length > 0;
     const questionTitle = useAuthHandoffStore.getState().questionTitle;
 
-    supabase.auth.getSession().then((res) => {
-      const session = res.data.session;
-      if (!session) {
+    supabase.auth.getUser().then((res) => {
+      const user = res.data.user;
+      if (!user) {
         router.replace("/login");
         return;
       }
@@ -72,13 +72,6 @@ export function PostAuthRoot(): React.ReactElement {
           },
           onRight: (payload) => {
             if (payload.created && payload.session_id) {
-              whenSome(questionTitle, (title) =>
-                void Effect.runPromise(
-                  Effect.either(
-                    renameSessionApi(payload.session_id, title)
-                  )
-                )
-              );
               setPendingAuthHandoff(Option.some(payload.session_id));
               router.replace(`/${payload.session_id}`);
             } else {
