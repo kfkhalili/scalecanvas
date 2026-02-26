@@ -89,6 +89,7 @@ export function SessionSelector({
 
   const startRename = (sessionId: string, currentTitle: string): void => {
     setMenuSessionIdOpt(Option.none());
+    setMenuPosition(Option.none());
     setRenamingIdOpt(Option.some(sessionId));
     setRenameValue(currentTitle);
     setTimeout(() => renameInputRef.current?.select(), 0);
@@ -160,6 +161,7 @@ export function SessionSelector({
 
   const openDeleteConfirm = (sessionId: string): void => {
     setMenuSessionIdOpt(Option.none());
+    setMenuPosition(Option.none());
     setDeleteConfirmSessionIdOpt(Option.some(sessionId));
   };
 
@@ -170,13 +172,11 @@ export function SessionSelector({
   };
 
   useEffect(() => {
-    if (Option.isNone(menuSessionIdOpt)) {
-      setMenuPosition(Option.none());
-      return;
-    }
+    if (Option.isNone(menuSessionIdOpt)) return;
     const close = (e: MouseEvent): void => {
       if (menuRef.current?.contains(e.target as Node)) return;
       setMenuSessionIdOpt(Option.none());
+      setMenuPosition(Option.none());
     };
     document.addEventListener("click", close, true);
     return () => document.removeEventListener("click", close, true);
@@ -290,6 +290,7 @@ export function SessionSelector({
                         e.stopPropagation();
                         if (Option.match(menuSessionIdOpt, { onNone: () => false, onSome: (id) => id === s.id })) {
                           setMenuSessionIdOpt(Option.none());
+                          setMenuPosition(Option.none());
                         } else {
                           openMenu(s.id, e.currentTarget);
                         }

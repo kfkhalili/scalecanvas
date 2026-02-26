@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -23,17 +23,14 @@ export function SplitScreen({
   defaultLeftRatio = 0.55,
 }: SplitScreenProps): ReactNode {
   const [leftRatio, setLeftRatio] = useState(defaultLeftRatio);
+  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-  }, []);
+  useEffect(() => {
+    if (!isDragging) return;
 
-  const onMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return;
+    const onMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const width = rect.width;
       const minLeft = MIN_PANEL_PX / width;
@@ -41,28 +38,22 @@ export function SplitScreen({
       const raw = (e.clientX - rect.left) / width;
       const next = Math.min(maxLeft, Math.max(minLeft, raw));
       setLeftRatio(next);
-    },
-    []
-  );
+    };
 
-  const onMouseUp = useCallback(() => {
-    isDragging.current = false;
-    document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
-  }, [onMouseMove]);
+    const onMouseUp = () => setIsDragging(false);
 
-  const startDrag = useCallback(() => {
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
-  }, [onMouseMove, onMouseUp]);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [isDragging]);
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      onMouseDown(e);
-      startDrag();
-    },
-    [onMouseDown, startDrag]
-  );
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
 
   return (
     <div ref={containerRef} className="flex h-full w-full">

@@ -45,6 +45,11 @@ export function LabeledEdge({
   const [isEditing, setIsEditing] = useState(false);
   const label = (data?.label as string | undefined) ?? "";
   const [value, setValue] = useState(label);
+  const prevLabelRef = useRef(label);
+  if (prevLabelRef.current !== label) {
+    prevLabelRef.current = label;
+    if (!isEditing) setValue(label);
+  }
   const inputRef = useRef<HTMLInputElement>(null);
 
   const baseOffsetX = (data?.labelOffsetX as number | undefined) ?? 0;
@@ -58,10 +63,6 @@ export function LabeledEdge({
 
   const displayX = labelX + baseOffsetX + (isDragging ? dragOffset.x : 0);
   const displayY = labelY + baseOffsetY + (isDragging ? dragOffset.y : 0);
-
-  useEffect(() => {
-    if (!isEditing) setValue(label);
-  }, [label, isEditing]);
 
   useEffect(() => {
     if (isEditing) inputRef.current?.focus();

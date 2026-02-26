@@ -53,7 +53,7 @@ function originMatchesHost(
   });
 }
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
 
   if (requiresOriginCheck(request.nextUrl.pathname, request.method)) {
