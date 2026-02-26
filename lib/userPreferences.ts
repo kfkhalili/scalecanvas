@@ -6,15 +6,34 @@ import {
   type NodeLibraryProvider,
 } from "@/lib/types";
 
-function parseProviderOption(value: string): Option.Option<NodeLibraryProvider> {
-  const result = NodeLibraryProviderSchema.safeParse(value);
-  return result.success ? Option.some(result.data) : Option.none();
+/** Parses stored value: "" or "all" (after trim) → []; else split by comma, trim, parse, dedupe. */
+export function parseProvidersValue(value: string): NodeLibraryProvider[] {
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed === "all") return [];
+  const parts = trimmed.split(",").map((p) => p.trim()).filter(Boolean);
+  const parsed: NodeLibraryProvider[] = [];
+  const seen = new Set<NodeLibraryProvider>();
+  for (const part of parts) {
+    const result = NodeLibraryProviderSchema.safeParse(part);
+    if (result.success && !seen.has(result.data)) {
+      seen.add(result.data);
+      parsed.push(result.data);
+    }
+  }
+  return parsed;
 }
 
-export function getNodeLibraryProvider(
+/** Serializes provider set to stored string. Empty array → "". */
+export function serializeProviders(
+  providers: readonly NodeLibraryProvider[]
+): string {
+  return providers.length === 0 ? "" : providers.join(",");
+}
+
+export function getNodeLibraryProviders(
   client: ServerSupabaseClient,
   userId: string
-): Effect.Effect<Option.Option<NodeLibraryProvider>> {
+): Effect.Effect<Option.Option<NodeLibraryProvider[]>> {
   return pipe(
     Effect.tryPromise({
       try: () =>
@@ -28,31 +47,27 @@ export function getNodeLibraryProvider(
     }),
     Effect.map(({ data, error }) => {
       if (error) return Option.none();
-      return pipe(
-        Option.fromNullable(data),
-        Option.flatMap((d) =>
-          Option.fromNullable(
-            typeof d === "object" && d !== null && "value" in d
-              ? (d as { value: string }).value
-              : null
-          )
-        ),
-        Option.flatMap(parseProviderOption)
-      );
+      if (data === null) return Option.none();
+      const raw =
+        typeof data === "object" && data !== null && "value" in data
+          ? (data as { value: string }).value
+          : "";
+      const value = typeof raw === "string" ? raw : "";
+      return Option.some(parseProvidersValue(value));
     }),
     Effect.catchAll(() => Effect.succeed(Option.none()))
   );
 }
 
-export function setNodeLibraryProvider(
+export function setNodeLibraryProviders(
   client: ServerSupabaseClient,
   userId: string,
-  value: NodeLibraryProvider
+  providers: NodeLibraryProvider[]
 ): Effect.Effect<void, Error> {
   const row = {
     user_id: userId,
     key: NODE_LIBRARY_PROVIDER_KEY,
-    value,
+    value: serializeProviders(providers),
     updated_at: new Date().toISOString(),
   };
   return pipe(
