@@ -13,20 +13,20 @@ vi.mock("@/lib/stripe", () => ({
 }));
 
 vi.mock("@/services/tokens", () => ({
-  getOrCreateStripeCustomerId: vi.fn(),
+  findStripeCustomerId: vi.fn(),
   saveStripeCustomerId: vi.fn(),
 }));
 
 import { POST } from "./route";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getStripeClient, getPackById, getStripePriceId } from "@/lib/stripe";
-import { getOrCreateStripeCustomerId, saveStripeCustomerId } from "@/services/tokens";
+import { findStripeCustomerId, saveStripeCustomerId } from "@/services/tokens";
 
 const mockedCreateClient = vi.mocked(createServerClientInstance);
 const mockedGetPack = vi.mocked(getPackById);
 const mockedGetPrice = vi.mocked(getStripePriceId);
 const mockedGetStripeClient = vi.mocked(getStripeClient);
-const mockedGetCustomer = vi.mocked(getOrCreateStripeCustomerId);
+const mockedGetCustomer = vi.mocked(findStripeCustomerId);
 const mockedSaveCustomer = vi.mocked(saveStripeCustomerId);
 
 const PACK = { id: "pack_3", tokens: 3, label: "3 Interviews", priceUsd: 14, priceEnvKey: "STRIPE_PRICE_ID_3" } as const;
@@ -135,7 +135,7 @@ describe("POST /api/checkout", () => {
     expect(mockedSaveCustomer).toHaveBeenCalledWith(expect.anything(), "user-1", "cus_new");
   });
 
-  it("returns 500 when getOrCreateStripeCustomerId fails", async () => {
+  it("returns 500 when findStripeCustomerId fails", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
     mockedGetPack.mockReturnValue(Option.some(PACK));
     mockedGetPrice.mockReturnValue(Option.some("price_abc"));

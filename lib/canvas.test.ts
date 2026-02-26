@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canvasFromDb, replaceCanvasState, resolveEdgeHandles } from "./canvas";
+import { canvasFromDb, makeCanvasState, resolveEdgeHandles } from "./canvas";
 import { getSampleCanvasState } from "./__fixtures__/canvas";
 import type { DbCanvasState } from "@/lib/database.aliases";
 import type { CanvasState, ReactFlowNode, ReactFlowEdge, Viewport } from "@/lib/types";
@@ -38,7 +38,7 @@ describe("canvasFromDb", () => {
   });
 });
 
-describe("replaceCanvasState", () => {
+describe("makeCanvasState", () => {
   it("returns new CanvasState with replaced nodes/edges/viewport (immutable)", () => {
     const current: CanvasState = {
       nodes: [{ id: "n1", position: { x: 0, y: 0 }, data: {} }] as ReactFlowNode[],
@@ -52,7 +52,7 @@ describe("replaceCanvasState", () => {
       { id: "e1", source: "n2", target: "n3" },
     ];
     const newViewport: Viewport = { x: 1, y: 1, zoom: 1.5 };
-    const result = replaceCanvasState(current, newNodes, newEdges, newViewport);
+    const result = makeCanvasState(newNodes, newEdges, newViewport);
     expect(result.nodes).toBe(newNodes);
     expect(result.edges).toBe(newEdges);
     expect(result.viewport).toEqual(newViewport);
@@ -60,8 +60,7 @@ describe("replaceCanvasState", () => {
   });
 
   it("allows optional viewport (undefined)", () => {
-    const current: CanvasState = { nodes: [], edges: [] };
-    const result = replaceCanvasState(current, [], []);
+    const result = makeCanvasState([], []);
     expect(result.viewport).toBeUndefined();
   });
 });

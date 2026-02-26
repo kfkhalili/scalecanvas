@@ -16,7 +16,6 @@ type RpcClient = {
  */
 export function claimTrialAndCreateSession(
   client: ServerSupabaseClient,
-  _userId: string,
   titleOpt: Option.Option<string> = Option.none()
 ): Effect.Effect<string, HandoffError> {
   const rpcClient = client as unknown as RpcClient;

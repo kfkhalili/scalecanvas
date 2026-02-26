@@ -51,7 +51,6 @@ describe("POST /api/auth/handoff", () => {
     expect(json).toEqual({ created: true, session_id: "session-123" });
     expect(mockedClaimTrial).toHaveBeenCalledWith(
       expect.anything(),
-      "user-1",
       Option.some("URL Shortener")
     );
   });
@@ -85,7 +84,6 @@ describe("POST /api/auth/handoff", () => {
     expect(res.status).toBe(201);
     expect(mockedClaimTrial).toHaveBeenCalledWith(
       expect.anything(),
-      "user-1",
       Option.none()
     );
   });

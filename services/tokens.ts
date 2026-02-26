@@ -23,7 +23,7 @@ export function getTokenBalance(
   );
 }
 
-export function getOrCreateStripeCustomerId(
+export function findStripeCustomerId(
   client: ServerSupabaseClient,
   userId: string
 ): Effect.Effect<Option.Option<string>, TokenError> {

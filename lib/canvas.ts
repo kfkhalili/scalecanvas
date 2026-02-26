@@ -90,8 +90,7 @@ export function resolveEdgeHandles(
   return changed ? resolved : edges;
 }
 
-export function replaceCanvasState(
-  _current: CanvasState,
+export function makeCanvasState(
   nodes: ReadonlyArray<ReactFlowNode>,
   edges: ReadonlyArray<ReactFlowEdge>,
   viewport?: Viewport

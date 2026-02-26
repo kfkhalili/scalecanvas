@@ -24,7 +24,7 @@ describe("claimTrialAndCreateSession", () => {
       vi.fn().mockResolvedValue({ data: "session-abc", error: null })
     );
     const result = await runEffect(
-      claimTrialAndCreateSession(client, "user-1", Option.some("URL Shortener"))
+      claimTrialAndCreateSession(client, Option.some("URL Shortener"))
     );
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) expect(result.right).toBe("session-abc");
@@ -38,7 +38,7 @@ describe("claimTrialAndCreateSession", () => {
       })
     );
     const result = await runEffect(
-      claimTrialAndCreateSession(client, "user-1", Option.none())
+      claimTrialAndCreateSession(client, Option.none())
     );
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result))
@@ -50,7 +50,7 @@ describe("claimTrialAndCreateSession", () => {
       vi.fn().mockResolvedValue({ data: 123, error: null })
     );
     const result = await runEffect(
-      claimTrialAndCreateSession(client, "user-1", Option.none())
+      claimTrialAndCreateSession(client, Option.none())
     );
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result))
@@ -62,7 +62,7 @@ describe("claimTrialAndCreateSession", () => {
     const client = asClient(rpc);
     await Effect.runPromise(
       Effect.either(
-        claimTrialAndCreateSession(client, "user-1", Option.some("My Question"))
+        claimTrialAndCreateSession(client, Option.some("My Question"))
       )
     );
     expect(rpc).toHaveBeenCalledWith("claim_trial_and_create_session", {

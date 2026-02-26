@@ -29,7 +29,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     Effect.either(
       claimTrialAndCreateSession(
         supabase,
-        user.id,
         Option.fromNullable(parsed.data.question_title)
       )
     )

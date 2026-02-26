@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getStripeClient, getPackById, getStripePriceId } from "@/lib/stripe";
 import type { CheckoutMetadata } from "@/lib/stripe.types";
-import { getOrCreateStripeCustomerId, saveStripeCustomerId } from "@/services/tokens";
+import { findStripeCustomerId, saveStripeCustomerId } from "@/services/tokens";
 import { CheckoutBodySchema } from "@/lib/api.schemas";
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -45,7 +45,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const stripe = getStripeClient();
 
   const existingEither = await Effect.runPromise(
-    Effect.either(getOrCreateStripeCustomerId(supabase, user.id))
+    Effect.either(findStripeCustomerId(supabase, user.id))
   );
   if (Either.isLeft(existingEither)) {
     return NextResponse.json(

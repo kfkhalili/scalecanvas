@@ -2,7 +2,7 @@ import { Effect, Either, Option } from "effect";
 import { describe, it, expect, vi } from "vitest";
 import {
   getTokenBalance,
-  getOrCreateStripeCustomerId,
+  findStripeCustomerId,
   saveStripeCustomerId,
   creditTokensForPurchase,
 } from "./tokens";
@@ -53,7 +53,7 @@ describe("getTokenBalance", () => {
   });
 });
 
-describe("getOrCreateStripeCustomerId", () => {
+describe("findStripeCustomerId", () => {
   it("returns existing stripe customer id", async () => {
     const client = asClient({
       from: vi.fn().mockReturnValue({
@@ -67,7 +67,7 @@ describe("getOrCreateStripeCustomerId", () => {
         }),
       }),
     });
-    const either = await runEffect(getOrCreateStripeCustomerId(client, "user-1"));
+    const either = await runEffect(findStripeCustomerId(client, "user-1"));
     expect(Either.isRight(either)).toBe(true);
     if (Either.isRight(either))
       expect(Option.getOrNull(either.right)).toBe("cus_abc");
@@ -86,7 +86,7 @@ describe("getOrCreateStripeCustomerId", () => {
         }),
       }),
     });
-    const either = await runEffect(getOrCreateStripeCustomerId(client, "user-1"));
+    const either = await runEffect(findStripeCustomerId(client, "user-1"));
     expect(Either.isRight(either)).toBe(true);
     if (Either.isRight(either)) expect(Option.isNone(either.right)).toBe(true);
   });
@@ -104,7 +104,7 @@ describe("getOrCreateStripeCustomerId", () => {
         }),
       }),
     });
-    const either = await runEffect(getOrCreateStripeCustomerId(client, "user-1"));
+    const either = await runEffect(findStripeCustomerId(client, "user-1"));
     expect(Either.isLeft(either)).toBe(true);
   });
 });
