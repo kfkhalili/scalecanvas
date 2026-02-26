@@ -28,7 +28,7 @@ pnpm dev
 ## Enforcement
 
 - **CI** (GitHub Actions): on push/PR to `main`, runs `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm test`, `pnpm build`. The build fails if any step fails.
-- **Pre-commit** (husky): before each commit, runs `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm test`. Commit is blocked if any step fails.
+- **Pre-commit** (husky): before each commit, runs `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm test`. Commit is blocked if any step fails. E2E tests (`pnpm test:e2e`) run in CI or manually, not in the commit hook.
 - **lint-staged**: ESLint runs on staged `*.ts`/`*.tsx` when configured (e.g. for faster feedback).
 
 ## Environment
