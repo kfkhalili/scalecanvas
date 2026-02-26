@@ -60,6 +60,10 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
    */
   const lastPushedNodesRef = useRef<readonly Node[] | null>(null);
   const lastPushedEdgesRef = useRef<readonly Edge[] | null>(null);
+  const viewportRef = useRef(viewport);
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
 
   // Sync store -> local only when store was updated externally (e.g. fetchCanvas, session switch)
   useEffect(() => {
@@ -75,20 +79,18 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
     setEdges(storeEdges as Edge[]);
   }, [storeNodes, storeEdges, setNodes, setEdges]);
 
-  // Push local state to store (for save, Evaluate, getCanvasState)
+  // Push local state to store (for save, Evaluate, getCanvasState). Viewport
+  // is read from a ref so we don't depend on it here — it is updated in the
+  // store by onMoveEnd; depending on it would cause an infinite loop because
+  // setCanvasState produces new Option references.
   useEffect(() => {
     lastPushedNodesRef.current = nodes;
     lastPushedEdgesRef.current = edges;
     setCanvasState({
       nodes,
       edges,
-      viewport: Option.getOrUndefined(viewport),
+      viewport: Option.getOrUndefined(viewportRef.current),
     });
-    // Note: `viewport` is intentionally excluded from deps — it is pushed to
-    // the store via its own `setViewport` call in `onMoveEnd`.  Including it
-    // here creates an infinite loop because `setCanvasState` wraps the value
-    // with `Option.fromNullable`, producing a new reference on every call.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges, setCanvasState]);
 
   const onMoveEnd = useCallback(
