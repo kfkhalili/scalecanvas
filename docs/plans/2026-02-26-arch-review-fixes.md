@@ -197,8 +197,9 @@ pnpm tsc --noEmit
 
 ---
 
-## Commit 9 — `refactor: rename misleading functions, remove dead params`
+## ✅ Commit 9 — `refactor: rename misleading functions, remove dead params`
 **Findings:** 4.1, 4.6, 8.4
+**Status:** Done — committed as `9b7fc6c`
 **Risk:** P3–P4 — naming-only, no logic change
 **Files changed:**
 
@@ -280,6 +281,6 @@ Commits 6–10 form a linear chain that should land in order.
 | 6 | M | ✅ Done |
 | 7 | S | ✅ Done |
 | 8 | M | ✅ Done |
-| 9 | S | 20 min (find-and-replace renames) |
+| 9 | S | ✅ Done |
 | 10 | S | 30 min |
 | **Total** | | **~5–7 hours** |

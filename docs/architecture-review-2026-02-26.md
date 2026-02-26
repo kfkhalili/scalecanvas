@@ -403,18 +403,18 @@ Total findings: **31** across 8 categories.
 | ✅ ~~**P3**~~ | ~~3.1~~ | ~~Duplication~~ | ~~Delete `lib/api.types.ts`; import inferred types from `lib/api.schemas.ts`~~ — **Done** (commit `666c889`) |
 | ✅ ~~**P3**~~ | ~~4.2~~ | ~~Smell~~ | ~~Extract `apiPatch` helper in `sessionsClient.ts`~~ — **Done** (commit `2300b1f`) |
 | ✅ ~~**P3**~~ | ~~1.3~~ | ~~Bug~~ | ~~Remove redundant `renameSessionApi` call after handoff~~ — **Done** (commit `89a64eb`) |
-| **P3** | 8.4 | Smell | Rename `getOrCreateStripeCustomerId` → `findStripeCustomerId` |
+| ✅ ~~**P3**~~ | ~~8.4~~ | ~~Smell~~ | ~~Rename `getOrCreateStripeCustomerId` → `findStripeCustomerId`~~ — **Done** (commit `9b7fc6c`) |
 | ✅ ~~**P4**~~ | ~~2.5~~ | ~~Dead code~~ | ~~Delete `mergeTranscript` export~~ — **Done** (commit `84f21c1`) |
 | ✅ ~~**P4**~~ | ~~2.2~~ | ~~Dead code~~ | ~~Apply or delete `API_RATE_LIMIT`~~ — **Done** (commit `72b445b`, deleted) |
 | ✅ ~~**P4**~~ | ~~2.6~~ | ~~Dead code~~ | ~~Move `getSampleCanvasState` to test fixtures~~ — **Done** (commit `84f21c1`) |
 | ✅ ~~**P4**~~ | ~~6.1~~ | ~~Dead code~~ | ~~Delete empty `app/dashboard/` and `app/interview/[sessionId]/` directories~~ — **Done** (commit `84f21c1`, deleted) |
 | ✅ ~~**P4**~~ | ~~6.3~~ | ~~Dead code~~ | ~~Delete `getProviderLabel` from `lib/userProfile.ts`~~ — **Done** (commit `84f21c1`, deleted) |
-| **P4** | 4.1 | Smell | Rename/fix `replaceCanvasState` → `makeCanvasState`, remove dead `_current` param |
+| ✅ ~~**P4**~~ | ~~4.1~~ | ~~Smell~~ | ~~Rename/fix `replaceCanvasState` → `makeCanvasState`, remove dead `_current` param~~ — **Done** (commit `9b7fc6c`) |
 | **P4** | 4.3 | Smell | Delete `AuthBar` or implement the signed-in UI inside it |
 | **P4** | 8.2 | Smell | Replace module-level `nodeIdCounter` with `crypto.randomUUID()` |
 | **P4** | 8.5 | Smell | Avoid double `fetchTokenBalance` call in `NewSessionButton.handleClick` |
 | **P4** | 4.5 | Smell | Simplify Zustand setters in `canvasStore` (remove redundant state re-spread) |
-| **P4** | 4.6, 4.8–4.9 | Smell | Minor cleanups: remove `_userId` param, fix import order, merge duplicate imports |
+| ✅ ~~**P4**~~ | ~~4.6, 4.8–4.9~~ | ~~Smell~~ | ~~Minor cleanups: remove `_userId` param, fix import order, merge duplicate imports~~ — **Done** (commits `89a64eb`, `2300b1f`, `9b7fc6c`) |
 
 ---
 
