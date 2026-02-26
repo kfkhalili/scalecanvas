@@ -174,8 +174,9 @@ pnpm vitest run components/
 
 ---
 
-## Commit 8 — `refactor: extract apiPatch, add preferencesClient, sidebar persist`
+## ✅ Commit 8 — `refactor: extract apiPatch, add preferencesClient, sidebar persist`
 **Findings:** 4.2, 8.1, 8.3
+**Status:** Done — committed as `2300b1f`
 **Risk:** P3 — code duplication & inconsistency cleanup
 **Files changed:**
 
@@ -278,7 +279,7 @@ Commits 6–10 form a linear chain that should land in order.
 | 5 | L | ✅ Done |
 | 6 | M | ✅ Done |
 | 7 | S | ✅ Done |
-| 8 | M | 45 min (new preferencesClient + sidebarStore rewrite) |
+| 8 | M | ✅ Done |
 | 9 | S | 20 min (find-and-replace renames) |
 | 10 | S | 30 min |
 | **Total** | | **~5–7 hours** |

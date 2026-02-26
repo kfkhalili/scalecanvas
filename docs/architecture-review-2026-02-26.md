@@ -397,11 +397,11 @@ Total findings: **31** across 8 categories.
 | ✅ ~~**P2**~~ | ~~6.2~~ | ~~Dead code~~ | ~~Delete unused `BuyTokensButton`~~ — **Done** (commit `84f21c1`, deleted) |
 | ✅ ~~**P2**~~ | ~~4.4~~ | ~~Smell~~ | ~~Delete `SessionSettings` CRUD infrastructure~~ — **Done** (commit `84f21c1`) |
 | ✅ ~~**P2**~~ | ~~2.3~~ | ~~Dead code~~ | ~~Delete `usePostAuthHandoff` hook~~ — **Done** (commit `84f21c1`, deleted) |
-| **P3** | 8.1 | Smell | Wrap `NodeLibrary` preferences calls in `services/preferencesClient.ts` |
-| **P3** | 8.3 | Smell | Replace hand-rolled localStorage in `sidebarStore` with Zustand `persist` middleware |
+| ✅ ~~**P3**~~ | ~~8.1~~ | ~~Smell~~ | ~~Wrap `NodeLibrary` preferences calls in `services/preferencesClient.ts`~~ — **Done** (commit `2300b1f`) |
+| ✅ ~~**P3**~~ | ~~8.3~~ | ~~Smell~~ | ~~Replace hand-rolled localStorage in `sidebarStore` with Zustand `persist` middleware~~ — **Done** (commit `2300b1f`) |
 | ✅ ~~**P3**~~ | ~~2.1~~ | ~~Dead code~~ | ~~Delete `lib/csrf.ts` (middleware has its own implementation)~~ — **Done** (commit `84f21c1`, deleted) |
 | ✅ ~~**P3**~~ | ~~3.1~~ | ~~Duplication~~ | ~~Delete `lib/api.types.ts`; import inferred types from `lib/api.schemas.ts`~~ — **Done** (commit `666c889`) |
-| **P3** | 4.2 | Smell | Extract `apiPatch` helper in `sessionsClient.ts` |
+| ✅ ~~**P3**~~ | ~~4.2~~ | ~~Smell~~ | ~~Extract `apiPatch` helper in `sessionsClient.ts`~~ — **Done** (commit `2300b1f`) |
 | ✅ ~~**P3**~~ | ~~1.3~~ | ~~Bug~~ | ~~Remove redundant `renameSessionApi` call after handoff~~ — **Done** (commit `89a64eb`) |
 | **P3** | 8.4 | Smell | Rename `getOrCreateStripeCustomerId` → `findStripeCustomerId` |
 | ✅ ~~**P4**~~ | ~~2.5~~ | ~~Dead code~~ | ~~Delete `mergeTranscript` export~~ — **Done** (commit `84f21c1`) |
