@@ -13,6 +13,8 @@ export type Session = {
   isTrial: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Set once when time-expired or voluntary conclusion summary is generated. */
+  conclusionSummary: string | null;
 };
 
 export type TranscriptEntry = {

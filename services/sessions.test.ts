@@ -94,7 +94,7 @@ async function runEffect<A, E>(effect: Effect.Effect<A, E>): Promise<Either.Eith
 
 describe("createSession", () => {
   it("returns ok(Session) when insert succeeds", async () => {
-    const dbRow = {
+    const dbRow: DbInterviewSession = {
       id: "sess-1",
       user_id: "user-1",
       title: "New",
@@ -102,6 +102,7 @@ describe("createSession", () => {
       is_trial: false,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
+      conclusion_summary: null,
     };
     const client = mockSupabaseClient({
       insertSingle: { data: dbRow, error: null },
@@ -126,7 +127,7 @@ describe("createSession", () => {
 
 describe("listSessions", () => {
   it("returns ok(Session[]) when select succeeds", async () => {
-    const dbRows = [
+    const dbRows: DbInterviewSession[] = [
       {
         id: "sess-1",
         user_id: "user-1",
@@ -135,6 +136,7 @@ describe("listSessions", () => {
         is_trial: false,
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
+        conclusion_summary: null,
       },
     ];
     const client = mockSupabaseClient({
@@ -151,7 +153,7 @@ describe("listSessions", () => {
 
 describe("getSession", () => {
   it("returns ok(Session) when session exists", async () => {
-    const dbRow = {
+    const dbRow: DbInterviewSession = {
       id: "sess-1",
       user_id: "user-1",
       title: "Get me",
@@ -159,6 +161,7 @@ describe("getSession", () => {
       is_trial: false,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
+      conclusion_summary: null,
     };
     const client = mockSupabaseClient({
       selectEqSingle: { data: dbRow, error: null },
@@ -167,9 +170,32 @@ describe("getSession", () => {
     expect(Either.isRight(result)).toBe(true);
     whenRight(result, (s) => expect(s.id).toBe("sess-1"));
   });
+
+  it("returns session with conclusionSummary when DB has conclusion_summary set", async () => {
+    const dbRow: DbInterviewSession = {
+      id: "sess-1",
+      user_id: "user-1",
+      title: "Done",
+      status: "active",
+      is_trial: false,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      conclusion_summary: "You did well on scaling. Improve consistency.",
+    };
+    const client = mockSupabaseClient({
+      selectEqSingle: { data: dbRow, error: null },
+    });
+    const result = await runEffect(getSession(client, "sess-1"));
+    expect(Either.isRight(result)).toBe(true);
+    whenRight(result, (s) => {
+      expect(s.conclusionSummary).toBe(
+        "You did well on scaling. Improve consistency."
+      );
+    });
+  });
 });
 
-const updatedDbRow = {
+const updatedDbRow: DbInterviewSession = {
   id: "sess-1",
   user_id: "user-1",
   title: "Renamed",
@@ -177,6 +203,7 @@ const updatedDbRow = {
   is_trial: false,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:01Z",
+  conclusion_summary: null,
 };
 
 describe("updateSession", () => {
@@ -222,7 +249,7 @@ describe("updateSession", () => {
 
   it("terminate-only: DB fields include status but NOT title", async () => {
     const capture: { fields: unknown } = { fields: null };
-    const terminatedRow = { ...updatedDbRow, status: "terminated" };
+    const terminatedRow: DbInterviewSession = { ...updatedDbRow, status: "terminated" };
     const client = mockSupabaseClient({
       updateEqSingle: { data: terminatedRow, error: null },
       updateCapture: capture,
@@ -256,7 +283,7 @@ describe("updateSession", () => {
 
   it("title set to null: DB fields include title as null", async () => {
     const capture: { fields: unknown } = { fields: null };
-    const nullTitleRow = { ...updatedDbRow, title: null };
+    const nullTitleRow: DbInterviewSession = { ...updatedDbRow, title: null };
     const client = mockSupabaseClient({
       updateEqSingle: { data: nullTitleRow, error: null },
       updateCapture: capture,
@@ -269,6 +296,43 @@ describe("updateSession", () => {
     const sent = capture.fields as Record<string, unknown>;
     expect(sent).toHaveProperty("title", null);
     expect(sent).not.toHaveProperty("status");
+  });
+
+  it("conclusionSummary-only: DB fields include conclusion_summary but NOT title", async () => {
+    const capture: { fields: unknown } = { fields: null };
+    const withSummary: DbInterviewSession = {
+      ...updatedDbRow,
+      conclusion_summary: "Final feedback text.",
+    };
+    const client = mockSupabaseClient({
+      updateEqSingle: { data: withSummary, error: null },
+      updateCapture: capture,
+    });
+    await runEffect(
+      updateSession(client, "sess-1", {
+        conclusionSummaryOpt: Option.some("Final feedback text."),
+      })
+    );
+    const sent = capture.fields as Record<string, unknown>;
+    expect(sent).toHaveProperty("conclusion_summary", "Final feedback text.");
+    expect(sent).not.toHaveProperty("title");
+  });
+
+  it("updateSession with conclusionSummaryOpt returns session with conclusionSummary", async () => {
+    const withSummary: DbInterviewSession = {
+      ...updatedDbRow,
+      conclusion_summary: "Stored summary.",
+    };
+    const client = mockSupabaseClient({
+      updateEqSingle: { data: withSummary, error: null },
+    });
+    const result = await runEffect(
+      updateSession(client, "sess-1", {
+        conclusionSummaryOpt: Option.some("Stored summary."),
+      })
+    );
+    expect(Either.isRight(result)).toBe(true);
+    whenRight(result, (s) => expect(s.conclusionSummary).toBe("Stored summary."));
   });
 });
 

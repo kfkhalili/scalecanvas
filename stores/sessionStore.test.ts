@@ -11,6 +11,7 @@ const session = (id: string, title: string | null = null): Session => ({
   isTrial: false,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  conclusionSummary: null,
 });
 
 beforeEach(() => {

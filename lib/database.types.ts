@@ -74,6 +74,7 @@ export type Database = {
       }
       interview_sessions: {
         Row: {
+          conclusion_summary: string | null
           created_at: string
           id: string
           is_trial: boolean
@@ -83,6 +84,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          conclusion_summary?: string | null
           created_at?: string
           id?: string
           is_trial?: boolean
@@ -92,6 +94,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          conclusion_summary?: string | null
           created_at?: string
           id?: string
           is_trial?: boolean

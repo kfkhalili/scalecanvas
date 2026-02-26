@@ -93,6 +93,7 @@ export function getSession(
 export type SessionUpdateFields = {
   titleOpt?: Option.Option<string>;
   statusOpt?: Option.Option<string>;
+  conclusionSummaryOpt?: Option.Option<string>;
 };
 
 /**
@@ -109,6 +110,9 @@ function toSessionUpdateDbFields(fields: SessionUpdateFields): Record<string, st
   }
   if (fields.statusOpt !== undefined) {
     result.status = Option.getOrNull(fields.statusOpt);
+  }
+  if (fields.conclusionSummaryOpt !== undefined) {
+    result.conclusion_summary = Option.getOrNull(fields.conclusionSummaryOpt);
   }
   return result;
 }

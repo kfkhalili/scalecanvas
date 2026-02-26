@@ -26,6 +26,7 @@ function session(createdAt: string, overrides?: Partial<Session>): Session {
     isTrial: false,
     createdAt,
     updatedAt: createdAt,
+    conclusionSummary: null,
     ...overrides,
   };
 }

@@ -26,6 +26,7 @@ function mockSession(id: string): Session {
     isTrial: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    conclusionSummary: null,
   };
 }
 

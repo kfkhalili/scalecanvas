@@ -12,6 +12,7 @@ describe("sessionToPublic", () => {
       is_trial: false,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-02T00:00:00Z",
+      conclusion_summary: null,
     };
     expect(sessionToPublic(db)).toEqual({
       id: "sess-1",
@@ -21,6 +22,7 @@ describe("sessionToPublic", () => {
       isTrial: false,
       createdAt: "2026-01-01T00:00:00Z",
       updatedAt: "2026-01-02T00:00:00Z",
+      conclusionSummary: null,
     });
   });
 
@@ -33,6 +35,7 @@ describe("sessionToPublic", () => {
       is_trial: true,
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
+      conclusion_summary: null,
     };
     expect(sessionToPublic(db).title).toBeNull();
   });
@@ -49,6 +52,7 @@ describe("getSessionDisplayTitle", () => {
         isTrial: false,
         createdAt: "",
         updatedAt: "",
+        conclusionSummary: null,
       })
     ).toBe("My Session");
   });
@@ -63,6 +67,7 @@ describe("getSessionDisplayTitle", () => {
         isTrial: false,
         createdAt: "",
         updatedAt: "",
+        conclusionSummary: null,
       })
     ).toBe("Untitled");
   });

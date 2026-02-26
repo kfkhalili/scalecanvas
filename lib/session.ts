@@ -10,6 +10,7 @@ export function sessionToPublic(db: DbInterviewSession): Session {
     isTrial: db.is_trial,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
+    conclusionSummary: db.conclusion_summary ?? null,
   };
 }
 
