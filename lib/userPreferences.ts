@@ -1,22 +1,14 @@
 import { Effect, Option, pipe } from "effect";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
+import { NodeLibraryProviderSchema } from "@/lib/api.schemas";
 import {
   NODE_LIBRARY_PROVIDER_KEY,
   type NodeLibraryProvider,
 } from "@/lib/types";
 
-const VALID_PROVIDERS: readonly NodeLibraryProvider[] = [
-  "all",
-  "aws",
-  "gcp",
-  "azure",
-  "generic",
-];
-
 function parseProviderOption(value: string): Option.Option<NodeLibraryProvider> {
-  return VALID_PROVIDERS.includes(value as NodeLibraryProvider)
-    ? Option.some(value as NodeLibraryProvider)
-    : Option.none();
+  const result = NodeLibraryProviderSchema.safeParse(value);
+  return result.success ? Option.some(result.data) : Option.none();
 }
 
 export function getNodeLibraryProvider(

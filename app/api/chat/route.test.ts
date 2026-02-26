@@ -55,7 +55,7 @@ describe("POST /api/chat", () => {
 
   // Session ownership (403 when session belongs to another user) is covered by
   // lib/chatGuardrails.test.ts: "returns 403 when userId does not match session owner".
-  // session_id UUID and array-length validation are applied in validateChatBoundaries before the guardrail.
+  // session_id UUID and array-length validation are applied by ChatBodySchema.safeParse before the guardrail.
 
   it("returns 503 when Bedrock env vars are missing", async () => {
     const sessionRow = {

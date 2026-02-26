@@ -10,26 +10,9 @@ import { parseCanvasState } from "@/lib/canvasParser";
 import { getSystemPrompt } from "@/lib/prompts";
 import { checkRateLimit, CHAT_RATE_LIMIT } from "@/lib/rateLimit";
 import {
+  ChatBodySchema,
   MAX_CHAT_BODY_BYTES,
-  MAX_EDGES,
-  MAX_MESSAGES,
-  MAX_NODES,
-  SESSION_ID_MAX_LENGTH,
 } from "@/lib/api.schemas";
-
-type ParsedMessage = { role: "user" | "assistant" | "system"; content: string };
-type ParsedNode = {
-  id: string;
-  type?: string;
-  position: { x: number; y: number };
-  data?: { label?: string };
-};
-type ParsedEdge = {
-  id: string;
-  source: string;
-  target: string;
-  data?: { label?: string };
-};
 
 function extractContent(content: unknown): string {
   if (typeof content === "string") return content;
@@ -45,104 +28,35 @@ function extractContent(content: unknown): string {
   return "";
 }
 
-type ParsedChatBody = {
-  messages: ParsedMessage[];
-  nodes: ParsedNode[];
-  edges: ParsedEdge[];
-  session_id: Option.Option<string>;
-};
-
-function parseChatBody(raw: unknown): Option.Option<ParsedChatBody> {
-  if (!raw || typeof raw !== "object") return Option.none();
+/**
+ * Pre-process raw JSON: promote data.messages → messages when the top-level
+ * field is absent. Some clients (e.g. ai-sdk useChat) nest messages there.
+ */
+function preprocessChatPayload(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
   const o = raw as Record<string, unknown>;
-  const rawMessages = Array.isArray(o.messages)
-    ? o.messages
-    : o.data && typeof o.data === "object" && Array.isArray((o.data as Record<string, unknown>).messages)
-      ? (o.data as Record<string, unknown[]>).messages
-      : undefined;
-  if (!rawMessages || rawMessages.length === 0) return Option.none();
-  const messages: ParsedMessage[] = [];
-  for (const m of rawMessages) {
-    if (!m || typeof m !== "object") return Option.none();
-    const msg = m as Record<string, unknown>;
-    const role = msg.role;
-    const content = extractContent(msg.content);
-    if (role !== "user" && role !== "assistant" && role !== "system") return Option.none();
-    messages.push({ role, content });
+  if (!Array.isArray(o.messages) && o.data && typeof o.data === "object") {
+    const d = o.data as Record<string, unknown>;
+    if (Array.isArray(d.messages)) {
+      return { ...o, messages: d.messages };
+    }
   }
-  const nodes = parseNodeArray(o.nodes);
-  const edges = parseEdgeArray(o.edges);
-  const session_id =
-    typeof o.session_id === "string" && o.session_id.length > 0
-      ? Option.some(o.session_id)
-      : Option.none();
-  return Option.some({ messages, nodes, edges, session_id });
+  return raw;
 }
 
-/** Returns Some(error message) when invalid, None when valid. */
-function validateChatBoundaries(parsed: ParsedChatBody): Option.Option<string> {
-  const sessionIdError = Option.match(parsed.session_id, {
-    onNone: () => Option.none() as Option.Option<string>,
-    onSome: (id) => {
-      if (id.length > SESSION_ID_MAX_LENGTH) return Option.some("session_id too long.");
-      const uuidResult = z.string().uuid().safeParse(id);
-      return uuidResult.success ? Option.none() : Option.some("session_id must be a valid UUID.");
-    },
-  });
-  if (Option.isSome(sessionIdError)) return sessionIdError;
-  if (parsed.messages.length > MAX_MESSAGES) return Option.some("Too many messages.");
-  if (parsed.nodes.length > MAX_NODES) return Option.some("Too many nodes.");
-  if (parsed.edges.length > MAX_EDGES) return Option.some("Too many edges.");
-  return Option.none();
-}
-
-function parseNodeArray(v: unknown): ParsedNode[] {
-  if (!Array.isArray(v)) return [];
-  const out: ParsedNode[] = [];
-  for (const n of v) {
-    if (!n || typeof n !== "object") continue;
-    const x = n as Record<string, unknown>;
-    const pos = x.position;
-    if (
-      typeof x.id !== "string" ||
-      !pos ||
-      typeof pos !== "object" ||
-      typeof (pos as { x: number }).x !== "number" ||
-      typeof (pos as { y: number }).y !== "number"
-    )
-      continue;
-    out.push({
-      id: x.id,
-      type: typeof x.type === "string" ? x.type : undefined,
-      position: { x: (pos as { x: number }).x, y: (pos as { y: number }).y },
-      data:
-        x.data && typeof x.data === "object" && "label" in x.data
-          ? { label: (x.data as { label?: string }).label }
-          : undefined,
-    });
+/** Map Zod validation errors to user-friendly messages. */
+function formatChatParseError(error: z.ZodError): string {
+  const first = error.issues[0];
+  if (!first) return "Invalid request body.";
+  const path = first.path[0];
+  if (path === "session_id") return "session_id must be a valid UUID.";
+  if (path === "messages") {
+    if (first.code === "too_big") return "Too many messages.";
+    return "Invalid request body: messages required.";
   }
-  return out;
-}
-
-function parseEdgeArray(v: unknown): ParsedEdge[] {
-  if (!Array.isArray(v)) return [];
-  const out: ParsedEdge[] = [];
-  for (const e of v) {
-    if (!e || typeof e !== "object") continue;
-    const x = e as Record<string, unknown>;
-    if (
-      typeof x.id !== "string" ||
-      typeof x.source !== "string" ||
-      typeof x.target !== "string"
-    )
-      continue;
-    const data =
-      x.data && typeof x.data === "object" && "label" in x.data
-        ? { label: (x.data as { label?: string }).label }
-        : undefined;
-    out.push({ id: x.id, source: x.source, target: x.target, data });
-  }
-  return out;
+  if (path === "nodes" && first.code === "too_big") return "Too many nodes.";
+  if (path === "edges" && first.code === "too_big") return "Too many edges.";
+  return "Invalid request body.";
 }
 
 export async function POST(
@@ -190,7 +104,10 @@ export async function POST(
     modelId = "global.anthropic.claude-sonnet-4-6";
   }
 
-  let body: ParsedChatBody;
+  let parsedMessages: { role: "user" | "assistant" | "system"; content: string }[];
+  let parsedNodes: { id: string; type?: string; position: { x: number; y: number }; data?: { label?: string } }[];
+  let parsedEdges: { id: string; source: string; target: string; data?: { label?: string } }[];
+  let sessionIdOpt: Option.Option<string>;
   try {
     const text = await request.text();
     if (text.length > MAX_CHAT_BODY_BYTES) {
@@ -200,23 +117,23 @@ export async function POST(
       );
     }
     const raw = JSON.parse(text) as unknown;
-    const bodyOrBadRequest = Option.match(parseChatBody(raw), {
-      onNone: () => {
-        console.error("[chat] 400 Invalid body. Keys:", raw && typeof raw === "object" ? Object.keys(raw as object) : "not object");
-        return NextResponse.json(
-          { error: "Invalid request body: messages required." },
-          { status: 400 }
-        ) as NextResponse;
-      },
-      onSome: (parsed) =>
-        Option.match(validateChatBoundaries(parsed), {
-          onNone: () => parsed as ParsedChatBody | NextResponse,
-          onSome: (boundaryError) =>
-            NextResponse.json({ error: boundaryError }, { status: 400 }) as ParsedChatBody | NextResponse,
-        }),
-    });
-    if (bodyOrBadRequest instanceof NextResponse) return bodyOrBadRequest;
-    body = bodyOrBadRequest;
+    const preprocessed = preprocessChatPayload(raw);
+    const parseResult = ChatBodySchema.safeParse(preprocessed);
+    if (!parseResult.success) {
+      console.error("[chat] 400 Invalid body. Keys:", raw && typeof raw === "object" ? Object.keys(raw as object) : "not object");
+      return NextResponse.json(
+        { error: formatChatParseError(parseResult.error) },
+        { status: 400 }
+      );
+    }
+    const { data: parsed } = parseResult;
+    parsedMessages = parsed.messages.map((m) => ({
+      role: m.role,
+      content: extractContent(m.content),
+    }));
+    parsedNodes = parsed.nodes;
+    parsedEdges = parsed.edges;
+    sessionIdOpt = Option.fromNullable(parsed.session_id);
   } catch (e) {
     console.error("[chat] 400 Parse error:", e);
     return NextResponse.json(
@@ -229,7 +146,7 @@ export async function POST(
     Effect.either(
       getSessionIfWithinTimeLimit(
         (id) => getSession(supabaseAuth, id),
-        body.session_id,
+        sessionIdOpt,
         user.id
       )
     )
@@ -243,18 +160,17 @@ export async function POST(
   }
   const sessionId = guardrailEither.right.id;
 
-  const { messages, nodes, edges } = body;
-  const nodesForParser = nodes.map((n) => ({
+  const nodesForParser = parsedNodes.map((n) => ({
     id: n.id,
     type: n.type,
     position: n.position,
     data: n.data ?? {},
   }));
-  const canvasContext = parseCanvasState(nodesForParser, edges);
+  const canvasContext = parseCanvasState(nodesForParser, parsedEdges);
   const systemPrompt = getSystemPrompt(canvasContext);
 
   const coreMessages = convertToCoreMessages(
-    messages.map((m) => ({ role: m.role, content: m.content }))
+    parsedMessages.map((m) => ({ role: m.role, content: m.content }))
   );
 
   const bedrock = createAmazonBedrock({

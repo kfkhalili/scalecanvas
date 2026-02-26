@@ -2,6 +2,9 @@
  * Shared app types. Readonly variants used where state is immutable.
  */
 
+import type { z } from "zod";
+import type { NodeLibraryProviderSchema } from "@/lib/api.schemas";
+
 export type Session = {
   id: string;
   userId: string;
@@ -72,12 +75,7 @@ export type ReadonlyTranscriptEntry = Readonly<TranscriptEntry>;
 export type ReadonlyCanvasState = Readonly<CanvasState>;
 
 /** Node library filter: All or a single cloud provider / generic. */
-export type NodeLibraryProvider =
-  | "all"
-  | "aws"
-  | "gcp"
-  | "azure"
-  | "generic";
+export type NodeLibraryProvider = z.infer<typeof NodeLibraryProviderSchema>;
 
 /** Key for the node library provider preference in user_preferences. */
 export const NODE_LIBRARY_PROVIDER_KEY = "node_library_provider" as const;

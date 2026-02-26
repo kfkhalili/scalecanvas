@@ -7,10 +7,28 @@ import {
   ChatBodySchema,
   CheckoutBodySchema,
   HandoffBodySchema,
+  NodeLibraryProviderSchema,
   MAX_NODES,
   MAX_EDGES,
   MAX_MESSAGES,
 } from "./api.schemas";
+
+describe("NodeLibraryProviderSchema", () => {
+  it.each(["all", "aws", "gcp", "azure", "generic"] as const)(
+    "accepts '%s'",
+    (value) => {
+      expect(NodeLibraryProviderSchema.safeParse(value).success).toBe(true);
+    }
+  );
+
+  it("rejects unknown provider", () => {
+    expect(NodeLibraryProviderSchema.safeParse("oracle").success).toBe(false);
+  });
+
+  it("rejects non-string", () => {
+    expect(NodeLibraryProviderSchema.safeParse(42).success).toBe(false);
+  });
+});
 
 describe("CreateSessionBodySchema", () => {
   it("accepts empty object", () => {

@@ -5,7 +5,13 @@ import type {
   CanvasState,
   SessionSettings,
 } from "@/lib/types";
-import type { ApiErrorResponse, SessionApiPostBody } from "@/lib/api.types";
+import type {
+  CreateSessionBody,
+  AppendTranscriptBody,
+} from "@/lib/api.schemas";
+
+/** JSON body shape when API returns an error (e.g. 4xx/5xx). */
+type ApiErrorResponse = { error?: string };
 
 export type ApiError = { message: string };
 
@@ -44,7 +50,7 @@ function apiGet<T>(path: string): Effect.Effect<T, ApiError> {
 
 function apiPost<T>(
   path: string,
-  body: SessionApiPostBody
+  body: CreateSessionBody | AppendTranscriptBody
 ): Effect.Effect<T, ApiError> {
   return pipe(
     Effect.tryPromise({

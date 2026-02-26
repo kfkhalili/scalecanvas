@@ -1,19 +1,11 @@
 import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { createServerClientInstance } from "@/lib/supabase/server";
+import { NodeLibraryProviderSchema } from "@/lib/api.schemas";
 import {
   getNodeLibraryProvider,
   setNodeLibraryProvider,
 } from "@/lib/userPreferences";
-
-const NodeLibraryProviderSchema = z.enum([
-  "all",
-  "aws",
-  "gcp",
-  "azure",
-  "generic",
-]);
 
 export async function GET(): Promise<NextResponse> {
   const supabase = await createServerClientInstance();

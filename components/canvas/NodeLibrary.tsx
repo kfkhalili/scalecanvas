@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronRight, GripVertical, StickyNote } from "lucide-react";
 import { whenSome } from "@/lib/optionHelpers";
+import { NodeLibraryProviderSchema } from "@/lib/api.schemas";
 import {
   CATEGORY_ORDER,
   CATEGORY_LABELS,
@@ -29,10 +30,10 @@ const PROVIDER_OPTIONS: { value: NodeLibraryProvider; label: string }[] = [
 function parseProviderFromUrl(param: Option.Option<string>): NodeLibraryProvider {
   return Option.match(param, {
     onNone: () => "all" as const,
-    onSome: (p) =>
-      p === "all" || p === "aws" || p === "gcp" || p === "azure" || p === "generic"
-        ? p
-        : ("all" as const),
+    onSome: (p) => {
+      const result = NodeLibraryProviderSchema.safeParse(p);
+      return result.success ? result.data : ("all" as const);
+    },
   });
 }
 
