@@ -84,14 +84,31 @@ export const useCanvasStore = create<CanvasStore>()(
         nodes: state.nodes,
         edges: state.edges,
         hasAttemptedEval: state.hasAttemptedEval,
+        viewport: Option.match(state.viewport, {
+          onNone: () => undefined,
+          onSome: (v) => ({ _tag: "Some" as const, value: v }),
+        }),
       }),
       merge: (persisted, current) => {
-        const p = persisted as { nodes?: unknown[]; edges?: unknown[]; hasAttemptedEval?: boolean } | undefined;
+        const p = persisted as PersistedState | undefined;
+        const rawVp = p?.viewport;
+        const viewport: Option.Option<Viewport> =
+          rawVp &&
+          typeof rawVp === "object" &&
+          "value" in rawVp &&
+          rawVp.value &&
+          typeof rawVp.value === "object" &&
+          "x" in rawVp.value &&
+          "y" in rawVp.value &&
+          "zoom" in rawVp.value
+            ? Option.some(rawVp.value as Viewport)
+            : current.viewport;
         return {
           ...current,
-          nodes: Array.isArray(p?.nodes) ? p.nodes as ReadonlyArray<ReactFlowNode> : current.nodes,
-          edges: Array.isArray(p?.edges) ? p.edges as ReadonlyArray<ReactFlowEdge> : current.edges,
+          nodes: Array.isArray(p?.nodes) ? (p.nodes as ReadonlyArray<ReactFlowNode>) : current.nodes,
+          edges: Array.isArray(p?.edges) ? (p.edges as ReadonlyArray<ReactFlowEdge>) : current.edges,
           hasAttemptedEval: typeof p?.hasAttemptedEval === "boolean" ? p.hasAttemptedEval : current.hasAttemptedEval,
+          viewport,
         };
       },
       skipHydration: true,
