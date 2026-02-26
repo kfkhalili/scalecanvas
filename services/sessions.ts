@@ -95,18 +95,26 @@ export function getSession(
 
 /** Session update fields in Option form; adapter converts to DB shape. */
 export type SessionUpdateFields = {
-  titleOpt: Option.Option<string>;
+  titleOpt?: Option.Option<string>;
   statusOpt?: Option.Option<string>;
 };
 
-function toSessionUpdateDbFields(fields: SessionUpdateFields): {
-  title?: string | null;
-  status?: string | null;
-} {
-  return {
-    title: Option.getOrNull(fields.titleOpt),
-    status: Option.getOrNull(fields.statusOpt ?? Option.none()),
-  };
+/**
+ * Build a plain object containing only the fields the caller explicitly
+ * provided.  Keys that are `undefined` on `fields` are omitted entirely so
+ * that PostgREST does not NULL out columns the caller never intended to
+ * touch (e.g. a rename must not clear `status`, a terminate must not clear
+ * `title`).
+ */
+function toSessionUpdateDbFields(fields: SessionUpdateFields): Record<string, string | null> {
+  const result: Record<string, string | null> = {};
+  if (fields.titleOpt !== undefined) {
+    result.title = Option.getOrNull(fields.titleOpt);
+  }
+  if (fields.statusOpt !== undefined) {
+    result.status = Option.getOrNull(fields.statusOpt);
+  }
+  return result;
 }
 
 export function updateSession(

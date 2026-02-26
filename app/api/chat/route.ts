@@ -277,7 +277,6 @@ export async function POST(
             await Effect.runPromise(
               Effect.either(
                 updateSession(supabaseAuth, sessionId, {
-                  titleOpt: Option.none(),
                   statusOpt: Option.some("terminated"),
                 })
               )
