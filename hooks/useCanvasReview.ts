@@ -1,8 +1,10 @@
 "use client";
 
+import { Option } from "effect";
 import { useRef, useCallback, useState } from "react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { parseCanvasState } from "@/lib/canvasParser";
+import { whenSome } from "@/lib/optionHelpers";
 import type { Message } from "ai";
 
 const MIN_NODES_FOR_REVIEW = 1;
@@ -13,14 +15,16 @@ const MIN_NODES_FOR_REVIEW = 1;
  */
 export function canEvaluateFromSnapshot(
   currentSnapshot: string,
-  lastEvaluatedSnapshot: string | null,
+  lastEvaluatedSnapshot: Option.Option<string>,
   hasEnoughNodes: boolean,
   isEvaluating: boolean,
   isLoading: boolean
 ): boolean {
   if (!hasEnoughNodes || isEvaluating || isLoading) return false;
-  if (lastEvaluatedSnapshot === null) return true;
-  return currentSnapshot !== lastEvaluatedSnapshot;
+  return Option.match(lastEvaluatedSnapshot, {
+    onNone: () => true,
+    onSome: (last) => currentSnapshot !== last,
+  });
 }
 
 async function readStreamText(response: Response): Promise<string> {
@@ -50,7 +54,7 @@ type UseCanvasReviewOpts = {
   setMessages: (fn: (prev: Message[]) => Message[]) => void;
   isLoading: boolean;
   /** Required for authenticated users so the chat API can validate session and time limit. */
-  sessionId?: string | null;
+  sessionId?: Option.Option<string>;
 };
 
 /**
@@ -70,7 +74,7 @@ export function useCanvasReview({
 } {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
-  const lastEvaluatedSnapshotRef = useRef<string | null>(null);
+  const lastEvaluatedSnapshotRef = useRef<Option.Option<string>>(Option.none());
   const [isEvaluating, setIsEvaluating] = useState(false);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -89,7 +93,11 @@ export function useCanvasReview({
     if (isEvaluating || isLoading) return;
     const state = useCanvasStore.getState();
     const snapshot = parseCanvasState(state.nodes, state.edges);
-    if (snapshot === lastEvaluatedSnapshotRef.current) return;
+    const alreadyEvaluated = Option.match(lastEvaluatedSnapshotRef.current, {
+      onNone: () => false,
+      onSome: (last) => snapshot === last,
+    });
+    if (alreadyEvaluated) return;
     if (state.nodes.length < MIN_NODES_FOR_REVIEW) return;
 
     setIsEvaluating(true);
@@ -111,7 +119,9 @@ export function useCanvasReview({
         nodes: state.nodes,
         edges: state.edges,
       };
-      if (sessionId) body.session_id = sessionId;
+      whenSome(sessionId ?? Option.none(), (sid) => {
+        body.session_id = sid;
+      });
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -127,7 +137,7 @@ export function useCanvasReview({
 
       const text = await readStreamText(res);
       if (text.trim()) {
-        lastEvaluatedSnapshotRef.current = snapshot;
+        lastEvaluatedSnapshotRef.current = Option.some(snapshot);
         setMessages((prev) => [
           ...prev,
           {

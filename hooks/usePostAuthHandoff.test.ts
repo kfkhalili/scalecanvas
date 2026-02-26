@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { runPostAuthHandoff } from "./usePostAuthHandoff";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -7,7 +7,7 @@ import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 describe("runPostAuthHandoff", () => {
   beforeEach(() => {
     useCanvasStore.setState({ hasAttemptedEval: false });
-    useAuthHandoffStore.setState({ pendingSessionId: null });
+    useAuthHandoffStore.setState({ pendingSessionId: Option.none() });
   });
 
   it("when session exists and hasAttemptedEval true: resets flag and calls RPC, sets pending handoff on success", async () => {
@@ -26,7 +26,7 @@ describe("runPostAuthHandoff", () => {
 
     expect(useCanvasStore.getState().hasAttemptedEval).toBe(false);
     expect(deductRpc).toHaveBeenCalledTimes(1);
-    expect(setPending).toHaveBeenCalledWith(sessionId);
+    expect(setPending).toHaveBeenCalledWith(Option.some(sessionId));
   });
 
   it("when hasAttemptedEval false: does not call RPC or set pending", async () => {
