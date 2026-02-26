@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { CookieOptions, CookieToSet } from "@/lib/cookie.types";
@@ -32,31 +33,45 @@ function requiresOriginCheck(pathname: string, method: string): boolean {
   return !WEBHOOK_PATHS.some((wp) => pathname.startsWith(wp));
 }
 
-function originMatchesHost(origin: string | null, host: string | null): boolean {
-  if (!origin || !host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
+function originMatchesHost(
+  origin: Option.Option<string>,
+  host: Option.Option<string>
+): boolean {
+  return Option.match(origin, {
+    onNone: () => false,
+    onSome: (o) =>
+      Option.match(host, {
+        onNone: () => false,
+        onSome: (h) => {
+          try {
+            return new URL(o).host === h;
+          } catch {
+            return false;
+          }
+        },
+      }),
+  });
 }
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request });
 
   if (requiresOriginCheck(request.nextUrl.pathname, request.method)) {
-    const origin = request.headers.get("origin");
-    const host = request.headers.get("host");
+    const origin = Option.fromNullable(request.headers.get("origin"));
+    const host = Option.fromNullable(request.headers.get("host"));
     if (!originMatchesHost(origin, host)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
-  if (!url || !key) {
+  const envOpt = Option.all([
+    Option.fromNullable(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    Option.fromNullable(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY),
+  ]);
+  if (Option.isNone(envOpt)) {
     return new NextResponse("Server misconfiguration", { status: 500 });
   }
+  const [url, key] = envOpt.value;
 
   const supabase = createServerClient(url, key, {
     cookies: {
