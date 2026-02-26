@@ -388,7 +388,7 @@ Total findings: **31** across 8 categories.
 | ✅ ~~**P1**~~ | ~~5.1~~ | ~~Bug~~ | ~~Fix `toSessionUpdateDbFields` — conditionally include fields to stop NULLing title on terminate and status on rename~~ — **Done** (commit `672ce69`) |
 | ✅ ~~**P1**~~ | ~~1.1~~ | ~~Bug~~ | ~~Fix `fitView` overriding saved viewport on every mount~~ — **Done** (commit `9e76fd4`) |
 | **P3** | 5.3 | UX | Replace `getSession()` with `getUser()` in `PostAuthRoot` (not a security issue — server routes already validate) |
-| **P2** | 5.2 | Bug | Replace `"http://localhost:3000"` fallback in checkout with `NEXT_PUBLIC_SITE_URL` |
+| ✅ ~~**P2**~~ | ~~5.2~~ | ~~Bug~~ | ~~Replace `"http://localhost:3000"` fallback in checkout with `NEXT_PUBLIC_SITE_URL`~~ — **Done** (commit `52a19f4`) |
 | **P4** | 8.6 | Smell | Move `CheckoutFeedback` to root layout for immediate rendering (toast is not actually lost) |
 | **P2** | 4.7 | Smell | Split shared `loadingSessionIdRef` into canvas and transcript refs |
 | **P2** | 3.2 | Duplication | Use `ChatBodySchema` in the chat route; delete hand-written `parseChatBody` |

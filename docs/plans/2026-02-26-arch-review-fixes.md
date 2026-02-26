@@ -67,9 +67,10 @@ supabase db reset && supabase test db   # migration + RPC test
 
 ---
 
-## Commit 4 — `fix: use NEXT_PUBLIC_SITE_URL as checkout origin fallback`
+## ✅ Commit 4 — `fix: use NEXT_PUBLIC_SITE_URL as checkout origin fallback`
 **Findings:** 5.2
 **Risk:** P2 — broken Stripe redirect in production
+**Status:** Done — committed as `52a19f4`
 **Files changed:**
 
 | File | Change |
@@ -270,7 +271,7 @@ Commits 6–10 form a linear chain that should land in order.
 | 1 | XS | ✅ Done |
 | 2 | S | ✅ Done |
 | 3 | M | ✅ Done |
-| 4 | XS | 10 min |
+| 4 | XS | ✅ Done |
 | 5 | L | 1–2 hr (touches many files, needs careful type-checking) |
 | 6 | M | 45 min (many files but mostly deletion) |
 | 7 | S | 20 min |
