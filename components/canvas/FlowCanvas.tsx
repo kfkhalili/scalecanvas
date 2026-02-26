@@ -26,6 +26,10 @@ import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
 import { saveCanvasApi } from "@/services/sessionsClient";
+import {
+  getDiagramShortcutEntries,
+  computeShortcutsPanelPosition,
+} from "@/lib/canvasShortcuts";
 import { HelpCircle } from "lucide-react";
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -92,6 +96,22 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
       viewport: Option.getOrUndefined(viewportRef.current),
     });
   }, [nodes, edges, setCanvasState]);
+
+  // Escape: clear selection so the shortcuts-panel hint is accurate
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") {
+        setNodes((prev) =>
+          prev.map((n) => ({ ...n, selected: false }))
+        );
+        setEdges((prev) =>
+          prev.map((edge) => ({ ...edge, selected: false }))
+        );
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [setNodes, setEdges]);
 
   const onMoveEnd = useCallback(
     (_ev: MouseEvent | TouchEvent | null, vp: RfViewport) => {
@@ -288,10 +308,9 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
     if (nextOpen) {
       const rect = helpBtnRef.current?.getBoundingClientRect();
       if (rect) {
-        setPanelPosition({
-          bottom: window.innerHeight - rect.top + 8,
-          left: rect.left,
-        });
+        setPanelPosition(
+          computeShortcutsPanelPosition(rect, window.innerHeight)
+        );
       }
     } else {
       setPanelPosition(null);
@@ -313,24 +332,20 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
               Diagram shortcuts
             </div>
             <ul className="space-y-2 text-xs text-muted-foreground" aria-label="Shortcut list">
-              <li>
-                <kbd className="rounded border border-border bg-muted px-1 font-mono">Shift</kbd>
-                {" + "}
-                <kbd className="rounded border border-border bg-muted px-1 font-mono">drag</kbd>
-                {" — Select multiple (box select)"}
-              </li>
-              <li>
-                <kbd className="rounded border border-border bg-muted px-1 font-mono">Drag</kbd>
-                {" — Pan"}
-              </li>
-              <li>
-                <kbd className="rounded border border-border bg-muted px-1 font-mono">Scroll</kbd>
-                {" — Zoom"}
-              </li>
-              <li>
-                <kbd className="rounded border border-border bg-muted px-1 font-mono">Escape</kbd>
-                {" — Clear selection"}
-              </li>
+              {getDiagramShortcutEntries().map((entry, i) => (
+                <li key={i}>
+                  {entry.keys.map((key, j) => (
+                    <span key={j}>
+                      {j > 0 ? " + " : null}
+                      <kbd className="rounded border border-border bg-muted px-1 font-mono">
+                        {key}
+                      </kbd>
+                    </span>
+                  ))}
+                  {" — "}
+                  {entry.description}
+                </li>
+              ))}
             </ul>
           </div>,
           document.body
