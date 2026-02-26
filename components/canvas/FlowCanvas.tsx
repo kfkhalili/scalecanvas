@@ -6,6 +6,7 @@ import {
   ReactFlow,
   Background,
   addEdge,
+  reconnectEdge,
   MarkerType,
   type Viewport as RfViewport,
   type Node,
@@ -102,6 +103,18 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
         const prevIds = new Set(prev.map((e) => e.id));
         return next.map((e) =>
           prevIds.has(e.id) ? e : { ...e, data: { ...e.data, label: "" } }
+        );
+      });
+    },
+    [setEdges]
+  );
+
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      setEdges((prev) => {
+        const next = reconnectEdge(oldEdge, newConnection, prev);
+        return next.map((e) =>
+          e.id === oldEdge.id ? { ...e, data: { ...e.data, ...oldEdge.data } } : e
         );
       });
     },
@@ -205,6 +218,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
         onMoveEnd={onMoveEnd}
         onDragOver={onDragOver}
         onDrop={onDrop}
