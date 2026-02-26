@@ -140,7 +140,7 @@ export function replaceCanvasState(_current: CanvasState, nodes, edges, viewport
 
 ---
 
-### 4.3 `AuthBar` always renders `<></>` but still fetches user data *(Low)*
+### 4.3 `AuthBar` always renders `<></>` but still fetches user data *(Low)* ✅ Done
 **File:** `components/layout/AuthBar.tsx`
 
 The component calls `supabase.auth.getUser()` on mount and stores the result in state, then renders an empty fragment regardless. The comment acknowledges the signed-in UI is elsewhere. This is a fetch with no consumer.
@@ -158,7 +158,7 @@ The settings type is permanently empty by definition. `saveSessionSettings` igno
 
 ---
 
-### 4.5 Zustand setters unnecessarily re-spread the full state *(Low)*
+### 4.5 Zustand setters unnecessarily re-spread the full state *(Low)* ✅ Done
 **File:** `stores/canvasStore.ts`
 
 ```ts
@@ -321,7 +321,7 @@ All other client-to-API communication goes through typed, Effect-wrapped helpers
 
 ---
 
-### 8.2 Module-level mutable `nodeIdCounter` is not safe across remounts *(Low)*
+### 8.2 Module-level mutable `nodeIdCounter` is not safe across remounts *(Low)* ✅ Done
 **File:** `components/canvas/FlowCanvas.tsx`
 
 ```ts
@@ -356,7 +356,7 @@ The function name implies it will create a Stripe customer if none exists. It do
 
 ---
 
-### 8.5 `NewSessionButton` fetches the token balance twice on open *(Low)*
+### 8.5 `NewSessionButton` fetches the token balance twice on open *(Low)* ✅ Done
 **File:** `components/billing/NewSessionButton.tsx`
 
 On mount, `refreshBalance()` is called to populate the badge counter. When the user clicks "New Session", `handleClick` calls `fetchTokenBalance()` again to decide which dialog variant to show. The fresh fetch on click is justified (prevents race conditions), but it ignores the in-flight state already resolved in `balanceOpt`. At minimum, the UI should show the badge value optimistically rather than going to `loading` state every click.
@@ -365,7 +365,7 @@ On mount, `refreshBalance()` is called to populate the badge counter. When the u
 
 ---
 
-### 8.6 `CheckoutFeedback` depends on `PostAuthRoot` mount timing *(Low)*
+### 8.6 `CheckoutFeedback` depends on `PostAuthRoot` mount timing *(Low)* ✅ Done
 **File:** `components/billing/CheckoutFeedback.tsx`, `components/PostAuthRoot.tsx`
 
 `CheckoutFeedback` is only mounted inside `PostAuthRoot`, which renders at `/` for authenticated users. The Stripe `success_url` is `/?checkout=success`. `PostAuthRoot` redirects to `/{sessionId}` for returning users who have sessions.

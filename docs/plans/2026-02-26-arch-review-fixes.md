@@ -224,8 +224,8 @@ pnpm tsc --noEmit
 
 ---
 
-## Commit 10 — `chore: minor cleanups (AuthBar, nodeId, Zustand setters, etc.)`
-**Findings:** 4.3, 4.5, 8.2, 8.5, 8.6
+## ✅ Commit 10 — `chore: minor cleanups (AuthBar, nodeId, Zustand setters, etc.)`
+**Findings:** 4.3, 4.5, 8.2, 8.5, 8.6 · **Status:** Done — `fc3a3da`
 **Risk:** P4 — cosmetic / hygiene
 **Files changed:**
 
@@ -282,5 +282,5 @@ Commits 6–10 form a linear chain that should land in order.
 | 7 | S | ✅ Done |
 | 8 | M | ✅ Done |
 | 9 | S | ✅ Done |
-| 10 | S | 30 min |
+| 10 | S | ✅ Done |
 | **Total** | | **~5–7 hours** |
