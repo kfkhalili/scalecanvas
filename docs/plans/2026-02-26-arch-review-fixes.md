@@ -46,9 +46,10 @@ pnpm exec playwright test e2e/anonymous-canvas.spec.ts  # e2e
 
 ---
 
-## Commit 3 — `fix: replace in-memory rate limiter with Supabase`
+## ✅ Commit 3 — `fix: replace in-memory rate limiter with Supabase`
 **Findings:** 1.2, 2.2
 **Risk:** P1 — rate limiting is non-functional in serverless
+**Status:** Done — committed as `72b445b`
 **Files changed:**
 
 | File | Change |
@@ -268,7 +269,7 @@ Commits 6–10 form a linear chain that should land in order.
 |--------|------|----------------|
 | 1 | XS | ✅ Done |
 | 2 | S | ✅ Done |
-| 3 | M | 1–2 hr (migration + RPC + test rewrite) |
+| 3 | M | ✅ Done |
 | 4 | XS | 10 min |
 | 5 | L | 1–2 hr (touches many files, needs careful type-checking) |
 | 6 | M | 45 min (many files but mostly deletion) |

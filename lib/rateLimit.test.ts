@@ -1,6 +1,6 @@
 import { Effect, Either } from "effect";
 import { describe, it, expect, vi } from "vitest";
-import { checkRateLimit, type RateLimitResult } from "./rateLimit";
+import { checkRateLimit } from "./rateLimit";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 
 const config = { windowMs: 60_000, maxRequests: 3 };

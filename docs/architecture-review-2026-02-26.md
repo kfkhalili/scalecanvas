@@ -384,7 +384,7 @@ Total findings: **31** across 8 categories.
 
 | Priority | # | Finding | Action |
 |----------|---|---------|--------|
-| **P1** | 1.2 | Bug | Replace in-memory rate limiter with a persistent store (Supabase table) |
+| ✅ ~~**P1**~~ | ~~1.2~~ | ~~Bug~~ | ~~Replace in-memory rate limiter with a persistent store (Supabase table)~~ — **Done** (commit `72b445b`) |
 | ✅ ~~**P1**~~ | ~~5.1~~ | ~~Bug~~ | ~~Fix `toSessionUpdateDbFields` — conditionally include fields to stop NULLing title on terminate and status on rename~~ — **Done** (commit `672ce69`) |
 | ✅ ~~**P1**~~ | ~~1.1~~ | ~~Bug~~ | ~~Fix `fitView` overriding saved viewport on every mount~~ — **Done** (commit `9e76fd4`) |
 | **P3** | 5.3 | UX | Replace `getSession()` with `getUser()` in `PostAuthRoot` (not a security issue — server routes already validate) |
@@ -405,7 +405,7 @@ Total findings: **31** across 8 categories.
 | **P3** | 1.3 | Bug | Remove redundant `renameSessionApi` call after handoff |
 | **P3** | 8.4 | Smell | Rename `getOrCreateStripeCustomerId` → `findStripeCustomerId` |
 | **P4** | 2.5 | Dead code | Delete `mergeTranscript` export |
-| **P4** | 2.2 | Dead code | Apply or delete `API_RATE_LIMIT` |
+| ✅ ~~**P4**~~ | ~~2.2~~ | ~~Dead code~~ | ~~Apply or delete `API_RATE_LIMIT`~~ — **Done** (commit `72b445b`, deleted) |
 | **P4** | 2.6 | Dead code | Move `getSampleCanvasState` to test fixtures |
 | **P4** | 6.1 | Dead code | Delete empty `app/dashboard/` and `app/interview/[sessionId]/` directories |
 | **P4** | 6.3 | Dead code | Delete or use `getProviderLabel` in `lib/userProfile.ts` |
