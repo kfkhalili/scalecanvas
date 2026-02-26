@@ -5,7 +5,7 @@ import { useCanvasStore } from "@/stores/canvasStore";
 describe("PLG", () => {
   it("teaser message prompts sign-in and mentions scaling strategy", () => {
     expect(PLG_TEASER_MESSAGE).toContain("Sign in to unlock");
-    expect(PLG_TEASER_MESSAGE).toContain("scaling strategy");
+    expect(PLG_TEASER_MESSAGE).toContain("observations about your design");
     expect(PLG_TEASER_MESSAGE).toContain("free mock interview");
   });
 

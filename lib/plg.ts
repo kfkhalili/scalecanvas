@@ -3,7 +3,7 @@
  * Used when an anonymous user clicks Evaluate or sends a chat message.
  */
 export const PLG_TEASER_MESSAGE =
-  "I see you've started building your architecture. I have a critical question about your scaling strategy here. Sign in to unlock my feedback and start your free mock interview.";
+  "I see you've started building your architecture. I have some observations about your design. Sign in to unlock my feedback and start your free mock interview.";
 
 /** Accepts the same updater shape as useChat's setMessages. */
 type SetMessages = (
