@@ -1,7 +1,8 @@
 "use client";
 
+import { createPortal as _createPortal } from "react-dom";
 import { Effect, Option } from "effect";
-import { useCallback, useEffect, useMemo, useRef, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ReactFlow,
   Background,
@@ -25,6 +26,7 @@ import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
 import { saveCanvasApi } from "@/services/sessionsClient";
+import { HelpCircle } from "lucide-react";
 
 const SAVE_DEBOUNCE_MS = 800;
 
@@ -247,6 +249,9 @@ type FlowCanvasProps = {
 export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElement {
   const evaluateActionOpt = useCanvasStore((s) => s.evaluateAction);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const helpBtnRef = useRef<HTMLButtonElement>(null);
+  const _helpPanelRef = useRef<HTMLDivElement>(null);
 
   return (
     <div
@@ -256,10 +261,20 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
       <ReactFlowProvider>
         <FlowCanvasInner sessionIdOpt={sessionIdOpt} />
       </ReactFlowProvider>
-      {Option.match(evaluateActionOpt, {
-        onNone: () => null,
-        onSome: (evaluateAction) => (
-          <div className="absolute bottom-2 right-2 z-10">
+      <div className="absolute bottom-2 right-2 z-10 flex items-center gap-2">
+        <button
+          type="button"
+          ref={helpBtnRef}
+          onClick={() => setShortcutsOpen((prev) => !prev)}
+          aria-label="Canvas shortcuts"
+          aria-expanded={shortcutsOpen}
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <HelpCircle className="h-4 w-4" />
+        </button>
+        {Option.match(evaluateActionOpt, {
+          onNone: () => null,
+          onSome: (evaluateAction) => (
             <button
               type="button"
               onClick={evaluateAction.evaluate}
@@ -275,9 +290,9 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
             >
               {evaluateAction.isEvaluating ? "Evaluating…" : "Evaluate"}
             </button>
-          </div>
-        ),
-      })}
+          ),
+        })}
+      </div>
     </div>
   );
 }
