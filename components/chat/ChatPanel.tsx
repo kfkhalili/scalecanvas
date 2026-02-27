@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
 import { generateId } from "ai";
 import { Lightbulb, Maximize2, Minimize2 } from "lucide-react";
-import { getRandomQuestion } from "@/lib/questions";
+import { getRandomQuestion, getTopicById, getTopicByTitle } from "@/lib/questions";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useQuestionStore } from "@/stores/questionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
@@ -15,6 +15,7 @@ import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasReview } from "@/hooks/useCanvasReview";
 import { appendTranscriptApi, saveCanvasApi } from "@/services/sessionsClient";
 import { performAnonymousEvalHandoff } from "@/lib/plg";
+import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
 import { runBffHandoff, type RunBffHandoffParams } from "@/lib/authHandoff";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,8 @@ type ChatPanelProps = {
   sessionId?: string;
   initialEntries: ReadonlyArray<TranscriptEntry>;
   isAnonymous?: boolean;
+  /** When true, authHandoffStore has been rehydrated; anonymous bootstrap can safely read stored topic + messages. */
+  handoffRehydrated?: boolean;
 };
 
 const toMessage = transcriptEntryToMessage;
@@ -45,10 +48,12 @@ export function ChatPanel({
   sessionId,
   initialEntries,
   isAnonymous = false,
+  handoffRehydrated = true,
 }: ChatPanelProps): React.ReactElement {
   const router = useRouter();
   const appendEntry = useTranscriptStore((s) => s.appendEntry);
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
+  const setCanvasState = useCanvasStore((s) => s.setCanvasState);
   const setHasAttemptedEval = useCanvasStore((s) => s.setHasAttemptedEval);
   const hasAttemptedEval = useCanvasStore((s) => s.hasAttemptedEval);
   const pendingSessionIdOpt = useAuthHandoffStore((s) => s.pendingSessionId);
@@ -56,6 +61,7 @@ export function ChatPanel({
   const setHandoffTranscript = useAuthHandoffStore((s) => s.setHandoffTranscript);
   const setAnonymousMessages = useAuthHandoffStore((s) => s.setAnonymousMessages);
   const setQuestionTitle = useAuthHandoffStore((s) => s.setQuestionTitle);
+  const setQuestionTopicId = useAuthHandoffStore((s) => s.setQuestionTopicId);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
   const setSessionActive = useSessionStore((s) => s.setSessionActive);
   const activeQuestionOpt = useQuestionStore((s) => s.activeQuestion);
@@ -188,10 +194,93 @@ export function ChatPanel({
       if (!isAnonymous) {
         const stored = useAuthHandoffStore.getState().anonymousMessages;
         if (stored.length > 0) return;
+      } else {
+        if (!handoffRehydrated) return;
+
+        const store = useAuthHandoffStore.getState();
+        const storedMessages = store.anonymousMessages;
+        const topicIdOpt = store.questionTopicId;
+        const titleOpt = store.questionTitle;
+
+        if (storedMessages.length > 0) {
+          setMessages(
+            storedMessages.map((m) => ({
+              id: m.id,
+              role: (m.role === "user" || m.role === "assistant" ? m.role : "assistant") as "user" | "assistant",
+              content: m.content,
+            }))
+          );
+          const topicFromId = Option.match(topicIdOpt, {
+            onNone: () => undefined,
+            onSome: (id) => getTopicById(id),
+          });
+          const topicFromTitle =
+            topicFromId ??
+            Option.match(titleOpt, {
+              onNone: () => undefined,
+              onSome: (title) => getTopicByTitle(title),
+            });
+          if (topicFromTitle) {
+            setInitialQuestion({
+              id: topicFromTitle.id,
+              title: topicFromTitle.title,
+              prompt: topicFromTitle.comprehensivePrompt,
+              hints: [],
+            });
+          }
+          return;
+        }
+
+        const topicFromId = Option.match(topicIdOpt, {
+          onNone: () => undefined,
+          onSome: (id) => getTopicById(id),
+        });
+        const topicFromTitle =
+          topicFromId ??
+          Option.match(titleOpt, {
+            onNone: () => undefined,
+            onSome: (title) => getTopicByTitle(title),
+          });
+
+        if (topicFromTitle) {
+          setInitialQuestion({
+            id: topicFromTitle.id,
+            title: topicFromTitle.title,
+            prompt: topicFromTitle.comprehensivePrompt,
+            hints: [],
+          });
+          setQuestionTitle(Option.some(topicFromTitle.title));
+          setQuestionTopicId(Option.some(topicFromTitle.id));
+          setMessages([
+            {
+              id: generateId(),
+              role: "assistant",
+              content: topicFromTitle.comprehensivePrompt,
+            },
+          ]);
+          return;
+        }
+
+        setCanvasState({ nodes: [], edges: [], viewport: undefined });
+        const question = getRandomQuestion();
+        setInitialQuestion(question);
+        setQuestionTitle(Option.some(question.title));
+        setQuestionTopicId(Option.some(question.id));
+        setMessages([
+          {
+            id: generateId(),
+            role: "assistant",
+            content: question.prompt,
+          },
+        ]);
+        return;
       }
       const question = getRandomQuestion();
       setInitialQuestion(question);
       setQuestionTitle(Option.some(question.title));
+      if (isAnonymous) {
+        setQuestionTopicId(Option.some(question.id));
+      }
       setMessages([
         {
           id: generateId(),
@@ -208,7 +297,17 @@ export function ChatPanel({
       if (Option.isNone(currentTitleOpt))
         setQuestionTitle(Option.some(question.title));
     }
-  }, [messages.length, activeQuestionOpt, isAnonymous, setInitialQuestion, setQuestionTitle, setMessages]);
+  }, [
+    messages.length,
+    activeQuestionOpt,
+    isAnonymous,
+    handoffRehydrated,
+    setInitialQuestion,
+    setQuestionTitle,
+    setQuestionTopicId,
+    setMessages,
+    setCanvasState,
+  ]);
 
   useEffect(() => {
     if (sessionId) setSessionActive(true);
@@ -257,6 +356,7 @@ export function ChatPanel({
     whenSome(pendingSessionIdOpt, (pendingSessionId) => {
       if (handoffDoneRef.current === pendingSessionId) return;
       handoffDoneRef.current = pendingSessionId;
+      loadAnonymousWorkspace();
       const sessionIdForHandoff = pendingSessionId;
       const currentFromChat = messages.map((m) => ({
         id: m.id,

@@ -222,6 +222,14 @@ export const INTERVIEW_TOPICS: readonly InterviewTopic[] = [
   ),
 ];
 
+export function getTopicById(id: string): InterviewTopic | undefined {
+  return INTERVIEW_TOPICS.find((t) => t.id === id);
+}
+
+export function getTopicByTitle(title: string): InterviewTopic | undefined {
+  return INTERVIEW_TOPICS.find((t) => t.title === title);
+}
+
 export function getRandomTopic(): InterviewTopic {
   return INTERVIEW_TOPICS[
     Math.floor(Math.random() * INTERVIEW_TOPICS.length)

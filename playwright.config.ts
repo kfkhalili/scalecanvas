@@ -1,10 +1,18 @@
+import * as fs from "fs";
 import { defineConfig, devices } from "@playwright/test";
+
+const authFile = "e2e/.auth/user.json";
 
 /**
  * Playwright E2E test configuration.
  * Run `pnpm exec playwright test` after installing with:
  *   pnpm add -D @playwright/test
  *   pnpm exec playwright install --with-deps chromium
+ *
+ * Anonymous → trial handoff test requires auth state. Create it once with:
+ *   pnpm exec playwright test e2e/auth.setup.ts
+ * then complete sign-in in the browser. After that, the handoff test runs when
+ * you run the full suite (project "anonymous-handoff" is added when authFile exists).
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -21,7 +29,20 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: [/anonymous-handoff-canvas\.spec\.ts/],
     },
+    ...(fs.existsSync(authFile)
+      ? [
+          {
+            name: "anonymous-handoff",
+            use: {
+              ...devices["Desktop Chrome"],
+              storageState: authFile,
+            },
+            testMatch: /anonymous-handoff-canvas\.spec\.ts/,
+          },
+        ]
+      : []),
   ],
   webServer: {
     command: "pnpm dev",

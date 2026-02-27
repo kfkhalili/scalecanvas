@@ -1,6 +1,5 @@
 import { Option } from "effect";
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   ReactFlowNode,
   ReactFlowEdge,
@@ -8,6 +7,7 @@ import type {
   CanvasState,
 } from "@/lib/types";
 import { makeCanvasState, resolveEdgeHandles } from "@/lib/canvas";
+import { readFromStorage, isViewport } from "@/stores/anonymousWorkspaceStorage";
 
 export type EvaluateAction = {
   evaluate: () => void;
@@ -35,141 +35,70 @@ type CanvasStore = {
 const initialNodes: ReadonlyArray<ReactFlowNode> = [];
 const initialEdges: ReadonlyArray<ReactFlowEdge> = [];
 
-const PERSIST_KEY = "scalecanvas-canvas";
-
-const persistStorage = typeof window !== "undefined"
-  ? createJSONStorage(() => localStorage)
-  : undefined;
-
-type PersistedState = {
-  nodes?: unknown[];
-  edges?: unknown[];
-  hasAttemptedEval?: boolean;
-  viewport?: { _tag?: string; value?: Viewport };
-};
-
-export const useCanvasStore = create<CanvasStore>()(
-  persist(
-    (set, get) => ({
-      nodes: initialNodes,
-      edges: initialEdges,
-      viewport: Option.none(),
-      evaluateAction: Option.none(),
-      hasAttemptedEval: false,
-      setNodes: (nodes) => set({ nodes }),
-      setEdges: (edges) => set({ edges }),
-      setViewport: (viewport) => set({ viewport }),
-      setEvaluateAction: (action) => set({ evaluateAction: action }),
-      setHasAttemptedEval: (hasAttemptedEval) => set({ hasAttemptedEval }),
-      setCanvasState: (state) =>
-        set({
-          nodes: state.nodes,
-          edges: resolveEdgeHandles(state.nodes, state.edges),
-          viewport: Option.fromNullable(state.viewport),
-        }),
-      getCanvasState: () => {
-        const { nodes, edges, viewport } = get();
-        const viewportValue = Option.getOrUndefined(viewport);
-        return makeCanvasState(
-          nodes,
-          edges,
-          viewportValue
-        );
-      },
+export const useCanvasStore = create<CanvasStore>()((set, get) => ({
+  nodes: initialNodes,
+  edges: initialEdges,
+  viewport: Option.none(),
+  evaluateAction: Option.none(),
+  hasAttemptedEval: false,
+  setNodes: (nodes) => set({ nodes }),
+  setEdges: (edges) => set({ edges }),
+  setViewport: (viewport) => set({ viewport }),
+  setEvaluateAction: (action) => set({ evaluateAction: action }),
+  setHasAttemptedEval: (hasAttemptedEval) => set({ hasAttemptedEval }),
+  setCanvasState: (state) =>
+    set({
+      nodes: state.nodes,
+      edges: resolveEdgeHandles(state.nodes, state.edges),
+      viewport: Option.fromNullable(state.viewport),
     }),
-    {
-      name: PERSIST_KEY,
-      storage: persistStorage,
-      partialize: (state) => ({
-        nodes: state.nodes,
-        edges: state.edges,
-        hasAttemptedEval: state.hasAttemptedEval,
-        viewport: Option.match(state.viewport, {
-          onNone: () => undefined,
-          onSome: (v) => ({ _tag: "Some" as const, value: v }),
-        }),
-      }),
-      merge: (persisted, current) => {
-        const p = persisted as PersistedState | undefined;
-        const rawVp = p?.viewport;
-        const viewport: Option.Option<Viewport> =
-          rawVp &&
-          typeof rawVp === "object" &&
-          "value" in rawVp &&
-          rawVp.value &&
-          typeof rawVp.value === "object" &&
-          "x" in rawVp.value &&
-          "y" in rawVp.value &&
-          "zoom" in rawVp.value
-            ? Option.some(rawVp.value as Viewport)
-            : current.viewport;
-        return {
-          ...current,
-          nodes: Array.isArray(p?.nodes) ? (p.nodes as ReadonlyArray<ReactFlowNode>) : current.nodes,
-          edges: Array.isArray(p?.edges) ? (p.edges as ReadonlyArray<ReactFlowEdge>) : current.edges,
-          hasAttemptedEval: typeof p?.hasAttemptedEval === "boolean" ? p.hasAttemptedEval : current.hasAttemptedEval,
-          viewport,
-        };
-      },
-      skipHydration: true,
-    }
-  )
-);
+  getCanvasState: () => {
+    const { nodes, edges, viewport } = get();
+    const viewportValue = Option.getOrUndefined(viewport);
+    return makeCanvasState(
+      nodes,
+      edges,
+      viewportValue
+    );
+  },
+}));
 
-type CanvasPersistApi = {
-  rehydrate: () => Promise<void>;
-  onFinishHydration: (cb: () => void) => () => void;
-};
-
-/** Call once on client mount to rehydrate from localStorage (avoids SSR mismatch). */
+/** No-op: canvas is now persisted only via anonymousWorkspaceStorage (one key). */
 export function rehydrateCanvasStore(): Promise<void> | undefined {
-  const store = useCanvasStore as unknown as { persist?: CanvasPersistApi };
-  return store.persist?.rehydrate();
+  return Promise.resolve();
 }
 
 /**
- * Synchronously read canvas state from localStorage and apply to the store.
- * Use for anonymous users so FlowCanvas never mounts with empty state before
- * async rehydration completes. Returns true if state was applied.
+ * Synchronously read canvas state from the single anonymous-workspace key and apply.
+ * Returns true if state was applied.
  */
 export function applyPersistedCanvasStateSync(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = localStorage.getItem(PERSIST_KEY);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw) as { state?: PersistedState; version?: number };
-    const state = parsed?.state;
-    if (!state || !Array.isArray(state.nodes)) return false;
-    const viewport =
-      state.viewport?.value ?? (state.viewport as PersistedState["viewport"])?.value;
-    useCanvasStore.getState().setCanvasState({
-      nodes: state.nodes as ReadonlyArray<ReactFlowNode>,
-      edges: (Array.isArray(state.edges) ? state.edges : []) as ReadonlyArray<ReactFlowEdge>,
-      viewport:
-        viewport && typeof viewport === "object" && "x" in viewport && "y" in viewport && "zoom" in viewport
-          ? viewport
-          : undefined,
-    });
-    return true;
-  } catch {
-    return false;
+  const state = readFromStorage();
+  if (!state || !Array.isArray(state.nodes)) return false;
+  const viewport =
+    state.viewport?.value && isViewport(state.viewport.value)
+      ? state.viewport.value
+      : undefined;
+  const nodes = state.nodes as ReadonlyArray<ReactFlowNode>;
+  const edges = (Array.isArray(state.edges) ? state.edges : []) as ReadonlyArray<ReactFlowEdge>;
+  useCanvasStore.getState().setCanvasState({
+    nodes,
+    edges: resolveEdgeHandles(nodes, edges),
+    viewport,
+  });
+  if (typeof state.hasAttemptedEval === "boolean") {
+    useCanvasStore.getState().setHasAttemptedEval(state.hasAttemptedEval);
   }
+  return true;
 }
 
-/**
- * Subscribe to canvas store rehydration completion. Call before rehydrate() so
- * the callback runs when persistence has finished loading (avoids showing
- * canvas with empty state before localStorage is merged).
- */
+/** No-op: rehydration is sync via applyPersistedCanvasStateSync / loadAnonymousWorkspace. */
 export function onCanvasRehydrationFinished(
-  callback: () => void
+  _callback: () => void
 ): (() => void) | undefined {
-  const store = useCanvasStore as unknown as { persist?: CanvasPersistApi };
-  return store.persist?.onFinishHydration(callback);
+  return () => {};
 }
 
-// Apply persisted state as soon as the store module loads on the client, so
-// the store is populated before any component (e.g. FlowCanvas) runs and writes.
 if (typeof window !== "undefined") {
   applyPersistedCanvasStateSync();
 }

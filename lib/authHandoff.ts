@@ -41,14 +41,20 @@ export async function runBffHandoff(params: RunBffHandoffParams): Promise<void> 
   } = params;
 
   const state = getCanvasState();
-  void Effect.runPromise(
-    Effect.either(saveCanvasApi(sessionId, state))
-  ).then((either) =>
-    Either.match(either, {
-      onLeft: onCanvasSaveError,
-      onRight: () => {},
-    })
-  );
+  const trySave = () =>
+    Effect.runPromise(Effect.either(saveCanvasApi(sessionId, state)));
+
+  void trySave().then((first) => {
+    if (Either.isRight(first)) return;
+    setTimeout(() => {
+      void trySave().then((second) =>
+        Either.match(second, {
+          onLeft: onCanvasSaveError,
+          onRight: () => {},
+        })
+      );
+    }, 400);
+  });
 
   const filtered = messages.filter(
     (m) =>

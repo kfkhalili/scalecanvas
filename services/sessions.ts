@@ -16,10 +16,10 @@ import type {
   DbCanvasState,
 } from "@/lib/database.aliases";
 
-export type SessionError = { message: string };
+export type SessionError = { message: string; code?: string };
 
-function toSessionError(e: { message: string }): SessionError {
-  return { message: e.message };
+function toSessionError(e: { message?: string; code?: string }): SessionError {
+  return { message: e.message ?? "Unknown error", code: e.code };
 }
 
 export function createSession(

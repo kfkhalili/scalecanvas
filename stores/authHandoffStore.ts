@@ -1,6 +1,5 @@
 import { Option } from "effect";
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
 import type { TranscriptEntry } from "@/lib/types";
 
 /** Message shape for anonymous chat backup (survives OAuth redirect). */
@@ -21,52 +20,25 @@ type AuthHandoffStore = {
   /** Title of the question selected during anonymous session; used as session name after handoff. */
   questionTitle: Option.Option<string>;
   setQuestionTitle: (title: Option.Option<string>) => void;
+  /** Stable topic id for the anonymous interview; keeps question consistent across refreshes. */
+  questionTopicId: Option.Option<string>;
+  setQuestionTopicId: (id: Option.Option<string>) => void;
 };
 
-const persistStorage =
-  typeof window !== "undefined"
-    ? createJSONStorage(() => localStorage)
-    : undefined;
+export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
+  pendingSessionId: Option.none(),
+  setPendingAuthHandoff: (sessionId) => set({ pendingSessionId: sessionId }),
+  handoffTranscript: Option.none(),
+  setHandoffTranscript: (data) => set({ handoffTranscript: data }),
+  anonymousMessages: [],
+  setAnonymousMessages: (messages) => set({ anonymousMessages: messages }),
+  questionTitle: Option.none(),
+  setQuestionTitle: (title) => set({ questionTitle: title }),
+  questionTopicId: Option.none(),
+  setQuestionTopicId: (id) => set({ questionTopicId: id }),
+}));
 
-export const useAuthHandoffStore = create<AuthHandoffStore>()(
-  persist(
-    (set) => ({
-      pendingSessionId: Option.none(),
-      setPendingAuthHandoff: (sessionId) => set({ pendingSessionId: sessionId }),
-      handoffTranscript: Option.none(),
-      setHandoffTranscript: (data) => set({ handoffTranscript: data }),
-      anonymousMessages: [],
-      setAnonymousMessages: (messages) => set({ anonymousMessages: messages }),
-      questionTitle: Option.none(),
-      setQuestionTitle: (title) => set({ questionTitle: title }),
-    }),
-    {
-      name: "scalecanvas-auth-handoff",
-      storage: persistStorage,
-      partialize: (state) => ({
-        anonymousMessages: state.anonymousMessages,
-        questionTitle: Option.getOrNull(state.questionTitle),
-      }),
-      merge: (persistedState, currentState) => {
-        const p = persistedState as {
-          anonymousMessages?: AnonymousMessage[];
-          questionTitle?: string | null;
-        };
-        return {
-          ...currentState,
-          anonymousMessages: p.anonymousMessages ?? currentState.anonymousMessages,
-          questionTitle: Option.fromNullable(p.questionTitle),
-        };
-      },
-      skipHydration: true,
-    }
-  )
-);
-
-/** Call once on client mount to rehydrate anonymousMessages from localStorage. */
+/** No-op: handoff is now persisted only via anonymousWorkspaceStorage (one key). */
 export function rehydrateAuthHandoffStore(): Promise<void> | undefined {
-  const store = useAuthHandoffStore as unknown as {
-    persist?: { rehydrate: () => Promise<void> };
-  };
-  return store.persist?.rehydrate();
+  return Promise.resolve();
 }

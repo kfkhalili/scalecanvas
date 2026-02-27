@@ -8,15 +8,14 @@ import { FlowCanvas } from "@/components/canvas/FlowCanvas";
 import { NodeLibrary } from "@/components/canvas/NodeLibrary";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { NoSessionPrompt } from "@/components/billing/NoSessionPrompt";
-import {
-  useCanvasStore,
-  rehydrateCanvasStore,
-  onCanvasRehydrationFinished,
-  applyPersistedCanvasStateSync,
-} from "@/stores/canvasStore";
+import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
+import {
+  loadAnonymousWorkspace,
+  persistAnonymousWorkspace,
+} from "@/stores/anonymousWorkspaceStorage";
 import {
   fetchCanvas,
   fetchTranscript,
@@ -46,31 +45,35 @@ export function InterviewSplitView({
   const setEntries = useTranscriptStore((s) => s.setEntries);
   const entries = useTranscriptStore((s) => s.entries);
   const setHandoffTranscript = useAuthHandoffStore((s) => s.setHandoffTranscript);
+  const pendingSessionIdOpt = useAuthHandoffStore((s) => s.pendingSessionId);
   const previousSessionIdRef = useRef<string | null>(null);
   const loadingCanvasSessionIdRef = useRef<string | null>(null);
   const loadingTranscriptSessionIdRef = useRef<string | null>(null);
 
   const [canvasReady, setCanvasReady] = useState(false);
+  /** When true, authHandoffStore has been rehydrated so anonymous chat/canvas can be restored as one unit. */
+  const [handoffReady, setHandoffReady] = useState(false);
   const [transcriptForSessionOpt, setTranscriptForSessionOpt] = useState<
     Option.Option<TranscriptEntry[]>
   >(sessionId ? Option.none() : Option.some([]));
 
   useEffect(() => {
-    // For anonymous users (no sessionId) localStorage is the only persistence.
-    // Apply persisted state synchronously first so FlowCanvas never mounts with
-    // empty state and overwrites storage; then run async rehydrate so the
-    // persist middleware stays in sync, and set canvasReady so the canvas shows.
+    // Anonymous: single key (anonymousWorkspaceStorage) holds chat + canvas as one unit.
     if (!sessionId) {
-      applyPersistedCanvasStateSync();
-      setCanvasReady(true);
-      const unsubscribe = onCanvasRehydrationFinished(() =>
-        setCanvasReady(true)
-      );
-      rehydrateCanvasStore();
-      return () => unsubscribe?.();
+      loadAnonymousWorkspace();
+      queueMicrotask(() => {
+        setCanvasReady(true);
+        setHandoffReady(true);
+      });
+      const unsubCanvas = useCanvasStore.subscribe(() => persistAnonymousWorkspace());
+      const unsubHandoff = useAuthHandoffStore.subscribe(() => persistAnonymousWorkspace());
+      return () => {
+        unsubCanvas();
+        unsubHandoff();
+      };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    queueMicrotask(() => setHandoffReady(true));
+  }, [sessionId]);
 
   useEffect(() => {
     if (sessionId) {
@@ -86,11 +89,25 @@ export function InterviewSplitView({
     previousSessionIdRef.current = sessionId ?? null;
 
     if (!sessionId) {
-      if (!isAnonymous) {
-        setCanvasState(empty);
-        setCanvasReady(true);
-      }
       // Anonymous canvasReady is set by the rehydration effect above.
+      return;
+    }
+
+    const handoffOpt = useAuthHandoffStore.getState().handoffTranscript;
+    const isHandoffForSession = Option.match(handoffOpt, {
+      onNone: () => false,
+      onSome: (handoff) => handoff.sessionId === sessionId,
+    });
+    const isPendingHandoffSession = Option.match(pendingSessionIdOpt, {
+      onNone: () => false,
+      onSome: (pendingId) => pendingId === sessionId,
+    });
+
+    // First load after anonymous → session handoff: keep the in-memory canvas
+    // and skip fetching. handoffTranscript is set only after runBffHandoff finishes,
+    // so we also skip when pendingSessionId === sessionId (handoff in progress).
+    if (prevId === null && (isHandoffForSession || isPendingHandoffSession)) {
+      queueMicrotask(() => setCanvasReady(true));
       return;
     }
 
@@ -102,26 +119,31 @@ export function InterviewSplitView({
     }
 
     loadingCanvasSessionIdRef.current = sessionId;
-    setCanvasReady(false);
+    queueMicrotask(() => setCanvasReady(false));
 
     void Effect.runPromise(Effect.either(fetchCanvas(sessionId))).then(
       (canvasEither) => {
         const stale = loadingCanvasSessionIdRef.current !== sessionId;
         if (stale) return;
         Either.match(canvasEither, {
-          onLeft: () => setCanvasState(empty),
+          // On error, keep whatever canvas we already had in memory instead of
+          // wiping it. This avoids losing an anonymous canvas when the backend
+          // save/fetch fails (e.g. 500 from /canvas).
+          onLeft: () => setCanvasReady(true),
           onRight: (state) =>
             setCanvasState(state.nodes.length > 0 ? state : empty),
         });
         setCanvasReady(true);
       }
     );
-  }, [sessionId, isAnonymous, setCanvasState, getCanvasState]);
+  }, [sessionId, isAnonymous, pendingSessionIdOpt, setCanvasState, getCanvasState]);
 
   useEffect(() => {
     if (!sessionId) {
-      setTranscriptForSessionOpt(Option.some([]));
-      setEntries([]);
+      queueMicrotask(() => {
+        setTranscriptForSessionOpt(Option.some([]));
+        setEntries([]);
+      });
       return;
     }
     const handoffOpt = useAuthHandoffStore.getState().handoffTranscript;
@@ -138,8 +160,32 @@ export function InterviewSplitView({
       cleanup = () => clearTimeout(t);
     });
     if (Option.isSome(matched)) return cleanup;
+
+    const isPendingHandoffSession = Option.match(pendingSessionIdOpt, {
+      onNone: () => false,
+      onSome: (pendingId) => pendingId === sessionId,
+    });
+    if (isPendingHandoffSession) {
+      const now = new Date().toISOString();
+      const anonymousMessages = useAuthHandoffStore.getState().anonymousMessages;
+      const entriesFromAnonymous: TranscriptEntry[] = anonymousMessages.map(
+        (m) => ({
+          id: m.id,
+          sessionId,
+          role: (m.role === "user" || m.role === "assistant" ? m.role : "assistant") as "user" | "assistant",
+          content: m.content,
+          createdAt: now,
+        })
+      );
+      queueMicrotask(() => {
+        setTranscriptForSessionOpt(Option.some(entriesFromAnonymous));
+        setEntries(entriesFromAnonymous);
+      });
+      return;
+    }
+
     loadingTranscriptSessionIdRef.current = sessionId;
-    setTranscriptForSessionOpt(Option.none());
+    queueMicrotask(() => setTranscriptForSessionOpt(Option.none()));
     void Effect.runPromise(Effect.either(fetchTranscript(sessionId))).then(
       (result) => {
         const stale = loadingTranscriptSessionIdRef.current !== sessionId;
@@ -156,13 +202,16 @@ export function InterviewSplitView({
         });
       }
     );
-  }, [sessionId, setEntries, setHandoffTranscript]);
+  }, [sessionId, pendingSessionIdOpt, setEntries, setHandoffTranscript]);
 
-  const sessionReady = isSessionContentReady(
-    sessionId,
-    canvasReady,
-    Option.isSome(transcriptForSessionOpt)
-  );
+  const sessionReady =
+    !sessionId && isAnonymous
+      ? canvasReady && handoffReady
+      : isSessionContentReady(
+          sessionId,
+          canvasReady,
+          Option.isSome(transcriptForSessionOpt)
+        );
   const initialEntries = Option.getOrElse(transcriptForSessionOpt, () => entries);
 
   return (
@@ -195,6 +244,7 @@ export function InterviewSplitView({
                   sessionId={sessionId}
                   initialEntries={initialEntries}
                   isAnonymous={isAnonymous}
+                  handoffRehydrated={!sessionId ? handoffReady : true}
                 />
               ) : (
                 <div className="min-h-0 flex-1 bg-muted/30" />

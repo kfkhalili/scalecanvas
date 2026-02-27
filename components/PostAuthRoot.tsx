@@ -4,8 +4,9 @@ import { Effect, Either, Option } from "effect";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
-import { rehydrateCanvasStore, useCanvasStore } from "@/stores/canvasStore";
-import { useAuthHandoffStore, rehydrateAuthHandoffStore } from "@/stores/authHandoffStore";
+import { useCanvasStore } from "@/stores/canvasStore";
+import { useAuthHandoffStore } from "@/stores/authHandoffStore";
+import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
 import { postHandoff } from "@/services/handoffClient";
 import { fetchSessions } from "@/services/sessionsClient";
 import { whenRight } from "@/lib/optionHelpers";
@@ -23,10 +24,8 @@ export function PostAuthRoot(): React.ReactElement {
   const [storesReady, setStoresReady] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      rehydrateCanvasStore() ?? Promise.resolve(),
-      rehydrateAuthHandoffStore() ?? Promise.resolve(),
-    ]).then(() => setStoresReady(true));
+    loadAnonymousWorkspace();
+    queueMicrotask(() => setStoresReady(true));
   }, []);
 
   useEffect(() => {

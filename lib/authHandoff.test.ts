@@ -87,6 +87,53 @@ describe("runBffHandoff", () => {
     expect(onHandoffComplete).toHaveBeenCalledWith(sessionId, expect.any(Array));
   });
 
+  it("sends exact canvas state from getCanvasState to saveCanvasApi (nodes and edges)", async () => {
+    const stateWithNodes: CanvasState = {
+      nodes: [
+        { id: "n1", type: "awsLambda", position: { x: 10, y: 20 }, data: { label: "Lambda" } },
+      ],
+      edges: [{ id: "e1", source: "n1", target: "n2", data: {} }],
+    };
+    const getCanvasState = vi.fn(() => stateWithNodes);
+    const saveCanvasApi = vi.fn().mockReturnValue(Effect.succeed(undefined));
+
+    await runBffHandoff({
+      sessionId,
+      messages: [],
+      getCanvasState,
+      saveCanvasApi,
+      setMessages: vi.fn(),
+      persistTranscript: vi.fn().mockResolvedValue(undefined),
+      onCanvasSaveError: vi.fn(),
+      onHandoffComplete: vi.fn(),
+    });
+
+    expect(getCanvasState).toHaveBeenCalled();
+    expect(saveCanvasApi).toHaveBeenCalledWith(sessionId, stateWithNodes);
+    expect(saveCanvasApi.mock.calls[0][1].nodes).toHaveLength(1);
+    expect(saveCanvasApi.mock.calls[0][1].edges).toHaveLength(1);
+  });
+
+  it("sends empty canvas when getCanvasState returns no nodes (still persists)", async () => {
+    const emptyState: CanvasState = { nodes: [], edges: [] };
+    const saveCanvasApi = vi.fn().mockReturnValue(Effect.succeed(undefined));
+
+    await runBffHandoff({
+      sessionId,
+      messages: [],
+      getCanvasState: () => emptyState,
+      saveCanvasApi,
+      setMessages: vi.fn(),
+      persistTranscript: vi.fn().mockResolvedValue(undefined),
+      onCanvasSaveError: vi.fn(),
+      onHandoffComplete: vi.fn(),
+    });
+
+    expect(saveCanvasApi).toHaveBeenCalledWith(sessionId, emptyState);
+    expect(saveCanvasApi.mock.calls[0][1].nodes).toHaveLength(0);
+    expect(saveCanvasApi.mock.calls[0][1].edges).toHaveLength(0);
+  });
+
   it("does not call onCanvasSaveError when saveCanvasApi returns ok", async () => {
     const saveCanvasApi = vi.fn().mockReturnValue(Effect.succeed(undefined));
     const onCanvasSaveError = vi.fn();
