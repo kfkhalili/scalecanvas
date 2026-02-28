@@ -103,6 +103,13 @@ export const HandoffBodySchema = z.object({
   question_title: z.string().nullable().optional(),
 });
 
+/** POST /api/sessions/[id]/conclusion — full transcript + canvas for time-expired summary. */
+export const ConclusionBodySchema = z.object({
+  messages: z.array(MessageSchema).max(MAX_MESSAGES),
+  nodes: z.array(NodeSchema).max(MAX_NODES).optional().default([]),
+  edges: z.array(EdgeSchema).max(MAX_EDGES).optional().default([]),
+});
+
 export type HandoffSuccessResponse = { created: true; session_id: string };
 export type HandoffNotCreatedResponse = { created: false };
 export type HandoffResponse = HandoffSuccessResponse | HandoffNotCreatedResponse;
@@ -114,3 +121,4 @@ export type CanvasBody = z.infer<typeof CanvasBodySchema>;
 export type ChatBody = z.infer<typeof ChatBodySchema>;
 export type CheckoutBody = z.infer<typeof CheckoutBodySchema>;
 export type HandoffBody = z.infer<typeof HandoffBodySchema>;
+export type ConclusionBody = z.infer<typeof ConclusionBodySchema>;
