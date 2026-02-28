@@ -4,6 +4,7 @@ import { getGenericIcon, isGenericNodeType } from "./genericNodeIcons";
 
 describe("getGenericIcon", () => {
   it("returns some(icon) for generic node types", () => {
+    expect(Option.isSome(getGenericIcon("genericClient"))).toBe(true);
     expect(Option.isSome(getGenericIcon("genericNosql"))).toBe(true);
     expect(Option.isSome(getGenericIcon("genericCache"))).toBe(true);
     expect(Option.isSome(getGenericIcon("genericApi"))).toBe(true);
@@ -22,6 +23,7 @@ describe("getGenericIcon", () => {
 
 describe("isGenericNodeType", () => {
   it("returns true for generic types", () => {
+    expect(isGenericNodeType("genericClient")).toBe(true);
     expect(isGenericNodeType("genericNosql")).toBe(true);
     expect(isGenericNodeType("genericApi")).toBe(true);
   });

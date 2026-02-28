@@ -12,6 +12,7 @@ type OurNode = { id: string; type?: string; data: NodeData };
 type AwsNodeProps = NodeProps<OurNode>;
 
 const CATEGORY_COLORS: Record<ServiceCategory | "default", { border: string; bg: string }> = {
+  client:      { border: "border-slate-400",  bg: "bg-slate-900" },
   compute:     { border: "border-orange-500", bg: "bg-orange-950" },
   networking:  { border: "border-blue-500",   bg: "bg-blue-950" },
   storage:     { border: "border-green-500",  bg: "bg-green-950" },
@@ -25,6 +26,7 @@ const CATEGORY_COLORS: Record<ServiceCategory | "default", { border: string; bg:
 };
 
 const TYPE_TO_CATEGORY: Record<string, ServiceCategory> = {
+  genericClient: "client",
   awsEc2: "compute",
   awsLambda: "compute",
   awsFargate: "containers",

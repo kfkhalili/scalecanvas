@@ -1,6 +1,7 @@
 import type { NodeLibraryProvider } from "@/lib/types";
 
 export type ServiceCategory =
+  | "client"
   | "compute"
   | "storage"
   | "database"
@@ -19,6 +20,9 @@ export type ServiceEntry = {
 };
 
 export const SERVICE_CATALOG: readonly ServiceEntry[] = [
+  // Client — end-user device
+  { type: "genericClient", label: "Client", description: "End-user device (laptop, phone, browser)", category: "client" },
+
   // Compute — generic first, then AWS, then GCP
   { type: "genericServerless", label: "Serverless Function", description: "Stateless function or serverless compute (Generic)", category: "compute" },
   { type: "awsEc2", label: "EC2", description: "Virtual servers in the cloud (AWS)", category: "compute" },
@@ -91,6 +95,7 @@ export const SERVICE_CATALOG: readonly ServiceEntry[] = [
 ] as const;
 
 export const CATEGORY_LABELS: Record<ServiceCategory, string> = {
+  client: "Client",
   compute: "Compute",
   storage: "Storage",
   database: "Database",
@@ -103,6 +108,7 @@ export const CATEGORY_LABELS: Record<ServiceCategory, string> = {
 };
 
 export const CATEGORY_ORDER: readonly ServiceCategory[] = [
+  "client",
   "notes",
   "compute",
   "networking",
