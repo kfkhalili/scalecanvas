@@ -2,6 +2,7 @@ import { Option } from "effect";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { CookieOptions, CookieToSet } from "@/lib/cookie.types";
+import { getSupabaseAuthCookieName } from "@/lib/supabaseAuthCookieName";
 
 const UUID_SEGMENT = /^\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -74,6 +75,7 @@ export default async function proxy(request: NextRequest) {
   const [url, key] = envOpt.value;
 
   const supabase = createServerClient(url, key, {
+    cookieOptions: { name: getSupabaseAuthCookieName(url) },
     cookies: {
       getAll(): { name: string; value: string }[] {
         return request.cookies.getAll();
