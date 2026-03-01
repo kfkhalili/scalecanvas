@@ -28,6 +28,10 @@ import type { TranscriptEntry } from "@/lib/types";
 type InterviewSplitViewProps = {
   sessionId?: string;
   isAnonymous?: boolean;
+  /** When true, session is a trial (post-handoff); ChatPanel uses design phase from first message. */
+  isTrial?: boolean;
+  /** When true, session already has a conclusion summary — show canvas as read-only on mount. */
+  isConcluded?: boolean;
 };
 
 /**
@@ -38,6 +42,8 @@ type InterviewSplitViewProps = {
 export function InterviewSplitView({
   sessionId,
   isAnonymous = false,
+  isTrial = false,
+  isConcluded = false,
 }: InterviewSplitViewProps): React.ReactElement {
   const setCanvasState = useCanvasStore((s) => s.setCanvasState);
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
@@ -245,6 +251,8 @@ export function InterviewSplitView({
                   initialEntries={initialEntries}
                   isAnonymous={isAnonymous}
                   handoffRehydrated={!sessionId ? handoffReady : true}
+                  isTrial={isTrial}
+                  isConcluded={isConcluded}
                 />
               ) : (
                 <div className="min-h-0 flex-1 bg-muted/30" />

@@ -16,6 +16,7 @@ import { getAvatarUrl, getDisplayName, getInitials } from "@/lib/userProfile";
 import { NewSessionButton } from "@/components/billing/NewSessionButton";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasStore } from "@/stores/canvasStore";
+import { clearAnonymousWorkspaceStorage } from "@/stores/anonymousWorkspaceStorage";
 
 const SIDEBAR_OPEN = 260;
 const SIDEBAR_CLOSED = 52;
@@ -116,6 +117,7 @@ export function CollapsibleSidebar({
   };
 
   const handleSignOut = async (): Promise<void> => {
+    clearAnonymousWorkspaceStorage();
     useAuthHandoffStore.getState().setAnonymousMessages([]);
     useAuthHandoffStore.getState().setQuestionTitle(Option.none());
     useCanvasStore.getState().setHasAttemptedEval(false);

@@ -51,6 +51,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
   const setCanvasState = useCanvasStore((s) => s.setCanvasState);
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
   const setViewport = useCanvasStore((s) => s.setViewport);
+  const isSessionActive = useSessionStore((s) => s.isSessionActive);
 
   const initialNodes = storeNodes as Node[];
   const initialEdges = storeEdges as Edge[];
@@ -190,6 +191,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
   const onDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
+      if (!isSessionActive) return;
       const type = e.dataTransfer.getData("application/reactflow-type");
       if (!type) return;
       const label = e.dataTransfer.getData("application/reactflow-label") || type;
@@ -202,10 +204,11 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
         { id: crypto.randomUUID(), type, position, data: { label } } as Node,
       ]);
     },
-    [reactFlowInstance, setNodes]
+    [reactFlowInstance, setNodes, isSessionActive]
   );
 
   useEffect(() => {
+    if (!isSessionActive) return;
     whenSome(sessionIdOpt, (sessionId) => {
       if (sessionId === "ephemeral") return;
       if (saveTimeoutRef.current !== null) {
@@ -224,7 +227,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [sessionIdOpt, nodes, edges, viewport, getCanvasState]);
+  }, [sessionIdOpt, nodes, edges, viewport, getCanvasState, isSessionActive]);
 
   const defaultViewport: RfViewport = Option.match(viewport, {
     onNone: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -252,6 +255,9 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
         onMoveEnd={onMoveEnd}
         onDragOver={onDragOver}
         onDrop={onDrop}
+        nodesDraggable={isSessionActive}
+        nodesConnectable={isSessionActive}
+        elementsSelectable={isSessionActive}
         defaultViewport={defaultViewport}
         defaultEdgeOptions={{
           style: { strokeWidth: 2.5 },

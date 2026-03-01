@@ -37,16 +37,26 @@ export function PostAuthRoot(): React.ReactElement {
     const hasAnonymousChat = useAuthHandoffStore.getState().anonymousMessages.length > 0;
     const questionTitle = useAuthHandoffStore.getState().questionTitle;
 
+    const debug = typeof window !== "undefined" && (window as Window & { __E2E_DEBUG__?: boolean }).__E2E_DEBUG__;
+    if (debug) {
+      console.log("[PostAuthRoot] storesReady=true", { hasAnonymousChat, questionTitle: Option.getOrNull(questionTitle) });
+    }
+
     supabase.auth.getUser().then((res) => {
       const user = res.data.user;
+      if (debug) {
+        console.log("[PostAuthRoot] getUser", user ? { id: user.id } : "no user");
+      }
       if (!user) {
         router.replace("/");
         return;
       }
 
       if (!hasAnonymousChat) {
+        if (debug) console.log("[PostAuthRoot] no anonymous chat, fetching sessions");
         void Effect.runPromise(Effect.either(fetchSessions())).then((either) =>
           whenRight(either, (list) => {
+            if (debug) console.log("[PostAuthRoot] fetchSessions", list.length, list[0]?.id);
             if (list.length > 0) router.replace(`/${list[0].id}`);
           })
         );
@@ -56,8 +66,14 @@ export function PostAuthRoot(): React.ReactElement {
       setHasAttemptedEval(false);
       void Effect.runPromise(
         Effect.either(postHandoff(questionTitle))
-      ).then((handoffEither) =>
-        Either.match(handoffEither, {
+      ).then((handoffEither) => {
+        if (debug) {
+          Either.match(handoffEither, {
+            onLeft: (e) => console.log("[PostAuthRoot] handoff failed", e),
+            onRight: (p) => console.log("[PostAuthRoot] handoff result", p),
+          });
+        }
+        return Either.match(handoffEither, {
           onLeft: () => {
             useAuthHandoffStore.getState().setAnonymousMessages([]);
             useAuthHandoffStore.getState().setQuestionTitle(Option.none());
@@ -83,8 +99,8 @@ export function PostAuthRoot(): React.ReactElement {
               );
             }
           },
-        })
-      );
+        });
+      });
     });
   }, [storesReady, router]);
 
