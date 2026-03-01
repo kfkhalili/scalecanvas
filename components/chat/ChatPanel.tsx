@@ -1,12 +1,12 @@
 "use client";
 
-import { Effect, Option } from "effect";
+import { Effect, Either, Option } from "effect";
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
 import { generateId } from "ai";
 import { Lightbulb, Maximize2, Minimize2 } from "lucide-react";
-import { getRandomQuestion, getTopicById, getTopicByTitle } from "@/lib/questions";
+import { getRandomQuestion, getRandomTopic, getTopicById, getTopicByTitle } from "@/lib/questions";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useQuestionStore } from "@/stores/questionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
@@ -14,6 +14,8 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasReview } from "@/hooks/useCanvasReview";
 import { appendTranscriptApi, saveCanvasApi } from "@/services/sessionsClient";
+import { requestConclusion } from "@/services/conclusionClient";
+import { remainingMs } from "@/lib/chatGuardrails";
 import { performAnonymousEvalHandoff } from "@/lib/plg";
 import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
 import { runBffHandoff, type RunBffHandoffParams } from "@/lib/authHandoff";
@@ -23,6 +25,7 @@ import { TranscriptView } from "./TranscriptView";
 import { SignInButtons } from "./SignInButtons";
 import { cn } from "@/lib/utils";
 import { whenSome, whenRight } from "@/lib/optionHelpers";
+import { shouldTriggerOpening } from "@/lib/chatOpening";
 import type { TranscriptEntry } from "@/lib/types";
 
 const CHAT_INPUT_MIN_HEIGHT_PX = 40;
@@ -40,6 +43,10 @@ type ChatPanelProps = {
   isAnonymous?: boolean;
   /** When true, authHandoffStore has been rehydrated; anonymous bootstrap can safely read stored topic + messages. */
   handoffRehydrated?: boolean;
+  /** When true, session is a trial (post-handoff); do not send opening, use design phase from first message. */
+  isTrial?: boolean;
+  /** When true, session already has a conclusion summary in DB — mark session inactive immediately on mount. */
+  isConcluded?: boolean;
 };
 
 const toMessage = transcriptEntryToMessage;
@@ -49,6 +56,8 @@ export function ChatPanel({
   initialEntries,
   isAnonymous = false,
   handoffRehydrated = true,
+  isTrial = false,
+  isConcluded = false,
 }: ChatPanelProps): React.ReactElement {
   const router = useRouter();
   const appendEntry = useTranscriptStore((s) => s.appendEntry);
@@ -64,6 +73,7 @@ export function ChatPanel({
   const setQuestionTopicId = useAuthHandoffStore((s) => s.setQuestionTopicId);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
   const setSessionActive = useSessionStore((s) => s.setSessionActive);
+  const sessions = useSessionStore((s) => s.sessions);
   const activeQuestionOpt = useQuestionStore((s) => s.activeQuestion);
   const hintIndex = useQuestionStore((s) => s.hintIndex);
   const setInitialQuestion = useQuestionStore((s) => s.setInitialQuestion);
@@ -74,16 +84,20 @@ export function ChatPanel({
   const chatBody = useMemo(
     () => {
       const resolvedSessionId = sessionId ?? Option.getOrUndefined(pendingSessionIdOpt);
-      return {
+      const base = {
         nodes: canvasNodes,
         edges: canvasEdges,
         ...(resolvedSessionId ? { session_id: resolvedSessionId } : {}),
       };
+      if (resolvedSessionId && !isAnonymous) {
+        return { ...base, phase: "design" as const };
+      }
+      return base;
     },
-    [canvasNodes, canvasEdges, sessionId, pendingSessionIdOpt]
+    [canvasNodes, canvasEdges, sessionId, pendingSessionIdOpt, isAnonymous]
   );
 
-  const { messages, setMessages, input, setInput, handleSubmit, isLoading } =
+  const { messages, setMessages, input, setInput, handleSubmit, isLoading, append } =
     useChat({
       api: "/api/chat",
       fetch: fetchWithGuardrail,
@@ -262,19 +276,56 @@ export function ChatPanel({
         }
 
         setCanvasState({ nodes: [], edges: [], viewport: undefined });
-        const question = getRandomQuestion();
-        setInitialQuestion(question);
-        setQuestionTitle(Option.some(question.title));
-        setQuestionTopicId(Option.some(question.id));
+        const topic = getRandomTopic();
+        setInitialQuestion({
+          id: topic.id,
+          title: topic.title,
+          prompt: topic.comprehensivePrompt,
+          hints: [],
+        });
+        setQuestionTitle(Option.some(topic.title));
+        setQuestionTopicId(Option.some(topic.id));
         setMessages([
           {
             id: generateId(),
             role: "assistant",
-            content: question.prompt,
+            content: topic.comprehensivePrompt,
           },
         ]);
         return;
       }
+      if (
+        shouldTriggerOpening({
+          sessionId,
+          initialEntriesLength: initialEntries.length,
+          isAnonymous,
+          isTrial,
+          openingRequestedSessionIdOpt: Option.fromNullable(openingRequestedRef.current),
+        })
+      ) {
+        const topic = getRandomTopic();
+        setInitialQuestion({
+          id: topic.id,
+          title: topic.title,
+          prompt: topic.conversationalPrompt,
+          hints: [],
+        });
+        setQuestionTitle(Option.some(topic.title));
+        setQuestionTopicId(Option.some(topic.id));
+        openingRequestedRef.current = sessionId;
+        void append(
+          { role: "user", content: "", id: generateId() },
+          {
+            body: {
+              ...chatBody,
+              phase: "opening" as const,
+              problem_text: topic.conversationalPrompt,
+            },
+          }
+        );
+        return;
+      }
+      if (sessionId !== undefined && openingRequestedRef.current === sessionId) return;
       const question = getRandomQuestion();
       setInitialQuestion(question);
       setQuestionTitle(Option.some(question.title));
@@ -302,6 +353,11 @@ export function ChatPanel({
     activeQuestionOpt,
     isAnonymous,
     handoffRehydrated,
+    isTrial,
+    initialEntries.length,
+    sessionId,
+    chatBody,
+    append,
     setInitialQuestion,
     setQuestionTitle,
     setQuestionTopicId,
@@ -310,8 +366,8 @@ export function ChatPanel({
   ]);
 
   useEffect(() => {
-    if (sessionId) setSessionActive(true);
-  }, [sessionId, setSessionActive]);
+    if (sessionId && !isConcluded) setSessionActive(true);
+  }, [sessionId, isConcluded, setSessionActive]);
 
   useEffect(() => {
     if (isAnonymous && messages.length > 0) {
@@ -351,7 +407,106 @@ export function ChatPanel({
     }
   }, [messages, setSessionActive]);
 
+  const openingRequestedRef = useRef<string | undefined>(undefined);
+  const conclusionRequestedRef = useRef<string | undefined>(undefined);
+  const [_conclusionRequestedSessionId, setConclusionRequestedSessionId] = useState<string | undefined>(undefined);
+  // Derive conclusionRequestedSessionId so we don't need a setState-in-effect to sync isConcluded.
+  // When the server confirms the session is already concluded, treat it as if we already requested it.
+  const conclusionRequestedSessionId =
+    isConcluded && sessionId ? sessionId : _conclusionRequestedSessionId;
+
+  // If the session already has a conclusion in the DB (server-side flag), mark it inactive.
+  // This handles page reloads where the server knows the session is concluded.
+  useEffect(() => {
+    if (isConcluded && sessionId) {
+      setSessionActive(false);
+      conclusionRequestedRef.current = sessionId;
+    }
+  }, [isConcluded, sessionId, setSessionActive]);
   const handoffDoneRef = useRef<string | null>(null);
+  const sessionHadTimeLeftRef = useRef<{ sessionId: string; hadTimeLeft: boolean }>({
+    sessionId: "",
+    hadTimeLeft: false,
+  });
+
+  useEffect(() => {
+    if (!sessionId || isAnonymous) return;
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const remaining = remainingMs(session);
+    if (remaining > 0) {
+      if (sessionHadTimeLeftRef.current.sessionId !== sessionId) {
+        sessionHadTimeLeftRef.current = { sessionId, hadTimeLeft: false };
+      }
+      sessionHadTimeLeftRef.current.hadTimeLeft = true;
+      return;
+    }
+    if (sessionHadTimeLeftRef.current.sessionId !== sessionId) {
+      sessionHadTimeLeftRef.current = { sessionId, hadTimeLeft: false };
+    }
+    if (!sessionHadTimeLeftRef.current.hadTimeLeft) return;
+    if (conclusionRequestedRef.current === sessionId) return;
+    conclusionRequestedRef.current = sessionId;
+    const { nodes: currentNodes, edges: currentEdges } = useCanvasStore.getState();
+    const conclusionMessages = messages.map((m) => {
+      const content =
+        typeof m.content === "string"
+          ? m.content
+          : Array.isArray(m.content)
+            ? (m.content as { text?: string }[])
+                .map((p) => (p && typeof p === "object" && "text" in p ? String(p.text) : ""))
+                .join("")
+            : "";
+      return { role: m.role as "user" | "assistant" | "system", content };
+    });
+    void Effect.runPromise(
+      Effect.either(
+        requestConclusion(sessionId, {
+          messages: conclusionMessages,
+          nodes: [...currentNodes],
+          edges: [...currentEdges],
+        })
+      )
+    ).then((either) => {
+      setConclusionRequestedSessionId(sessionId);
+      if (Either.isRight(either)) {
+        const text = either.right;
+        setMessages((prev) => [
+          ...prev,
+          { id: generateId(), role: "assistant", content: text },
+        ]);
+        setSessionActive(false);
+        if (sessionId && text.trim().length > 0) {
+          void Effect.runPromise(
+            Effect.either(appendTranscriptApi(sessionId, "assistant", text))
+          ).then((appendEither) =>
+            whenRight(appendEither, (entry) => appendEntry(entry))
+          );
+        }
+      } else {
+        const err = either.left;
+        if (err.status === 403) {
+          setConclusionRequestedSessionId(sessionId);
+          conclusionRequestedRef.current = sessionId;
+          setSessionActive(false);
+        } else {
+          setConclusionRequestedSessionId(undefined);
+          conclusionRequestedRef.current = undefined;
+        }
+        toast.error(err.error);
+      }
+    });
+  }, [
+    sessionId,
+    isAnonymous,
+    sessions,
+    messages,
+    setMessages,
+    setSessionActive,
+    setConclusionRequestedSessionId,
+    appendEntry,
+  ]);
+
   useEffect(() => {
     whenSome(pendingSessionIdOpt, (pendingSessionId) => {
       if (handoffDoneRef.current === pendingSessionId) return;
@@ -501,6 +656,69 @@ export function ChatPanel({
     content: typeof m.content === "string" ? m.content : "",
   }));
 
+  const buildConclusionBody = useCallback(() => {
+    const conclusionMessages = messages.map((m) => {
+      const content =
+        typeof m.content === "string"
+          ? m.content
+          : Array.isArray(m.content)
+            ? (m.content as { text?: string }[])
+                .map((p) => (p && typeof p === "object" && "text" in p ? String(p.text) : ""))
+                .join("")
+            : "";
+      return { role: m.role as "user" | "assistant" | "system", content };
+    });
+    return {
+      messages: conclusionMessages,
+      nodes: [...canvasNodes],
+      edges: [...canvasEdges],
+    };
+  }, [messages, canvasNodes, canvasEdges]);
+
+  const requestConclusionSimulated = useCallback(() => {
+    if (!sessionId) return;
+    if (conclusionRequestedRef.current === sessionId) return;
+    conclusionRequestedRef.current = sessionId;
+    setConclusionRequestedSessionId(sessionId);
+    setSessionActive(false);
+    const body = { ...buildConclusionBody(), simulate_expired: true };
+    void Effect.runPromise(Effect.either(requestConclusion(sessionId, body))).then(
+      (either) => {
+        if (Either.isRight(either)) {
+          const text = either.right;
+          setMessages((prev) => [
+            ...prev,
+            { id: generateId(), role: "assistant", content: text },
+          ]);
+          if (text.trim().length > 0) {
+            void Effect.runPromise(
+              Effect.either(appendTranscriptApi(sessionId, "assistant", text))
+            ).then((appendEither) =>
+              whenRight(appendEither, (entry) => appendEntry(entry))
+            );
+          }
+        } else {
+          const err = either.left;
+          toast.error(err.error);
+          // Keep session concluded for ALL error cases (including Bedrock unavailable).
+          // The user already committed to ending the session by clicking "Simulate".
+          // 403 = time-not-expired or already-generated — session still stays concluded.
+          setSessionActive(false);
+          conclusionRequestedRef.current = sessionId;
+          setConclusionRequestedSessionId(sessionId);
+        }
+      }
+    );
+  }, [sessionId, buildConclusionBody, setMessages, setSessionActive, appendEntry]);
+
+  const isDev = process.env.NODE_ENV === "development";
+  const showSimulateExpiredButton =
+    isDev &&
+    sessionId &&
+    !isAnonymous &&
+    conclusionRequestedSessionId !== sessionId &&
+    isSessionActive;
+
   return (
     <div className="relative flex h-full flex-col">
       <div className="flex min-h-0 flex-1 flex-col">
@@ -513,6 +731,19 @@ export function ChatPanel({
         {isAnonymous && hasAttemptedEval && (
           <div className="shrink-0 border-t border-border/50 bg-muted/30 p-2">
             <SignInButtons redirectTo="/" />
+          </div>
+        )}
+        {showSimulateExpiredButton && (
+          <div className="shrink-0 border-t border-amber-500/30 bg-amber-950/20 p-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full border-amber-500/50 text-amber-200 hover:bg-amber-900/30"
+              onClick={requestConclusionSimulated}
+            >
+              Simulate time expired (test)
+            </Button>
           </div>
         )}
       </div>
