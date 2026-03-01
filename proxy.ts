@@ -1,28 +1,13 @@
 import { Option } from "effect";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import type { CookieOptions, CookieToSet } from "@/lib/cookie.types";
+import type { CookieToSet } from "@/lib/cookie.types";
 import { getSupabaseAuthCookieName } from "@/lib/supabaseAuthCookieName";
 
 const UUID_SEGMENT = /^\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isProtectedPath(pathname: string): boolean {
   return UUID_SEGMENT.test(pathname);
-}
-
-function adaptCookieOptions(
-  options: Record<string, string | number | boolean | undefined>
-): CookieOptions {
-  return {
-    path: typeof options.path === "string" ? options.path : undefined,
-    maxAge: typeof options.maxAge === "number" ? options.maxAge : undefined,
-    httpOnly: options.httpOnly === true,
-    secure: options.secure === true,
-    sameSite:
-      options.sameSite === "lax" || options.sameSite === "strict" || options.sameSite === "none"
-        ? options.sameSite
-        : undefined,
-  };
 }
 
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -54,9 +39,8 @@ function originMatchesHost(
   });
 }
 
-export default async function proxy(request: NextRequest) {
-  const response = NextResponse.next({ request });
-
+export async function proxy(request: NextRequest) {
+  // ── 1. CSRF / same-origin check for mutation API routes ─────────────────
   if (requiresOriginCheck(request.nextUrl.pathname, request.method)) {
     const origin = Option.fromNullable(request.headers.get("origin"));
     const host = Option.fromNullable(request.headers.get("host"));
@@ -74,40 +58,60 @@ export default async function proxy(request: NextRequest) {
   }
   const [url, key] = envOpt.value;
 
+  // ── 2. Session cookie refresh (SOTA pattern) ─────────────────────────────
+  //
+  // supabaseResponse must be reassigned inside setAll so that when the SDK
+  // writes a refreshed token it updates BOTH the outgoing request object
+  // (so downstream Server Components see the new token in the same render)
+  // AND the response (so the browser receives the updated cookie).
+  //
+  // Do NOT place any code between createServerClient and getClaims().
+  let supabaseResponse = NextResponse.next({ request });
+
   const supabase = createServerClient(url, key, {
     cookieOptions: { name: getSupabaseAuthCookieName(url) },
     cookies: {
-      getAll(): { name: string; value: string }[] {
+      getAll() {
         return request.cookies.getAll();
       },
-      setAll(
-        cookiesToSet: Array<{
-          name: string;
-          value: string;
-          options?: Record<string, string | number | boolean | undefined>;
-        }>
-      ): void {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          const opts: CookieToSet["options"] = options
-            ? adaptCookieOptions(options)
-            : undefined;
-          response.cookies.set(name, value, opts);
-        });
+      setAll(cookiesToSet: CookieToSet[]) {
+        // Write to the request so Server Components in this render see
+        // the refreshed token.
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value)
+        );
+        // Recreate the response with the updated request, then write to it
+        // so the browser receives the Set-Cookie header.
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options ?? {})
+        );
       },
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (isProtectedPath(request.nextUrl.pathname) && !user) {
+  // getClaims() performs local JWT validation (signature + expiry) and
+  // triggers a silent token refresh when the access token is near expiry.
+  // It does NOT call GoTrue — API routes use getUser() for that.
+  const { data } = await supabase.auth.getClaims();
+  const isAuthenticated = data?.claims != null;
+
+  // ── 3. Protect UUID-segment routes (/[sessionId]) ────────────────────────
+  if (isProtectedPath(request.nextUrl.pathname) && !isAuthenticated) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/";
     redirectUrl.searchParams.set("redirect", request.nextUrl.pathname);
-    return NextResponse.redirect(redirectUrl);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    // Copy any refreshed cookies onto the redirect response so the browser
+    // receives them even on this early return path.
+    supabaseResponse.cookies
+      .getAll()
+      .forEach((c) => redirectResponse.cookies.set(c.name, c.value));
+    return redirectResponse;
   }
 
-  return response;
+  // IMPORTANT: return supabaseResponse unchanged so cookies propagate.
+  return supabaseResponse;
 }
 
 export const config = {
