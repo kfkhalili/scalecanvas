@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either, Option } from "effect";
+import { Option } from "effect";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
@@ -9,15 +9,22 @@ import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
 import { postHandoff } from "@/services/handoffClient";
 import { fetchSessions } from "@/services/sessionsClient";
-import { whenRight } from "@/lib/optionHelpers";
+import {
+  decideBootstrapAction,
+  executeBootstrapAction,
+  type BootstrapContext,
+  type BootstrapDeps,
+} from "@/lib/sessionBootstrap";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
 
 /**
  * Renders the workspace at / when the user is logged in. After rehydrating
- * persisted stores it decides how to bootstrap the session:
+ * persisted stores it delegates to decideBootstrapAction + executeBootstrapAction:
  *
- *  1. Anonymous chat exists → POST /api/auth/handoff: if eligible (trial not claimed), creates trial session and handoff; else created: false, clear state and resume
- *  2. No anonymous chat (fresh visit) → redirect to most recent session, or show empty workspace
+ *  - No session → redirect to login
+ *  - Anonymous chat exists → POST /api/auth/handoff: if eligible, create trial
+ *    session and navigate; else clear state and resume most recent
+ *  - No anonymous chat → redirect to most recent session or show empty workspace
  */
 export function PostAuthRoot(): React.ReactElement {
   const router = useRouter();
@@ -37,9 +44,14 @@ export function PostAuthRoot(): React.ReactElement {
     const hasAnonymousChat = useAuthHandoffStore.getState().anonymousMessages.length > 0;
     const questionTitle = useAuthHandoffStore.getState().questionTitle;
 
-    const debug = typeof window !== "undefined" && (window as Window & { __E2E_DEBUG__?: boolean }).__E2E_DEBUG__;
+    const debug =
+      typeof window !== "undefined" &&
+      (window as Window & { __E2E_DEBUG__?: boolean }).__E2E_DEBUG__;
     if (debug) {
-      console.log("[PostAuthRoot] storesReady=true", { hasAnonymousChat, questionTitle: Option.getOrNull(questionTitle) });
+      console.log("[PostAuthRoot] storesReady=true", {
+        hasAnonymousChat,
+        questionTitle: Option.getOrNull(questionTitle),
+      });
     }
 
     supabase.auth.getUser().then((res) => {
@@ -47,60 +59,33 @@ export function PostAuthRoot(): React.ReactElement {
       if (debug) {
         console.log("[PostAuthRoot] getUser", user ? { id: user.id } : "no user");
       }
-      if (!user) {
-        router.replace("/");
-        return;
+
+      const action = decideBootstrapAction(!!user, hasAnonymousChat);
+
+      if (action.type === "handoff") {
+        // Reset eval state so the new trial session starts fresh.
+        setHasAttemptedEval(false);
       }
 
-      if (!hasAnonymousChat) {
-        if (debug) console.log("[PostAuthRoot] no anonymous chat, fetching sessions");
-        void Effect.runPromise(Effect.either(fetchSessions())).then((either) =>
-          whenRight(either, (list) => {
-            if (debug) console.log("[PostAuthRoot] fetchSessions", list.length, list[0]?.id);
-            if (list.length > 0) router.replace(`/${list[0].id}`);
-          })
-        );
-        return;
-      }
+      const ctx: BootstrapContext = {
+        hasAnonymousChat,
+        hasAttemptedEval: false,
+        questionTitle,
+      };
 
-      setHasAttemptedEval(false);
-      void Effect.runPromise(
-        Effect.either(postHandoff(questionTitle))
-      ).then((handoffEither) => {
-        if (debug) {
-          Either.match(handoffEither, {
-            onLeft: (e) => console.log("[PostAuthRoot] handoff failed", e),
-            onRight: (p) => console.log("[PostAuthRoot] handoff result", p),
-          });
-        }
-        return Either.match(handoffEither, {
-          onLeft: () => {
-            useAuthHandoffStore.getState().setAnonymousMessages([]);
-            useAuthHandoffStore.getState().setQuestionTitle(Option.none());
-            void Effect.runPromise(Effect.either(fetchSessions())).then(
-              (either) =>
-                whenRight(either, (list) => {
-                  if (list.length > 0) router.replace(`/${list[0].id}`);
-                })
-            );
-          },
-          onRight: (payload) => {
-            if (payload.created && payload.session_id) {
-              setPendingAuthHandoff(Option.some(payload.session_id));
-              router.replace(`/${payload.session_id}`);
-            } else {
-              useAuthHandoffStore.getState().setAnonymousMessages([]);
-              useAuthHandoffStore.getState().setQuestionTitle(Option.none());
-              void Effect.runPromise(Effect.either(fetchSessions())).then(
-                (either) =>
-                  whenRight(either, (list) => {
-                    if (list.length > 0) router.replace(`/${list[0].id}`);
-                  })
-              );
-            }
-          },
-        });
-      });
+      const deps: BootstrapDeps = {
+        fetchSessions: () => fetchSessions(),
+        redirectTo: (path) => router.replace(path),
+        doHandoff: (qt) => postHandoff(qt),
+        setPendingAuthHandoff: (sessionId) =>
+          setPendingAuthHandoff(Option.some(sessionId)),
+        clearAnonymousState: () => {
+          useAuthHandoffStore.getState().setAnonymousMessages([]);
+          useAuthHandoffStore.getState().setQuestionTitle(Option.none());
+        },
+      };
+
+      void executeBootstrapAction(action, ctx, deps);
     });
   }, [storesReady, router]);
 

@@ -270,7 +270,7 @@ All priority-1 and priority-2 items from section 7 have been implemented. Result
 | ID | Status | Resolution |
 |---|---|---|
 | B-1 | ✅ Resolved | Deleted `rehydrateCanvasStore` and `rehydrateAuthHandoffStore` |
-| D-1 | ✅ Resolved | Cleaned `decideBootstrapAction`: removed `_ctx` param and dead `BootstrapDeps` fields |
+| D-1 | ✅ Resolved | Extended `BootstrapAction` with `handoff` variant; `executeBootstrapAction` now handles all three cases; `PostAuthRoot` delegates through `decideBootstrapAction` + `executeBootstrapAction` and carries no inlined bootstrap decisions |
 | B-2 | ✅ Resolved | Added `SESSIONS_RATE_LIMIT` to `lib/rateLimit.ts`; `POST /api/sessions` now gates at 10 req/min |
 | C-1 | ✅ Resolved | Flattened nested `Option.match` in `sessionSelectorRefetch.ts` using `Option.isNone` guards |
 | C-2 | ✅ Resolved | Replaced `await Option.match(async, async)` in Stripe webhook with `if/else` |
