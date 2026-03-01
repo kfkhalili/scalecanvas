@@ -8,7 +8,7 @@ import {
   EdgeLabelRenderer,
   useReactFlow,
   type EdgeProps,
-} from "reactflow";
+} from "@xyflow/react";
 import { useUpdateEdgeLabel, useUpdateEdgeLabelPosition } from "./EdgeLabelContext";
 
 const LABEL_PLACEHOLDER = "label";

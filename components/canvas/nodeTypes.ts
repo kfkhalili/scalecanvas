@@ -1,4 +1,4 @@
-import type { NodeTypes } from "reactflow";
+import type { NodeTypes } from "@xyflow/react";
 import { AwsNode } from "./nodes/AwsNode";
 import { TextBoxNode } from "./nodes/TextBoxNode";
 import { SERVICE_CATALOG } from "@/lib/serviceCatalog";

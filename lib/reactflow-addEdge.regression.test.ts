@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addEdge } from "reactflow";
+import { addEdge } from "@xyflow/react";
 import { getSampleCanvasState } from "./__fixtures__/canvas";
 import type { ReactFlowEdge } from "@/lib/types";
 

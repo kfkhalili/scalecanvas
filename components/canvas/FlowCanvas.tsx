@@ -17,8 +17,8 @@ import {
   ReactFlowProvider,
   useNodesState,
   useEdgesState,
-} from "reactflow";
-import "reactflow/dist/style.css";
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { whenSome } from "@/lib/optionHelpers";

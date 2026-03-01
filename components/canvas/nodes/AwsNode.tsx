@@ -3,13 +3,12 @@
 import { Option, pipe } from "effect";
 import { memo } from "react";
 import Image from "next/image";
-import { Handle, type NodeProps, Position } from "reactflow";
+import { Handle, type NodeProps, type Node, Position } from "@xyflow/react";
 import type { NodeData } from "@/lib/types";
 import type { ServiceCategory } from "@/lib/serviceCatalog";
 import { getNodeIconUrl, getNodeIconComponent } from "@/lib/nodeIconResolver";
 
-type OurNode = { id: string; type?: string; data: NodeData };
-type AwsNodeProps = NodeProps<OurNode>;
+type AwsNodeProps = NodeProps<Node<NodeData>>;
 
 const CATEGORY_COLORS: Record<ServiceCategory | "default", { border: string; bg: string }> = {
   compute: { border: "border-orange-500", bg: "bg-orange-950" },

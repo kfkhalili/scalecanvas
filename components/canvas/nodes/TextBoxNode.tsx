@@ -1,14 +1,14 @@
 "use client";
 
 import { memo, useCallback, useRef, useEffect, useState } from "react";
-import { useReactFlow, type Node, type NodeProps } from "reactflow";
+import { useReactFlow, type Node, type NodeProps } from "@xyflow/react";
 import type { NodeData } from "@/lib/types";
 
 const MIN_TOTAL_WIDTH_PX = 100;
 const MIN_ROWS = 2;
 const LINE_HEIGHT_APPROX = 20;
 
-type TextBoxNodeProps = NodeProps<NodeData>;
+type TextBoxNodeProps = NodeProps<Node<NodeData>>;
 
 function TextBoxNodeBase({ id, data }: TextBoxNodeProps): React.ReactElement {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
