@@ -17,12 +17,19 @@ vi.mock("@/services/tokens", () => ({
   saveStripeCustomerId: vi.fn(),
 }));
 
+vi.mock("@/lib/rateLimit", () => ({
+  checkRateLimit: vi.fn(),
+  CHECKOUT_RATE_LIMIT: { windowMs: 60_000, maxRequests: 10 },
+}));
+
 import { POST } from "./route";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getStripeClient, getPackById, getStripePriceId } from "@/lib/stripe";
 import { findStripeCustomerId, saveStripeCustomerId } from "@/services/tokens";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 const mockedCreateClient = vi.mocked(createServerClientInstance);
+const mockedCheckRateLimit = vi.mocked(checkRateLimit);
 const mockedGetPack = vi.mocked(getPackById);
 const mockedGetPrice = vi.mocked(getStripePriceId);
 const mockedGetStripeClient = vi.mocked(getStripeClient);
@@ -66,6 +73,10 @@ function fakeStripe(sessionUrl: string | null = "https://checkout.stripe.com/tes
 describe("POST /api/checkout", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Default: allow through — individual tests can override to simulate 429
+    mockedCheckRateLimit.mockImplementation(() =>
+      Effect.succeed({ allowed: true, remaining: 9, resetAt: new Date().toISOString() })
+    );
   });
 
   it("returns 401 when not authenticated", async () => {

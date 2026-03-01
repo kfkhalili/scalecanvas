@@ -64,14 +64,18 @@ function mockSupabaseClient(overrides: {
       if (updateCapture) updateCapture.fields = fields;
       return {
         eq: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue(updateEqSingle),
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue(updateEqSingle),
+            }),
           }),
         }),
       };
     }),
     delete: vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue(overrides.deleteEq ?? { error: null }),
+      eq: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue(overrides.deleteEq ?? { error: null }),
+      }),
     }),
   };
   const from = vi.fn().mockReturnValue(chain);
@@ -212,7 +216,7 @@ describe("updateSession", () => {
       updateEqSingle: { data: updatedDbRow, error: null },
     });
     const result = await runEffect(
-      updateSession(client, "sess-1", { titleOpt: Option.some("Renamed") })
+      updateSession(client, "sess-1", "user-1", { titleOpt: Option.some("Renamed") })
     );
     expect(Either.isRight(result)).toBe(true);
     whenRight(result, (s) => {
@@ -226,7 +230,7 @@ describe("updateSession", () => {
       updateEqSingle: { data: null, error: { message: "DB error" } },
     });
     const result = await runEffect(
-      updateSession(client, "sess-1", { titleOpt: Option.some("X") })
+      updateSession(client, "sess-1", "user-1", { titleOpt: Option.some("X") })
     );
     expect(Either.isLeft(result)).toBe(true);
   });
@@ -238,7 +242,7 @@ describe("updateSession", () => {
       updateCapture: capture,
     });
     await runEffect(
-      updateSession(client, "sess-1", {
+      updateSession(client, "sess-1", "user-1", {
         titleOpt: Option.some("New Title"),
       })
     );
@@ -255,7 +259,7 @@ describe("updateSession", () => {
       updateCapture: capture,
     });
     await runEffect(
-      updateSession(client, "sess-1", {
+      updateSession(client, "sess-1", "user-1", {
         statusOpt: Option.some("terminated"),
       })
     );
@@ -271,7 +275,7 @@ describe("updateSession", () => {
       updateCapture: capture,
     });
     await runEffect(
-      updateSession(client, "sess-1", {
+      updateSession(client, "sess-1", "user-1", {
         titleOpt: Option.some("New"),
         statusOpt: Option.some("terminated"),
       })
@@ -289,7 +293,7 @@ describe("updateSession", () => {
       updateCapture: capture,
     });
     await runEffect(
-      updateSession(client, "sess-1", {
+      updateSession(client, "sess-1", "user-1", {
         titleOpt: Option.none(),
       })
     );
@@ -309,7 +313,7 @@ describe("updateSession", () => {
       updateCapture: capture,
     });
     await runEffect(
-      updateSession(client, "sess-1", {
+      updateSession(client, "sess-1", "user-1", {
         conclusionSummaryOpt: Option.some("Final feedback text."),
       })
     );
@@ -327,7 +331,7 @@ describe("updateSession", () => {
       updateEqSingle: { data: withSummary, error: null },
     });
     const result = await runEffect(
-      updateSession(client, "sess-1", {
+      updateSession(client, "sess-1", "user-1", {
         conclusionSummaryOpt: Option.some("Stored summary."),
       })
     );
@@ -341,7 +345,7 @@ describe("deleteSession", () => {
     const client = mockSupabaseClient({
       deleteEq: { error: null },
     });
-    const result = await runEffect(deleteSession(client, "sess-1"));
+    const result = await runEffect(deleteSession(client, "sess-1", "user-1"));
     expect(Either.isRight(result)).toBe(true);
   });
 });

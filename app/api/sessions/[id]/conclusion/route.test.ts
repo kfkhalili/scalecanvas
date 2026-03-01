@@ -256,6 +256,7 @@ describe("POST /api/sessions/[id]/conclusion", () => {
       expect(mockedUpdateSession).toHaveBeenCalledWith(
         expect.anything(),
         SESSION_ID,
+        USER_ID,
         { conclusionSummaryOpt: Option.some("Final summary.") }
       );
     } finally {
@@ -295,5 +296,31 @@ describe("POST /api/sessions/[id]/conclusion", () => {
       params()
     );
     expect(res.status).toBe(400);
+  });
+
+  // TEST-5: simulate_expired must be rejected in production without the flag
+  it("returns 403 when simulate_expired=true in production without ALLOW_SIMULATE_EXPIRED", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ALLOW_SIMULATE_EXPIRED", "");
+    try {
+      mockedCreateClient.mockResolvedValue(fakeSupabase({ id: USER_ID }));
+      mockedGetSession.mockReturnValue(
+        Effect.succeed(
+          sessionFixture({
+            // Session created 1 minute ago — not expired yet
+            createdAt: new Date(Date.now() - 60_000).toISOString(),
+          })
+        )
+      );
+      const res = await POST(
+        makeRequest({ messages: [], nodes: [], edges: [], simulate_expired: true }),
+        params()
+      );
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error).toMatch(/Time has not expired/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
-import { MAX_CHAT_BODY_BYTES } from "@/lib/api.schemas";
+import { MAX_CHAT_BODY_BYTES, MAX_CONTENT_LENGTH } from "@/lib/api.schemas";
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerClientInstance: vi.fn(),
@@ -420,5 +420,44 @@ describe("POST /api/chat", () => {
       if (origRegion !== undefined) process.env.AWS_REGION = origRegion;
       else delete process.env.AWS_REGION;
     }
+  });
+
+  // TEST-1: per-message content length limit
+  it("returns 400 when a message content string exceeds MAX_CONTENT_LENGTH", async () => {
+    mockedCreate.mockResolvedValue(fakeSupabaseClient({ id: "user-1" }));
+    process.env.BEDROCK_MODEL_ID = "us.anthropic.claude-3-5-sonnet-v2";
+    process.env.AWS_REGION = "us-east-1";
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "x".repeat(MAX_CONTENT_LENGTH + 1) }],
+        nodes: [],
+        edges: [],
+      }),
+    });
+    const res = await POST(req);
+    delete process.env.BEDROCK_MODEL_ID;
+    delete process.env.AWS_REGION;
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when a message content array text part exceeds MAX_CONTENT_LENGTH", async () => {
+    mockedCreate.mockResolvedValue(fakeSupabaseClient({ id: "user-1" }));
+    process.env.BEDROCK_MODEL_ID = "us.anthropic.claude-3-5-sonnet-v2";
+    process.env.AWS_REGION = "us-east-1";
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: [{ text: "y".repeat(MAX_CONTENT_LENGTH + 1) }] }],
+        nodes: [],
+        edges: [],
+      }),
+    });
+    const res = await POST(req);
+    delete process.env.BEDROCK_MODEL_ID;
+    delete process.env.AWS_REGION;
+    expect(res.status).toBe(400);
   });
 });

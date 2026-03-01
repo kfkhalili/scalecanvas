@@ -10,12 +10,19 @@ vi.mock("@/services/handoff", () => ({
   claimTrialAndCreateSession: vi.fn(),
 }));
 
+vi.mock("@/lib/rateLimit", () => ({
+  checkRateLimit: vi.fn(),
+  HANDOFF_RATE_LIMIT: { windowMs: 60_000, maxRequests: 5 },
+}));
+
 import { POST } from "./route";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { claimTrialAndCreateSession } from "@/services/handoff";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 const mockedCreateClient = vi.mocked(createServerClientInstance);
 const mockedClaimTrial = vi.mocked(claimTrialAndCreateSession);
+const mockedCheckRateLimit = vi.mocked(checkRateLimit);
 
 function fakeSupabase(user: { id: string } | null): ServerSupabaseClient {
   return {
@@ -34,6 +41,9 @@ function makeRequest(body: unknown): Request {
 describe("POST /api/auth/handoff", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    mockedCheckRateLimit.mockImplementation(() =>
+      Effect.succeed({ allowed: true, remaining: 4, resetAt: new Date().toISOString() })
+    );
   });
 
   it("returns 401 when not authenticated", async () => {
