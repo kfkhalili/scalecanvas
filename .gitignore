@@ -27,6 +27,3 @@ blob-report/
 # Supabase CLI local state
 supabase/.temp
 supabase/.branches
-
-# Git worktrees (isolated feature branches)
-.worktrees
