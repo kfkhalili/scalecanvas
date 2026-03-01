@@ -1,7 +1,18 @@
 import * as fs from "fs";
+import * as path from "path";
 import { defineConfig, devices } from "@playwright/test";
 
-const authFile = "e2e/.auth/user.json";
+// Load .env.local so e2e JWT bypass uses same Supabase URL (and cookie name) as the app
+function loadEnvFile(filePath: string): void {
+  if (!fs.existsSync(filePath)) return;
+  const content = fs.readFileSync(filePath, "utf8");
+  for (const line of content.split("\n")) {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m) process.env[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, "");
+  }
+}
+loadEnvFile(path.join(process.cwd(), ".env.local"));
+loadEnvFile(path.join(__dirname, ".env.local"));
 
 /**
  * Playwright E2E test configuration.
@@ -9,13 +20,11 @@ const authFile = "e2e/.auth/user.json";
  *   pnpm add -D @playwright/test
  *   pnpm exec playwright install --with-deps chromium
  *
- * Anonymous → trial handoff test requires auth state. Create it once with:
- *   pnpm exec playwright test e2e/auth.setup.ts
- * then complete sign-in in the browser. After that, the handoff test runs when
- * you run the full suite (project "anonymous-handoff" is added when authFile exists).
+ * All auth in e2e uses JWT bypass (no manual sign-in). Cross-auth specs require local Supabase.
  */
 export default defineConfig({
   testDir: "./e2e",
+  testMatch: /\.spec\.ts$/,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -29,20 +38,7 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: [/anonymous-handoff-canvas\.spec\.ts/],
     },
-    ...(fs.existsSync(authFile)
-      ? [
-          {
-            name: "anonymous-handoff",
-            use: {
-              ...devices["Desktop Chrome"],
-              storageState: authFile,
-            },
-            testMatch: /anonymous-handoff-canvas\.spec\.ts/,
-          },
-        ]
-      : []),
   ],
   webServer: {
     command: "pnpm dev",

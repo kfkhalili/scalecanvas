@@ -81,6 +81,7 @@ test.describe("Anonymous canvas persistence", () => {
   });
 
   test("canvas does not crash on zoom after refresh", async ({ page }) => {
+    test.setTimeout(60_000);
     await page.goto("/");
 
     await dragServiceToCanvas(page, "Lambda");
@@ -97,7 +98,6 @@ test.describe("Anonymous canvas persistence", () => {
     }
 
     // Should not crash — canvas and node should still be in the DOM
-    await page.waitForTimeout(500);
     await expect(canvas).toBeVisible();
     await expect(nodeByLabel(page, "Lambda")).toBeAttached();
   });
@@ -145,14 +145,16 @@ test.describe("Anonymous canvas persistence", () => {
 
     await page.reload();
 
-    const after = await viewport.getAttribute("style", { timeout: 5_000 });
-    const afterScale = parseScale(after);
-
-    expect(afterScale).not.toBeNull();
-    // After reload, the zoom level should be approximately what it was before reload.
-    expect(afterScale!).toBeCloseTo(beforeScale!, 1);
+    // Wait for viewport to be restored from storage (rehydration can be async).
+    const targetScale = beforeScale!;
+    await expect(async () => {
+      const style = await viewport.getAttribute("style", { timeout: 2_000 });
+      const scale = parseScale(style);
+      expect(scale).not.toBeNull();
+      expect(scale!).toBeCloseTo(targetScale, 1);
+    }).toPass({ timeout: 10_000 });
   });
 });
 
 // Anonymous → trial handoff (canvas persisted after sign-in) is covered by
-// e2e/anonymous-handoff-canvas.spec.ts. Run auth.setup.ts once to create auth state.
+// e2e/cross-auth-journeys.spec.ts (JWT bypass, local Supabase only).

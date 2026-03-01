@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Implement the adjusted interviewing cycle: differentiated beginning (anonymous comprehensive vs signed-in conversational), phase-based process with hints/notes/stray→terminate, and secure one-time time-expired conclusion via a dedicated endpoint.
+**Goal:** Implement the adjusted interviewing cycle: two beginning paths (anonymous → trial vs signed-in token), phase-based process with hints/notes/stray→terminate, and secure one-time time-expired conclusion via a dedicated endpoint.
 
-**Architecture:** Single topic list (27 topics) with two variants per topic (comprehensive for anonymous/trial, conversational for token sessions). Phase-specific prompts in `/api/chat` (opening, design, conclusion voluntary). New POST `/api/sessions/[id]/conclusion` for time-expired summary only; server validates elapsed ≥ limit and at-most-once per session, then streams Bedrock response and persists summary. No canvas lock after expiry.
+**Architecture:** Single topic list (27 topics) with two variants per topic. **Beginning has two entry paths:** (A) **Anonymous (never signed in)** — comprehensive prompt only, no Bedrock; on **first sign-in only**, handoff creates a trial and must carry over topic, chat, and canvas (see "Lessons learned" below). Trial is one-time per user. (B) **Signed-in with token** — Bedrock speaks first using conversational prompt; 60 min. Trial is the continuation of path A after first sign-in (15 min). Phase-specific prompts in `/api/chat` (opening, design, conclusion voluntary). New POST `/api/sessions/[id]/conclusion` for time-expired summary only; server validates elapsed ≥ limit and at-most-once per session, then streams Bedrock response and persists summary. No canvas lock after expiry.
 
 **Tech Stack:** Next.js App Router, Supabase (auth + sessions), Effect, Vercel AI SDK + Amazon Bedrock, Zustand. See design: `docs/plans/2026-02-26-interviewing-cycle-design.md`.
 
@@ -14,6 +14,16 @@
 
 - Design doc read and approved: `docs/plans/2026-02-26-interviewing-cycle-design.md`.
 - Existing: `lib/questions.ts`, `lib/prompts.ts`, `lib/chatGuardrails.ts`, `app/api/chat/route.ts`, `stores/authHandoffStore`, `components/chat/ChatPanel.tsx`, `services/sessions.ts`.
+
+---
+
+## Lessons learned (anonymous handoff — implemented)
+
+When changing handoff or session-load behavior, preserve the following (design Section 1.7):
+
+- **Single anonymous workspace:** Canvas and chat are persisted in one localStorage key (`stores/anonymousWorkspaceStorage.ts`). Rehydrate with `loadAnonymousWorkspace()` before reading state for handoff (e.g. in the effect that runs `runBffHandoff`), so `getCanvasState()` has nodes/edges.
+- **Skip fetch when handoff pending:** On the session page, when `pendingSessionId === sessionId`, do not fetch canvas or transcript from the API; use in-memory canvas and `anonymousMessages` for transcript. Otherwise the first fetch can return empty and overwrite the carried-over state.
+- **Canvas API:** `PUT /api/sessions/[id]/canvas` verifies session ownership; client may retry once on failure. E2E: assert on the first PUT request body (e.g. `nodes.length > 0`), not only UI after reload.
 
 ---
 
@@ -186,7 +196,9 @@ git commit -m "feat(prompts): phase-specific opening, design, conclusion"
 
 ---
 
-### Task 7: Beginning — anonymous uses comprehensive only
+### Task 7: Beginning — anonymous path (path A) uses comprehensive only — never signed in
+
+**Note:** Path A is for users who have **never signed in**; they get a trial **only on first sign-in**. Anonymous handoff (topic + chat + canvas carryover to trial) is already implemented; see "Lessons learned" and design Section 1.7. Do not regress rehydrate-before-handoff or skip-fetch-when-pending behavior.
 
 **Files:**
 - Modify: `components/chat/ChatPanel.tsx`
@@ -214,7 +226,7 @@ git commit -m "feat(anonymous): use comprehensive prompt from topic list"
 
 ---
 
-### Task 8: Beginning — token-created session uses conversational + Bedrock opening
+### Task 8: Beginning — signed-in token path (path B) uses conversational + Bedrock opening
 
 **Files:**
 - Modify: `components/chat/ChatPanel.tsx`
@@ -241,7 +253,7 @@ git commit -m "feat(signed-in): Bedrock opening with conversational prompt for n
 
 ---
 
-### Task 9: Trial post-handoff — same topic, design phase
+### Task 9: Trial (post-handoff) — same topic, design phase
 
 **Files:**
 - Modify: `components/chat/ChatPanel.tsx` or handoff flow

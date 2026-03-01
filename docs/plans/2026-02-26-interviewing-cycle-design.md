@@ -7,7 +7,7 @@
 
 ## Goals
 
-1. **Beginning** — Different experience for anonymous vs signed-in: anonymous gets a comprehensive question (scale, concurrency) to kickstart PLG; signed-in token sessions get a conversational open-ended opener. Trial (post-handoff) keeps the same topic, 15 min.
+1. **Beginning** — Two entry paths: (A) **Anonymous (never signed in)** — comprehensive question (scale, concurrency), no Bedrock; on **first sign-in only**, handoff creates a **trial** session and carries over topic, chat, canvas (see Section 1.7). (B) **Signed-in with token** — conversational opener via Bedrock; 60 min. Trial is only for users who came from path A; 15 min.
 2. **Process** — Signed-in only; interviewer assesses questions, uses canvas notes, can give hints or challenge; stray purposefully → warn then terminate.
 3. **Conclusion** — Two paths: (a) voluntary (interviewer satisfied or user ends) → final feedback then terminate; (b) time expired → one final Bedrock summary (what went well, what didn’t, resources), client-triggered, server-validated, once per session. Canvas not locked after expiry.
 
@@ -15,32 +15,39 @@
 
 ## Section 1: Beginning (who sees what, question bank)
 
+**Two ways to begin a session:**
+
+1. **Anonymous path (never signed in)** — User has **never signed in**. They see one comprehensive prompt (no Bedrock), can draw and type; on **first sign-in only**, handoff creates a **trial** session and carries over topic, chat, and canvas. Trial has 15 min. (Returning users who sign out and use the app anonymously are not on this path; they do not get another trial.)
+2. **Signed-in with token path** — User has signed in and has tokens; creates a session ("New session"). They see a **conversational** opener produced by Bedrock (trainer speaks first). Paid session has 60 min.
+
+Trial is the **continuation** of the anonymous path after **first** sign-in, not a separate entry point.
+
 ### 1.1 Topic list and variants
 
 - **Single source of truth:** One list of 27 topics with difficulty (Easy / Medium / Hard) in `lib/questions.ts` (or `lib/interviewTopics.ts`).
 - **Two variants per topic:**
-  - **Comprehensive:** For anonymous (and trial handoff). Includes scale and constraints (e.g. DAU, read/write ratio, retention, concurrency) so the user can start designing without talking to Bedrock. Field: `comprehensivePrompt` per topic.
-  - **Conversational:** For signed-in token-created sessions. Short, inviting opener (e.g. “I’d like you to design a URL shortener like Bit.ly. Ask me any clarifying questions about scale or requirements before you start.”). Field: `conversationalPrompt` per topic.
+  - **Comprehensive:** For the **anonymous path** (and trial after handoff). Includes scale and constraints (e.g. DAU, read/write ratio, retention, concurrency) so the user can start designing without talking to Bedrock. Field: `comprehensivePrompt` per topic.
+  - **Conversational:** For the **signed-in token path** only. Short, inviting opener (e.g. “I’d like you to design a URL shortener like Bit.ly. Ask me any clarifying questions about scale or requirements before you start.”). Field: `conversationalPrompt` per topic.
 - **Selection:** Random for now. Topic chosen at session start; no topic-selection UI in this phase.
 
-### 1.2 Anonymous flow
+### 1.2 Anonymous path (beginning alternative A) — never signed in only
 
-- Anonymous user lands (no session). Pick a **random topic** and show the **comprehensive** variant as the first (and only) “message” — no Bedrock. User can draw; typing or Evaluate → existing PLG flow (teaser + sign-in). On sign-in, handoff creates a **trial session** with that topic; opening message already shown (or re-injected); **15-minute** timer applies.
+- User has **never signed in**. They land with no session. Pick a **random topic** and show the **comprehensive** variant as the first (and only) “message” — no Bedrock. User can draw; typing or Evaluate → existing PLG flow (teaser + sign-in). On **first sign-in**, **handoff** creates a **trial session** (one-time; they do not get another trial on later visits). Topic, chat, and canvas must all carry over (see Section 1.7). Opening message already shown; **15-minute** timer applies.
 
-### 1.3 Signed-in, token-created session (New session)
+### 1.3 Signed-in token path (beginning alternative B)
 
-- User creates a session via token (“New session”). Pick a **random topic** and show the **conversational** variant as the opening. Opening is produced by **Bedrock** (trainer speaks first): frontend sends an init request to `/api/chat` with `phase: "opening"` and the chosen topic (or problem text); backend uses the **conversational** prompt for that topic in the opening system prompt. User sees one conversational opener; **60-minute** limit for paid sessions.
+- User is signed in and has tokens. They create a session via "New session" (token consumed). Pick a **random topic** and show the **conversational** variant as the opening. Opening is produced by **Bedrock** (trainer speaks first): frontend sends an init request to `/api/chat` with `phase: "opening"` and the chosen topic (or problem text); backend uses the **conversational** prompt for that topic in the opening system prompt. User sees one conversational opener; **60-minute** limit for paid sessions.
 
-### 1.4 Trial session after handoff
+### 1.4 Trial session (continuation of anonymous path — first sign-in only)
 
-- After handoff, session is trial (15 min). Problem is the same topic the anonymous user saw (comprehensive variant already shown). First Bedrock turn can restate “You have 15 minutes. Ask clarifying questions and work through your design.” or proceed to **design** phase with full transcript + canvas. Design phase uses full context (transcript + canvas, including notes).
+- After **first sign-in** handoff, the new session is a trial (15 min). Problem is the same topic the user saw when anonymous (comprehensive variant already shown). **Chat and canvas** are the ones from anonymous (persisted during handoff). First Bedrock turn can restate "You have 15 minutes. Ask clarifying questions and work through your design." or proceed to **design** phase with full transcript + canvas. Design phase uses full context (transcript + canvas, including notes). Users who had already signed in before do not get a trial; they use path B (tokens) for new sessions.
 
 ### 1.5 Summary table
 
 | Context                    | Opening content              | Who produces it   | Time limit   |
 |----------------------------|------------------------------|-------------------|--------------|
-| Anonymous                  | Comprehensive (one topic)    | Static / no LLM   | N/A          |
-| Trial (post-handoff)       | Same topic, already shown     | Bedrock (design)  | 15 min       |
+| Anonymous (never signed in)| Comprehensive (one topic)    | Static / no LLM   | N/A          |
+| Trial (first sign-in only) | Same topic, already shown     | Bedrock (design)  | 15 min       |
 | Token-created (New session)| Conversational (one topic)   | Bedrock (opening) | 60 min       |
 
 ### 1.6 Topic list (27 topics, two variants each)
@@ -50,6 +57,16 @@
 - **Hard:** Instagram, YouTube Top K, Uber, Robinhood, Google Docs, Distributed Cache, YouTube, Job Scheduler, Web Crawler, Ad Click Aggregator, Payment System  
 
 Each topic has `comprehensivePrompt` and `conversationalPrompt`; difficulty stored for future filtering/selection.
+
+### 1.7 Anonymous handoff — lessons learned (implemented)
+
+To avoid losing task, chat, or canvas when an anonymous user signs in and a trial session is created:
+
+- **Single anonymous workspace:** Persist both canvas and chat in one localStorage key (e.g. `scalecanvas-anonymous-workspace`) so handoff has a single source of truth. See `stores/anonymousWorkspaceStorage.ts`: `loadAnonymousWorkspace()`, `persistAnonymousWorkspace()`.
+- **Rehydrate before handoff:** When the client runs the BFF handoff (e.g. `runBffHandoff`), it must call `loadAnonymousWorkspace()` **immediately before** reading canvas state to send to `PUT /api/sessions/[id]/canvas`. Otherwise the store can still hold empty state from initial load and the backend receives an empty canvas. Same applies to transcript: anonymous messages must be in the handoff store before the session page mounts.
+- **Skip fetch when handoff is in progress:** On the session page, when `pendingSessionId === sessionId` (handoff not yet complete), **do not** fetch canvas or transcript from the API. If you fetch, the DB may not yet have the handoff data and you overwrite in-memory state with empty. Skip canvas fetch and transcript fetch in that case; instead, use in-memory canvas and initialize transcript from `anonymousMessages` in the auth handoff store.
+- **Canvas API:** `PUT /api/sessions/[id]/canvas` must verify session ownership (e.g. `getSession` then check `user_id`) before upserting. Return 403 when the user does not own the session. Optional: one retry (e.g. 400 ms) on the client if the first PUT fails (e.g. session row not yet visible).
+- **E2E coverage:** Assert on the **request payload** of the first `PUT .../canvas` (e.g. `nodes.length > 0`), not only on UI after reload, so regressions (empty canvas sent) are caught.
 
 ---
 
@@ -110,9 +127,9 @@ Each topic has `comprehensivePrompt` and `conversationalPrompt`; difficulty stor
 
 ### 4.4 Frontend
 
-- **Anonymous:** On load, pick random topic; set first “message” to `comprehensivePrompt`; no `/api/chat`. Persist `questionTitle` (or topic id) for handoff.
-- **Token-created session:** On new session with empty transcript, pick random topic; send init to `/api/chat` with `phase: "opening"` and topic/conversational prompt so Bedrock speaks first.
-- **Trial (post-handoff):** Load session with existing transcript (and optional “You have 15 minutes…” message); from next user message, use `phase: "design"`.
+- **Anonymous path A (never signed in):** On load, pick random topic; set first "message" to `comprehensivePrompt`; no `/api/chat`. Persist topic, chat, and canvas in single anonymous workspace (Section 1.7). On **first sign-in**, rehydrate from storage before handoff; session page must skip canvas/transcript fetch when handoff is pending.
+- **Token-created session (path B):** On new session with empty transcript, pick random topic; send init to `/api/chat` with `phase: "opening"` and topic/conversational prompt so Bedrock speaks first.
+- **Trial (post-handoff):** Load session; when `pendingSessionId === sessionId`, use in-memory canvas and `anonymousMessages` for transcript (do not fetch). From next user message, use `phase: "design"`.
 - **Countdown hit 0:** Call **POST `/api/sessions/[id]/conclusion`** with current `messages`, `nodes`, `edges`; display streamed summary; then disable further conclusion requests (and optionally show stored summary on revisit).
 - **“End interview” button:** Send to `/api/chat` with `phase: "conclusion"` (voluntary); show final message; disable chat when session is terminated or ended.
 
@@ -130,11 +147,11 @@ Each topic has `comprehensivePrompt` and `conversationalPrompt`; difficulty stor
 ## Implementation order (high level)
 
 1. **Topic list:** Add 27 topics with `comprehensivePrompt` and `conversationalPrompt`; keep difficulty; random selection.
-2. **Beginning:** Anonymous uses comprehensive variant only; token-created uses conversational + Bedrock opening (phase + init); trial keeps same topic, 15 min, design phase.
+2. **Beginning (two paths):** Path A — anonymous: comprehensive variant only, handoff carries topic/chat/canvas (Section 1.7). Path B — token-created: conversational + Bedrock opening (phase + init). Trial continues path A; 15 min, design phase.
 3. **Prompts:** Phase-specific prompts (opening, design, conclusion); design allows hints and challenges; note about canvas notes; stray → warn then terminate.
 4. **Conclusion endpoint:** POST `/api/sessions/[id]/conclusion`; validation (elapsed, one-time); Bedrock call; persist summary; stream response.
 5. **DB:** Add `conclusion_summary` (or equivalent) to sessions; migration.
-6. **Frontend:** Init flow for token sessions; “End interview”; on countdown 0 call conclusion endpoint; show summary and prevent duplicate requests.
+6. **Frontend:** Anonymous path: single workspace persist, rehydrate before handoff, skip fetch when pending (1.7). Token path: init flow for new sessions. “End interview”; on countdown 0 call conclusion endpoint; show summary and prevent duplicate requests.
 
 ---
 
@@ -144,4 +161,5 @@ Each topic has `comprehensivePrompt` and `conversationalPrompt`; difficulty stor
 - `lib/prompts.ts` — current single prompt  
 - `lib/chatGuardrails.ts` — `TRIAL_TIME_LIMIT_MS`, `PAID_TIME_LIMIT_MS`, `getSessionIfWithinTimeLimit`  
 - `docs/plans/2026-02-21-session-guardrails-kill-switch-design.md` — terminate tool and status  
-- `lib/questions.ts` — current QUESTION_BANK (to be replaced or extended with two variants)
+- `lib/questions.ts` — current QUESTION_BANK (to be replaced or extended with two variants)  
+- `stores/anonymousWorkspaceStorage.ts` — anonymous workspace persist/load; handoff rehydration (Section 1.7)

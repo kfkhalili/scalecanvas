@@ -1,27 +1,26 @@
 # E2E tests (Playwright)
 
-Install browsers once:
+**Run e2e tests (installs Chromium if needed, then runs all specs):**
 
 ```bash
-pnpm exec playwright install
+pnpm test:e2e:run
 ```
 
-Run all e2e tests:
+Or, if browsers are already installed:
 
 ```bash
-pnpm exec playwright test
+pnpm test:e2e
 ```
 
-## Anonymous → trial handoff test
+To install browsers only: `pnpm exec playwright install chromium`
 
-The handoff test (`anonymous-handoff-canvas.spec.ts`) asserts that after sign-in, the anonymous canvas is saved to the new trial session and survives reload. It runs only when auth state exists.
+## Cross-auth user journeys (JWT bypass — no manual auth)
 
-**One-time setup**
+Cross-auth flows are fully testable **without** real OAuth or manual sign-in:
 
-1. Create auth state by running the setup test and signing in when the browser opens:
-   ```bash
-   pnpm exec playwright test e2e/auth.setup.ts
-   ```
-2. Complete sign-in with Google (or GitHub) in the opened browser. When you are redirected back to the app, auth state is saved to `e2e/.auth/user.json`.
+- **`e2e/cross-auth-jwt.spec.ts`** – Click “Sign in with Google” → request is intercepted, a JWT session is injected, redirect to app → assert authenticated.
+- **`e2e/cross-auth-journeys.spec.ts`** – Full journeys using the same bypass:
+  1. **Anonymous → sign in → handoff** – Preload anonymous workspace, go to `/`, click sign-in (bypass), assert redirect to trial session and canvas persisted, survives reload.
+  2. **Same + simulate time expiry** – After handoff, click “Simulate time expired (test)”, assert canvas is read-only and state correct after refresh.
 
-After that, the handoff test runs automatically when you run the full suite (`pnpm exec playwright test`). If the auth state file is missing, the handoff test is not run. If it has expired, the test will skip with a message to re-run the setup.
+These specs run in the default **chromium** project. They require **local Supabase** so the JWT secret matches (`e2e/jwtBypass.ts` uses the standard local secret). Set `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` (or `http://localhost:54321`) in `.env.local`; if you use a hosted Supabase URL, these tests are **skipped** with a clear message. Suitable for CI when using local Supabase.
