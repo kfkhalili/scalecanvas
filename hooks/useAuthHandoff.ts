@@ -8,7 +8,7 @@ import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
 import { appendTranscriptApi, saveCanvasApi } from "@/services/sessionsClient";
-import { runBffHandoff, type RunBffHandoffParams } from "@/lib/authHandoff";
+import { runBffHandoff } from "@/lib/authHandoff";
 import { whenSome } from "@/lib/optionHelpers";
 import { toast } from "sonner";
 import type { TranscriptEntry } from "@/lib/types";
@@ -44,23 +44,28 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
 
       loadAnonymousWorkspace();
 
-      const currentFromChat = messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: typeof m.content === "string" ? m.content : "",
-      }));
-      const messagesToUse =
-        currentFromChat.length > 0
-          ? currentFromChat
-          : useAuthHandoffStore.getState().anonymousMessages;
+      const anonMsgs = useAuthHandoffStore.getState().anonymousMessages;
+      const messagesToUse: Message[] =
+        messages.length > 0
+          ? messages
+          : anonMsgs.map((m) => ({
+              id: m.id,
+              role:
+                m.role === "user" ||
+                m.role === "assistant" ||
+                m.role === "system" ||
+                m.role === "data"
+                  ? (m.role as Message["role"])
+                  : ("assistant" as const),
+              content: m.content,
+            }));
 
       void runBffHandoff({
         sessionId: pendingSessionId,
         messages: messagesToUse,
         getCanvasState,
         saveCanvasApi,
-        // ai SDK's setMessages type vs MessageLike mismatch: safe, shapes are compatible at runtime.
-        setMessages: setMessages as unknown as RunBffHandoffParams["setMessages"],
+        setMessages,
         persistTranscript: async (sid, entries) => {
           for (const { role, content } of entries) {
             await Effect.runPromise(

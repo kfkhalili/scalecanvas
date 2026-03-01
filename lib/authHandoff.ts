@@ -1,18 +1,17 @@
 import { Effect, Either } from "effect";
+import type { Message } from "ai";
 import { isTeaserMessage } from "@/lib/plg";
 import type { CanvasState } from "@/lib/types";
 
-type MessageLike = { id: string; role?: string; content?: string };
-
 export type RunBffHandoffParams = {
   sessionId: string;
-  messages: MessageLike[];
+  messages: Message[];
   getCanvasState: () => CanvasState;
   saveCanvasApi: (
     sessionId: string,
     state: CanvasState
   ) => Effect.Effect<undefined, { message: string }>;
-  setMessages: (fn: (prev: MessageLike[]) => MessageLike[]) => void;
+  setMessages: (messagesOrUpdater: Message[] | ((prev: Message[]) => Message[])) => void;
   /** Persist filtered messages to the new session's transcript; called before onHandoffComplete. */
   persistTranscript: (
     sessionId: string,
@@ -20,7 +19,7 @@ export type RunBffHandoffParams = {
   ) => Promise<void>;
   onCanvasSaveError: () => void;
   /** Called after transcript is persisted; receives sessionId and filtered messages so client can store handoff transcript and navigate. */
-  onHandoffComplete: (sessionId: string, filteredMessages: MessageLike[]) => void;
+  onHandoffComplete: (sessionId: string, filteredMessages: Message[]) => void;
 };
 
 /**
