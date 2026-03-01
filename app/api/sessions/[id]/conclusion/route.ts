@@ -86,7 +86,8 @@ export async function POST(request: Request, { params }: Params) {
   const allowSimulate =
     process.env.NODE_ENV !== "production" ||
     process.env.ALLOW_SIMULATE_EXPIRED === "true";
-  if (!(simulateExpired && allowSimulate) && elapsedMs < limitMs) {
+  const userRequestedEnd = parsed.data.user_requested_end === true;
+  if (!userRequestedEnd && !(simulateExpired && allowSimulate) && elapsedMs < limitMs) {
     return NextResponse.json(
       { error: TIME_NOT_EXPIRED_MESSAGE },
       { status: 403 }

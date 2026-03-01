@@ -168,6 +168,37 @@ describe("POST /api/sessions/[id]/conclusion", () => {
     }
   });
 
+  it("when user_requested_end is true, bypasses time check regardless of env", async () => {
+    const origModel = process.env.BEDROCK_MODEL_ID;
+    const origRegion = process.env.AWS_REGION;
+    process.env.BEDROCK_MODEL_ID = "us.anthropic.claude-3-5-sonnet-v2";
+    process.env.AWS_REGION = "us-east-1";
+    mockedUpdateSession.mockReturnValue(Effect.succeed(sessionFixture({})));
+    try {
+      mockedCreateClient.mockResolvedValue(fakeSupabase({ id: USER_ID }));
+      const notExpiredSession = sessionFixture({
+        createdAt: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
+      });
+      mockedGetSession.mockReturnValue(Effect.succeed(notExpiredSession));
+      const res = await POST(
+        makeRequest({
+          messages: [{ role: "user", content: "I want to end early." }],
+          nodes: [],
+          edges: [],
+          user_requested_end: true,
+        }),
+        params()
+      );
+      expect(res.status).toBe(200);
+      expect(res.body).not.toBeNull();
+    } finally {
+      if (origModel !== undefined) process.env.BEDROCK_MODEL_ID = origModel;
+      else delete process.env.BEDROCK_MODEL_ID;
+      if (origRegion !== undefined) process.env.AWS_REGION = origRegion;
+      else delete process.env.AWS_REGION;
+    }
+  });
+
   it("returns 403 when conclusion summary already generated", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: USER_ID }));
     const withConclusion = sessionFixture({

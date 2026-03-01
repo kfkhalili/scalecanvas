@@ -675,13 +675,16 @@ export function ChatPanel({
     };
   }, [messages, canvasNodes, canvasEdges]);
 
-  const requestConclusionSimulated = useCallback(() => {
+  const [showEndInterviewConfirm, setShowEndInterviewConfirm] = useState(false);
+
+  const requestEndInterview = useCallback(() => {
     if (!sessionId) return;
     if (conclusionRequestedRef.current === sessionId) return;
     conclusionRequestedRef.current = sessionId;
     setConclusionRequestedSessionId(sessionId);
     setSessionActive(false);
-    const body = { ...buildConclusionBody(), simulate_expired: true };
+    setShowEndInterviewConfirm(false);
+    const body = { ...buildConclusionBody(), user_requested_end: true as const };
     void Effect.runPromise(Effect.either(requestConclusion(sessionId, body))).then(
       (either) => {
         if (Either.isRight(either)) {
@@ -690,6 +693,7 @@ export function ChatPanel({
             ...prev,
             { id: generateId(), role: "assistant", content: text },
           ]);
+          setSessionActive(false);
           if (text.trim().length > 0) {
             void Effect.runPromise(
               Effect.either(appendTranscriptApi(sessionId, "assistant", text))
@@ -700,9 +704,7 @@ export function ChatPanel({
         } else {
           const err = either.left;
           toast.error(err.error);
-          // Keep session concluded for ALL error cases (including Bedrock unavailable).
-          // The user already committed to ending the session by clicking "Simulate".
-          // 403 = time-not-expired or already-generated — session still stays concluded.
+          // Keep session concluded even on error — user explicitly chose to end.
           setSessionActive(false);
           conclusionRequestedRef.current = sessionId;
           setConclusionRequestedSessionId(sessionId);
@@ -711,10 +713,8 @@ export function ChatPanel({
     );
   }, [sessionId, buildConclusionBody, setMessages, setSessionActive, appendEntry]);
 
-  const isDev = process.env.NODE_ENV === "development";
-  const showSimulateExpiredButton =
-    isDev &&
-    sessionId &&
+  const showEndInterviewButton =
+    sessionId !== undefined &&
     !isAnonymous &&
     conclusionRequestedSessionId !== sessionId &&
     isSessionActive;
@@ -733,17 +733,44 @@ export function ChatPanel({
             <SignInButtons redirectTo="/" />
           </div>
         )}
-        {showSimulateExpiredButton && (
-          <div className="shrink-0 border-t border-amber-500/30 bg-amber-950/20 p-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full border-amber-500/50 text-amber-200 hover:bg-amber-900/30"
-              onClick={requestConclusionSimulated}
-            >
-              Simulate time expired (test)
-            </Button>
+        {showEndInterviewButton && (
+          <div className="shrink-0 border-t border-border/50 p-2">
+            {showEndInterviewConfirm ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-muted-foreground">
+                  End your interview now? Your final summary will be generated immediately. Your session token will not be refunded.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setShowEndInterviewConfirm(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="flex-1"
+                    onClick={requestEndInterview}
+                  >
+                    End interview
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowEndInterviewConfirm(true)}
+              >
+                End interview
+              </Button>
+            )}
           </div>
         )}
       </div>

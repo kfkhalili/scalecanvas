@@ -114,6 +114,8 @@ export const ConclusionBodySchema = z.object({
   edges: z.array(EdgeSchema).max(MAX_EDGES).optional().default([]),
   /** When true and allowed (dev or ALLOW_SIMULATE_EXPIRED), bypass elapsed-time check for testing. */
   simulate_expired: z.boolean().optional(),
+  /** When true, user voluntarily ended their session early. Always bypasses the time check. */
+  user_requested_end: z.boolean().optional(),
 });
 
 export type HandoffSuccessResponse = { created: true; session_id: string };
