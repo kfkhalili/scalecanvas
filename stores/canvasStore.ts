@@ -76,8 +76,8 @@ export function applyPersistedCanvasStateSync(): boolean {
   const state = readFromStorage();
   if (!state || !Array.isArray(state.nodes)) return false;
   const viewport =
-    state.viewport?.value && isViewport(state.viewport.value)
-      ? state.viewport.value
+    state.viewport != null && isViewport(state.viewport)
+      ? state.viewport
       : undefined;
   const nodes = state.nodes as ReadonlyArray<ReactFlowNode>;
   const edges = (Array.isArray(state.edges) ? state.edges : []) as ReadonlyArray<ReactFlowEdge>;
