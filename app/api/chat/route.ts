@@ -18,20 +18,7 @@ import {
   ChatBodySchema,
   MAX_CHAT_BODY_BYTES,
 } from "@/lib/api.schemas";
-
-function extractContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (part && typeof part === "object" && "text" in part)
-          return String((part as { text: string }).text);
-        return "";
-      })
-      .join("");
-  }
-  return "";
-}
+import { extractContent } from "@/lib/chatHelpers";
 
 /**
  * Pre-process raw JSON: promote data.messages → messages when the top-level
@@ -209,7 +196,7 @@ export async function POST(
           execute: async ({ reason }) => {
             await Effect.runPromise(
               Effect.either(
-                updateSession(supabaseAuth, sessionId, {
+                updateSession(supabaseAuth, sessionId, user.id, {
                   statusOpt: Option.some("terminated"),
                 })
               )

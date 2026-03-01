@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { claimTrialAndCreateSession } from "@/services/handoff";
 import { HandoffBodySchema } from "@/lib/api.schemas";
+import { checkRateLimit, HANDOFF_RATE_LIMIT } from "@/lib/rateLimit";
 
 export async function POST(request: Request): Promise<NextResponse> {
   const supabase = await createServerClientInstance();
@@ -11,6 +12,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitEither = await Effect.runPromise(
+    Effect.either(checkRateLimit(supabase, `handoff:${user.id}`, HANDOFF_RATE_LIMIT))
+  );
+  if (Either.isLeft(rateLimitEither)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
   }
 
   let raw: unknown;

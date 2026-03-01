@@ -5,6 +5,7 @@ import { getStripeClient, getPackById, getStripePriceId } from "@/lib/stripe";
 import type { CheckoutMetadata } from "@/lib/stripe.types";
 import { findStripeCustomerId, saveStripeCustomerId } from "@/services/tokens";
 import { CheckoutBodySchema } from "@/lib/api.schemas";
+import { checkRateLimit, CHECKOUT_RATE_LIMIT } from "@/lib/rateLimit";
 
 export async function POST(request: Request): Promise<NextResponse> {
   const supabase = await createServerClientInstance();
@@ -13,6 +14,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitEither = await Effect.runPromise(
+    Effect.either(checkRateLimit(supabase, `checkout:${user.id}`, CHECKOUT_RATE_LIMIT))
+  );
+  if (Either.isLeft(rateLimitEither)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
   }
 
   let raw: unknown;
@@ -76,8 +87,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const origin =
-    request.headers.get("origin") ??
     process.env.NEXT_PUBLIC_SITE_URL ??
+    request.headers.get("origin") ??
     null;
   if (!origin) {
     return NextResponse.json(

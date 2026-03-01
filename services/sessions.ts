@@ -120,6 +120,7 @@ function toSessionUpdateDbFields(fields: SessionUpdateFields): Record<string, st
 export function updateSession(
   client: ServerSupabaseClient,
   sessionId: string,
+  userId: string,
   fields: SessionUpdateFields
 ): Effect.Effect<Session, SessionError> {
   const dbFields = toSessionUpdateDbFields(fields);
@@ -129,6 +130,7 @@ export function updateSession(
         .from("interview_sessions")
         .update(dbFields as never)
         .eq("id", sessionId)
+        .eq("user_id", userId)
         .select()
         .single()
     ),
@@ -144,11 +146,12 @@ export function updateSession(
 
 export function deleteSession(
   client: ServerSupabaseClient,
-  sessionId: string
+  sessionId: string,
+  userId: string
 ): Effect.Effect<undefined, SessionError> {
   return pipe(
     Effect.promise(() =>
-      client.from("interview_sessions").delete().eq("id", sessionId)
+      client.from("interview_sessions").delete().eq("id", sessionId).eq("user_id", userId)
     ),
     Effect.flatMap(({ error }) =>
       error ? Effect.fail(toSessionError(error)) : Effect.succeed(undefined)

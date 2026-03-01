@@ -9,6 +9,7 @@ import { timeLimitForSession } from "@/lib/chatGuardrails";
 import { ConclusionBodySchema } from "@/lib/api.schemas";
 import { parseCanvasState } from "@/lib/canvasParser";
 import { getSystemPromptConclusionTimeExpired } from "@/lib/prompts";
+import { extractContent } from "@/lib/chatHelpers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,20 +17,6 @@ const TIME_NOT_EXPIRED_MESSAGE =
   "Time has not expired. You cannot request the final summary yet.";
 const ALREADY_GENERATED_MESSAGE =
   "Final summary was already generated for this session.";
-
-function extractContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (part && typeof part === "object" && "text" in part)
-          return String((part as { text: string }).text);
-        return "";
-      })
-      .join("");
-  }
-  return "";
-}
 
 export async function POST(request: Request, { params }: Params) {
   const { id: sessionId } = await params;
@@ -158,7 +145,7 @@ export async function POST(request: Request, { params }: Params) {
         ) {
           await Effect.runPromise(
             Effect.either(
-              updateSession(supabase, sessionId, {
+              updateSession(supabase, sessionId, user.id, {
                 conclusionSummaryOpt: Option.some(text),
               })
             )

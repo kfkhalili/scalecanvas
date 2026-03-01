@@ -1,6 +1,27 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 const securityHeaders = [
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      // Turbopack dev runtime requires 'unsafe-eval'; omit in production
+      isDev
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        : "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      // Allow profile avatars from Google OAuth and Supabase storage
+      "img-src 'self' data: https://unpkg.com https://*.googleusercontent.com https://*.supabase.co",
+      // Allow Supabase auth + realtime, Google OAuth endpoints
+      // In dev, local Supabase runs on 127.0.0.1:54321
+      isDev
+        ? "connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 https://*.supabase.co wss://*.supabase.co https://accounts.google.com"
+        : "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com",
+      "frame-ancestors 'none'",
+    ].join("; "),
+  },
   {
     key: "X-Frame-Options",
     value: "DENY",

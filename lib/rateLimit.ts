@@ -67,3 +67,13 @@ export const CHAT_RATE_LIMIT: RateLimitConfig = {
   windowMs: 60_000,
   maxRequests: 20,
 };
+
+export const CHECKOUT_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 60_000,
+  maxRequests: 10,
+};
+
+export const HANDOFF_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 60_000,
+  maxRequests: 5,
+};

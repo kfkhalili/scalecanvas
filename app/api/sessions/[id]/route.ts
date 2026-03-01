@@ -48,7 +48,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
   const either = await Effect.runPromise(
     Effect.either(
-      updateSession(supabase, id, {
+      updateSession(supabase, id, user.id, {
         titleOpt: Option.fromNullable(parsed.data.title),
       })
     )
@@ -70,7 +70,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const either = await Effect.runPromise(
-    Effect.either(deleteSession(supabase, id))
+    Effect.either(deleteSession(supabase, id, user.id))
   );
   return Either.match(either, {
     onLeft: (e) => NextResponse.json({ error: e.message }, { status: 500 }),

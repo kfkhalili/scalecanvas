@@ -64,18 +64,18 @@ export const CanvasBodySchema = z.object({
     .optional(),
 });
 
+export const MAX_MESSAGES = 100;
+export const MAX_CONTENT_LENGTH = 10_000;
+
 const MessageSchema = z.object({
   role: z.enum(["user", "assistant", "system"]),
   content: z.union([
-    z.string(),
+    z.string().max(MAX_CONTENT_LENGTH),
     z.array(
-      z.object({ text: z.string() }).passthrough()
+      z.object({ text: z.string().max(MAX_CONTENT_LENGTH) }).passthrough()
     ),
   ]),
 });
-
-export const MAX_MESSAGES = 100;
-export const MAX_CONTENT_LENGTH = 10_000;
 
 /** Max request body size for POST /api/chat (bytes). */
 export const MAX_CHAT_BODY_BYTES = 1_000_000;

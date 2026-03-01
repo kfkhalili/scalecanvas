@@ -39,6 +39,26 @@ export function fetchWithGuardrail(
   });
 }
 
+/**
+ * Flatten a message `content` field that may be a plain string or an
+ * array of content-part objects (Bedrock multi-modal format) into a
+ * single string. Duplicate of the helper that previously lived inline in
+ * the chat and conclusion API routes — centralised here (ARCH-2).
+ */
+export function extractContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (part && typeof part === "object" && "text" in part)
+          return String((part as { text: string }).text);
+        return "";
+      })
+      .join("");
+  }
+  return "";
+}
+
 export function transcriptEntryToMessage(
   entry: TranscriptEntry
 ): { id: string; role: "user" | "assistant" | "system"; content: string } {
