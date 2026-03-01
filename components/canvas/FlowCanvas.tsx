@@ -56,8 +56,8 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
   const setViewport = useCanvasStore((s) => s.setViewport);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
 
-  const initialNodes = storeNodes as Node[];
-  const initialEdges = storeEdges as Edge[];
+  const initialNodes = [...storeNodes];
+  const initialEdges = [...storeEdges];
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -89,8 +89,8 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
     ) {
       return;
     }
-    setNodes(storeNodes as Node[]);
-    setEdges(storeEdges as Edge[]);
+    setNodes([...storeNodes]);
+    setEdges([...storeEdges]);
   }, [storeNodes, storeEdges, setNodes, setEdges]);
 
   // Push local state to store (for save, Evaluate, getCanvasState). Viewport
