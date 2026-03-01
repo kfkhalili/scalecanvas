@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     environment: "node",
-    include: ["**/*.test.ts", "**/*.spec.ts"],
-    exclude: ["node_modules", "e2e"],
+    include: ["**/*.test.ts", "**/*.spec.ts", "e2e/**/*.test.ts"],
+    exclude: ["node_modules", "e2e/**/*.spec.ts"],
   },
 });
