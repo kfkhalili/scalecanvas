@@ -102,8 +102,11 @@ jobs:
           version: latest
 
       - name: Push migrations to production
-        run: supabase db push --project-ref "$SUPABASE_PROJECT_ID"
+        # --db-url avoids needing a personal SUPABASE_ACCESS_TOKEN (account-wide).
+        # Only the DB password and project ref are required.
+        run: |
+          supabase db push --db-url \
+            "postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${SUPABASE_PROJECT_ID}.supabase.co:5432/postgres"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
