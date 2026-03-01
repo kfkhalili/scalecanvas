@@ -66,6 +66,18 @@ These rules are hard requirements for every change in this codebase. No exceptio
 
 ---
 
+## 9. Reports for Non-Code Tasks
+
+When the user requests a non-code task — analysis, audit, review, planning, comparison, or any investigation that produces findings rather than code changes — always produce a **written report** as the primary deliverable:
+
+- Create the report as a dated Markdown file in `docs/plans/` following the timestamped-filename rule (Rule 8).
+- Structure it with: Executive Summary, numbered sections per category of finding, a severity-coded table, and a Prioritised Action List.
+- Severity codes: 🔴 High · 🟠 Medium · 🟡 Low · ℹ️ Info.
+- Cross-reference prior reports when they exist (do not repeat findings already marked resolved).
+- The in-chat response may summarise key highlights, but the `docs/plans/` file is the canonical record.
+
+---
+
 ## 8. Timestamped Filenames
 
 For any file whose name includes a date or timestamp (Supabase migrations, dated docs):

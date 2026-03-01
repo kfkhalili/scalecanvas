@@ -1,7 +1,6 @@
 import type { Session } from "@/lib/types";
 import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
-import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
 import { streamText, convertToCoreMessages } from "ai";
 import { createServerClientInstance } from "@/lib/supabase/server";
 import { getSession, updateSession } from "@/services/sessions";
@@ -10,6 +9,7 @@ import { ConclusionBodySchema } from "@/lib/api.schemas";
 import { parseCanvasState } from "@/lib/canvasParser";
 import { getSystemPromptConclusionTimeExpired } from "@/lib/prompts";
 import { extractContent } from "@/lib/chatHelpers";
+import { getBedrockModel } from "@/lib/bedrock";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -81,20 +81,11 @@ export async function POST(request: Request, { params }: Params) {
     );
   }
 
-  let modelId = process.env.BEDROCK_MODEL_ID?.trim();
-  const region = process.env.AWS_REGION;
-  if (!modelId || !region) {
-    return NextResponse.json(
-      {
-        error:
-          "Server misconfiguration: BEDROCK_MODEL_ID and AWS_REGION are required.",
-      },
-      { status: 503 }
-    );
+  const bedrockResult = getBedrockModel();
+  if (!bedrockResult.success) {
+    return NextResponse.json({ error: bedrockResult.error }, { status: 503 });
   }
-  if (modelId === "anthropic.claude-sonnet-4-6") {
-    modelId = "global.anthropic.claude-sonnet-4-6";
-  }
+  const model = bedrockResult.model;
 
   const nodesForParser = parsed.data.nodes.map((n) => ({
     id: n.id,
@@ -121,13 +112,6 @@ export async function POST(request: Request, { params }: Params) {
           },
         ];
   const coreMessages = convertToCoreMessages(messagesForModel);
-
-  const bedrock = createAmazonBedrock({
-    region,
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  });
-  const model = bedrock(modelId);
 
   try {
     const result = streamText({

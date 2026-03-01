@@ -1,6 +1,6 @@
 "use client";
 
-import { Effect, Either, Option } from "effect";
+import { Effect, Option } from "effect";
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
@@ -13,12 +13,8 @@ import { useTranscriptStore } from "@/stores/transcriptStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasReview } from "@/hooks/useCanvasReview";
-import { appendTranscriptApi, saveCanvasApi } from "@/services/sessionsClient";
-import { requestConclusion } from "@/services/conclusionClient";
-import { remainingMs } from "@/lib/chatGuardrails";
+import { appendTranscriptApi } from "@/services/sessionsClient";
 import { performAnonymousEvalHandoff } from "@/lib/plg";
-import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
-import { runBffHandoff, type RunBffHandoffParams } from "@/lib/authHandoff";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { TranscriptView } from "./TranscriptView";
@@ -26,6 +22,8 @@ import { SignInButtons } from "./SignInButtons";
 import { cn } from "@/lib/utils";
 import { whenSome, whenRight } from "@/lib/optionHelpers";
 import { shouldTriggerOpening } from "@/lib/chatOpening";
+import { useConclusionRequest } from "@/hooks/useConclusionRequest";
+import { useAuthHandoff } from "@/hooks/useAuthHandoff";
 import type { TranscriptEntry } from "@/lib/types";
 
 const CHAT_INPUT_MIN_HEIGHT_PX = 40;
@@ -61,19 +59,16 @@ export function ChatPanel({
 }: ChatPanelProps): React.ReactElement {
   const router = useRouter();
   const appendEntry = useTranscriptStore((s) => s.appendEntry);
-  const getCanvasState = useCanvasStore((s) => s.getCanvasState);
   const setCanvasState = useCanvasStore((s) => s.setCanvasState);
   const setHasAttemptedEval = useCanvasStore((s) => s.setHasAttemptedEval);
   const hasAttemptedEval = useCanvasStore((s) => s.hasAttemptedEval);
   const pendingSessionIdOpt = useAuthHandoffStore((s) => s.pendingSessionId);
   const setPendingAuthHandoff = useAuthHandoffStore((s) => s.setPendingAuthHandoff);
-  const setHandoffTranscript = useAuthHandoffStore((s) => s.setHandoffTranscript);
   const setAnonymousMessages = useAuthHandoffStore((s) => s.setAnonymousMessages);
   const setQuestionTitle = useAuthHandoffStore((s) => s.setQuestionTitle);
   const setQuestionTopicId = useAuthHandoffStore((s) => s.setQuestionTopicId);
   const isSessionActive = useSessionStore((s) => s.isSessionActive);
   const setSessionActive = useSessionStore((s) => s.setSessionActive);
-  const sessions = useSessionStore((s) => s.sessions);
   const activeQuestionOpt = useQuestionStore((s) => s.activeQuestion);
   const hintIndex = useQuestionStore((s) => s.hintIndex);
   const setInitialQuestion = useQuestionStore((s) => s.setInitialQuestion);
@@ -408,155 +403,11 @@ export function ChatPanel({
   }, [messages, setSessionActive]);
 
   const openingRequestedRef = useRef<string | undefined>(undefined);
-  const conclusionRequestedRef = useRef<string | undefined>(undefined);
-  const [_conclusionRequestedSessionId, setConclusionRequestedSessionId] = useState<string | undefined>(undefined);
-  // Derive conclusionRequestedSessionId so we don't need a setState-in-effect to sync isConcluded.
-  // When the server confirms the session is already concluded, treat it as if we already requested it.
-  const conclusionRequestedSessionId =
-    isConcluded && sessionId ? sessionId : _conclusionRequestedSessionId;
 
-  // If the session already has a conclusion in the DB (server-side flag), mark it inactive.
-  // This handles page reloads where the server knows the session is concluded.
-  useEffect(() => {
-    if (isConcluded && sessionId) {
-      setSessionActive(false);
-      conclusionRequestedRef.current = sessionId;
-    }
-  }, [isConcluded, sessionId, setSessionActive]);
-  const handoffDoneRef = useRef<string | null>(null);
-  const sessionHadTimeLeftRef = useRef<{ sessionId: string; hadTimeLeft: boolean }>({
-    sessionId: "",
-    hadTimeLeft: false,
-  });
+  const { requestEndInterview, showEndInterviewButton } =
+    useConclusionRequest({ sessionId, isAnonymous, isConcluded, messages, setMessages });
 
-  useEffect(() => {
-    if (!sessionId || isAnonymous) return;
-    const session = sessions.find((s) => s.id === sessionId);
-    if (!session) return;
-    const remaining = remainingMs(session);
-    if (remaining > 0) {
-      if (sessionHadTimeLeftRef.current.sessionId !== sessionId) {
-        sessionHadTimeLeftRef.current = { sessionId, hadTimeLeft: false };
-      }
-      sessionHadTimeLeftRef.current.hadTimeLeft = true;
-      return;
-    }
-    if (sessionHadTimeLeftRef.current.sessionId !== sessionId) {
-      sessionHadTimeLeftRef.current = { sessionId, hadTimeLeft: false };
-    }
-    if (!sessionHadTimeLeftRef.current.hadTimeLeft) return;
-    if (conclusionRequestedRef.current === sessionId) return;
-    conclusionRequestedRef.current = sessionId;
-    const { nodes: currentNodes, edges: currentEdges } = useCanvasStore.getState();
-    const conclusionMessages = messages.map((m) => {
-      const content =
-        typeof m.content === "string"
-          ? m.content
-          : Array.isArray(m.content)
-            ? (m.content as { text?: string }[])
-                .map((p) => (p && typeof p === "object" && "text" in p ? String(p.text) : ""))
-                .join("")
-            : "";
-      return { role: m.role as "user" | "assistant" | "system", content };
-    });
-    void Effect.runPromise(
-      Effect.either(
-        requestConclusion(sessionId, {
-          messages: conclusionMessages,
-          nodes: [...currentNodes],
-          edges: [...currentEdges],
-        })
-      )
-    ).then((either) => {
-      setConclusionRequestedSessionId(sessionId);
-      if (Either.isRight(either)) {
-        const text = either.right;
-        setMessages((prev) => [
-          ...prev,
-          { id: generateId(), role: "assistant", content: text },
-        ]);
-        setSessionActive(false);
-        if (sessionId && text.trim().length > 0) {
-          void Effect.runPromise(
-            Effect.either(appendTranscriptApi(sessionId, "assistant", text))
-          ).then((appendEither) =>
-            whenRight(appendEither, (entry) => appendEntry(entry))
-          );
-        }
-      } else {
-        const err = either.left;
-        if (err.status === 403) {
-          setConclusionRequestedSessionId(sessionId);
-          conclusionRequestedRef.current = sessionId;
-          setSessionActive(false);
-        } else {
-          setConclusionRequestedSessionId(undefined);
-          conclusionRequestedRef.current = undefined;
-        }
-        toast.error(err.error);
-      }
-    });
-  }, [
-    sessionId,
-    isAnonymous,
-    sessions,
-    messages,
-    setMessages,
-    setSessionActive,
-    setConclusionRequestedSessionId,
-    appendEntry,
-  ]);
-
-  useEffect(() => {
-    whenSome(pendingSessionIdOpt, (pendingSessionId) => {
-      if (handoffDoneRef.current === pendingSessionId) return;
-      handoffDoneRef.current = pendingSessionId;
-      loadAnonymousWorkspace();
-      const sessionIdForHandoff = pendingSessionId;
-      const currentFromChat = messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: typeof m.content === "string" ? m.content : "",
-      }));
-      const messagesToUse =
-        currentFromChat.length > 0
-          ? currentFromChat
-          : useAuthHandoffStore.getState().anonymousMessages;
-      runBffHandoff({
-        sessionId: sessionIdForHandoff,
-        messages: messagesToUse,
-        getCanvasState,
-        saveCanvasApi,
-        setMessages: setMessages as unknown as RunBffHandoffParams["setMessages"],
-        persistTranscript: async (sid, entries) => {
-          for (const { role, content } of entries) {
-            await Effect.runPromise(
-              Effect.either(appendTranscriptApi(sid, role, content))
-            );
-          }
-        },
-        onCanvasSaveError: () =>
-          toast.error(
-            "Your diagram couldn't be saved. You can keep working; try refreshing later to see if it's there."
-          ),
-        onHandoffComplete: (sid, filteredMsgs) => {
-          const now = new Date().toISOString();
-          const entries: TranscriptEntry[] = filteredMsgs.map((m) => ({
-            id: m.id,
-            sessionId: sid,
-            role: (m.role === "user" || m.role === "assistant" ? m.role : "assistant") as "user" | "assistant",
-            content: typeof m.content === "string" ? m.content : "",
-            createdAt: now,
-          }));
-          setHandoffTranscript(Option.some({ sessionId: sid, entries }));
-          setPendingAuthHandoff(Option.none());
-          setAnonymousMessages([]);
-          setQuestionTitle(Option.none());
-          router.replace(`/${sid}`);
-        },
-      });
-    });
-  }, [pendingSessionIdOpt, messages, getCanvasState, setMessages, router, setPendingAuthHandoff, setHandoffTranscript, setAnonymousMessages, setQuestionTitle]);
+  useAuthHandoff({ messages, setMessages });
 
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -656,68 +507,7 @@ export function ChatPanel({
     content: typeof m.content === "string" ? m.content : "",
   }));
 
-  const buildConclusionBody = useCallback(() => {
-    const conclusionMessages = messages.map((m) => {
-      const content =
-        typeof m.content === "string"
-          ? m.content
-          : Array.isArray(m.content)
-            ? (m.content as { text?: string }[])
-                .map((p) => (p && typeof p === "object" && "text" in p ? String(p.text) : ""))
-                .join("")
-            : "";
-      return { role: m.role as "user" | "assistant" | "system", content };
-    });
-    return {
-      messages: conclusionMessages,
-      nodes: [...canvasNodes],
-      edges: [...canvasEdges],
-    };
-  }, [messages, canvasNodes, canvasEdges]);
-
   const [showEndInterviewConfirm, setShowEndInterviewConfirm] = useState(false);
-
-  const requestEndInterview = useCallback(() => {
-    if (!sessionId) return;
-    if (conclusionRequestedRef.current === sessionId) return;
-    conclusionRequestedRef.current = sessionId;
-    setConclusionRequestedSessionId(sessionId);
-    setSessionActive(false);
-    setShowEndInterviewConfirm(false);
-    const body = { ...buildConclusionBody(), user_requested_end: true as const };
-    void Effect.runPromise(Effect.either(requestConclusion(sessionId, body))).then(
-      (either) => {
-        if (Either.isRight(either)) {
-          const text = either.right;
-          setMessages((prev) => [
-            ...prev,
-            { id: generateId(), role: "assistant", content: text },
-          ]);
-          setSessionActive(false);
-          if (text.trim().length > 0) {
-            void Effect.runPromise(
-              Effect.either(appendTranscriptApi(sessionId, "assistant", text))
-            ).then((appendEither) =>
-              whenRight(appendEither, (entry) => appendEntry(entry))
-            );
-          }
-        } else {
-          const err = either.left;
-          toast.error(err.error);
-          // Keep session concluded even on error — user explicitly chose to end.
-          setSessionActive(false);
-          conclusionRequestedRef.current = sessionId;
-          setConclusionRequestedSessionId(sessionId);
-        }
-      }
-    );
-  }, [sessionId, buildConclusionBody, setMessages, setSessionActive, appendEntry]);
-
-  const showEndInterviewButton =
-    sessionId !== undefined &&
-    !isAnonymous &&
-    conclusionRequestedSessionId !== sessionId &&
-    isSessionActive;
 
   return (
     <div className="relative flex h-full flex-col">
@@ -754,7 +544,7 @@ export function ChatPanel({
                     type="button"
                     size="sm"
                     className="flex-1"
-                    onClick={requestEndInterview}
+                    onClick={() => { setShowEndInterviewConfirm(false); requestEndInterview(); }}
                   >
                     End interview
                   </Button>

@@ -92,11 +92,6 @@ export const ChatBodySchema = z.object({
   session_id: z.string().uuid().max(SESSION_ID_MAX_LENGTH).optional(),
   phase: ChatPhaseSchema.optional(),
   problem_text: z.string().max(10_000).optional(),
-  data: z
-    .object({
-      messages: z.array(MessageSchema).optional(),
-    })
-    .optional(),
 });
 
 export const CheckoutBodySchema = z.object({

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Effect } from "effect";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
+import type { Session } from "@/lib/types";
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerClientInstance: vi.fn(),
@@ -109,7 +110,7 @@ describe("PUT /api/sessions/[id]/canvas", () => {
 
   it("returns 400 for invalid JSON", async () => {
     mockedCreate.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetSession.mockReturnValue(Effect.succeed({} as never));
+    mockedGetSession.mockReturnValue(Effect.succeed({} as Session));
     const req = new Request("http://localhost/api/sessions/sess-1/canvas", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -123,7 +124,7 @@ describe("PUT /api/sessions/[id]/canvas", () => {
 
   it("returns 400 when nodes array exceeds MAX_NODES", async () => {
     mockedCreate.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetSession.mockReturnValue(Effect.succeed({} as never));
+    mockedGetSession.mockReturnValue(Effect.succeed({} as Session));
     const tooManyNodes = Array.from({ length: MAX_NODES + 1 }, (_, i) => ({
       id: `n${i}`,
       type: "default",
@@ -135,7 +136,7 @@ describe("PUT /api/sessions/[id]/canvas", () => {
 
   it("returns 204 on successful save", async () => {
     mockedCreate.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetSession.mockReturnValue(Effect.succeed({} as never));
+    mockedGetSession.mockReturnValue(Effect.succeed({} as Session));
     mockedSave.mockReturnValue(Effect.succeed(undefined));
     const res = await PUT(buildPut(VALID_BODY), buildParams());
     expect(res.status).toBe(204);
@@ -143,7 +144,7 @@ describe("PUT /api/sessions/[id]/canvas", () => {
 
   it("returns 500 when saveCanvasState fails", async () => {
     mockedCreate.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetSession.mockReturnValue(Effect.succeed({} as never));
+    mockedGetSession.mockReturnValue(Effect.succeed({} as Session));
     mockedSave.mockReturnValue(Effect.fail({ message: "Write failed", code: "DB_ERROR" }));
     const res = await PUT(buildPut(VALID_BODY), buildParams());
     expect(res.status).toBe(500);
@@ -154,7 +155,7 @@ describe("PUT /api/sessions/[id]/canvas", () => {
 
   it("passes nodes with data defaulted to {} when data is missing", async () => {
     mockedCreate.mockResolvedValue(fakeSupabase({ id: "user-1" }));
-    mockedGetSession.mockReturnValue(Effect.succeed({} as never));
+    mockedGetSession.mockReturnValue(Effect.succeed({} as Session));
     mockedSave.mockReturnValue(Effect.succeed(undefined));
     const body = {
       nodes: [{ id: "n1", type: "default", position: { x: 0, y: 0 } }],

@@ -33,7 +33,7 @@ export function serializeProviders(
 export function getNodeLibraryProviders(
   client: ServerSupabaseClient,
   userId: string
-): Effect.Effect<Option.Option<NodeLibraryProvider[]>> {
+): Effect.Effect<Option.Option<NodeLibraryProvider[]>, Error> {
   return pipe(
     Effect.tryPromise({
       try: () =>
@@ -45,17 +45,16 @@ export function getNodeLibraryProviders(
           .maybeSingle(),
       catch: () => new Error("user_preferences fetch failed"),
     }),
-    Effect.map(({ data, error }) => {
-      if (error) return Option.none();
-      if (data === null) return Option.none();
+    Effect.flatMap(({ data, error }) => {
+      if (error) return Effect.fail(new Error(error.message));
+      if (data === null) return Effect.succeed(Option.none<NodeLibraryProvider[]>());
       const raw =
         typeof data === "object" && data !== null && "value" in data
           ? (data as { value: string }).value
           : "";
       const value = typeof raw === "string" ? raw : "";
-      return Option.some(parseProvidersValue(value));
-    }),
-    Effect.catchAll(() => Effect.succeed(Option.none()))
+      return Effect.succeed(Option.some(parseProvidersValue(value)));
+    })
   );
 }
 
@@ -74,6 +73,7 @@ export function setNodeLibraryProviders(
     Effect.promise(() =>
       client
         .from("user_preferences")
+        // `as never`: @supabase/ssr v0.5.2 passes wrong type args to SupabaseClient.
         .upsert(row as never, { onConflict: "user_id,key" })
     ),
     Effect.flatMap(({ error }) =>

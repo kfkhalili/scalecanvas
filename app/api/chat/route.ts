@@ -1,6 +1,5 @@
 import { Effect, Either, Option } from "effect";
 import { NextResponse } from "next/server";
-import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
 import { streamText, convertToCoreMessages, tool } from "ai";
 import { z } from "zod";
 import { createServerClientInstance } from "@/lib/supabase/server";
@@ -19,6 +18,7 @@ import {
   MAX_CHAT_BODY_BYTES,
 } from "@/lib/api.schemas";
 import { extractContent } from "@/lib/chatHelpers";
+import { getBedrockModel } from "@/lib/bedrock";
 
 /**
  * Pre-process raw JSON: promote data.messages → messages when the top-level
@@ -79,21 +79,10 @@ export async function POST(
     );
   }
 
-  let modelId = process.env.BEDROCK_MODEL_ID?.trim();
-  const region = process.env.AWS_REGION;
-  if (!modelId || !region) {
-    console.error("[chat] 503 Missing BEDROCK_MODEL_ID or AWS_REGION");
-    return NextResponse.json(
-      {
-        error:
-          "Server misconfiguration: BEDROCK_MODEL_ID and AWS_REGION are required.",
-      },
-      { status: 503 }
-    );
-  }
-  // Claude Sonnet 4.6 requires an inference profile; raw model ID is not supported for on-demand.
-  if (modelId === "anthropic.claude-sonnet-4-6") {
-    modelId = "global.anthropic.claude-sonnet-4-6";
+  const bedrockResult = getBedrockModel();
+  if (!bedrockResult.success) {
+    console.error("[chat] 503", bedrockResult.error);
+    return NextResponse.json({ error: bedrockResult.error }, { status: 503 });
   }
 
   let parsedMessages: { role: "user" | "assistant" | "system"; content: string }[];
@@ -176,12 +165,7 @@ export async function POST(
     parsedMessages.map((m) => ({ role: m.role, content: m.content }))
   );
 
-  const bedrock = createAmazonBedrock({
-    region,
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  });
-  const model = bedrock(modelId);
+  const model = bedrockResult.model;
 
   try {
     const result = streamText({

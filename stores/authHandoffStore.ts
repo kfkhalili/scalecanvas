@@ -38,7 +38,3 @@ export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
   setQuestionTopicId: (id) => set({ questionTopicId: id }),
 }));
 
-/** No-op: handoff is now persisted only via anonymousWorkspaceStorage (one key). */
-export function rehydrateAuthHandoffStore(): Promise<void> | undefined {
-  return Promise.resolve();
-}

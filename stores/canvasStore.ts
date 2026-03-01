@@ -63,11 +63,6 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
   },
 }));
 
-/** No-op: canvas is now persisted only via anonymousWorkspaceStorage (one key). */
-export function rehydrateCanvasStore(): Promise<void> | undefined {
-  return Promise.resolve();
-}
-
 /**
  * Synchronously read canvas state from the single anonymous-workspace key and apply.
  * Returns true if state was applied.

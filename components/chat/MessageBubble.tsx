@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import type { Options as MarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ export function MessageBubble({ message }: MessageBubbleProps): React.ReactEleme
         )}
       >
         {isAssistant ? (
-          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks] as never[]}>
+          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks] as MarkdownOptions['remarkPlugins']}>
             {message.content}
           </ReactMarkdown>
         ) : (

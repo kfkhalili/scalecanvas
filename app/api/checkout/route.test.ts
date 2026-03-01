@@ -60,14 +60,13 @@ function makeRequestWithoutOrigin(body: unknown): Request {
   });
 }
 
-function fakeStripe(sessionUrl: string | null = "https://checkout.stripe.com/test"): {
-  customers: { create: ReturnType<typeof vi.fn> };
-  checkout: { sessions: { create: ReturnType<typeof vi.fn> } };
-} {
+import type Stripe from "stripe";
+
+function fakeStripe(sessionUrl: string | null = "https://checkout.stripe.com/test"): Stripe {
   return {
     customers: { create: vi.fn().mockResolvedValue({ id: "cus_new" }) },
     checkout: { sessions: { create: vi.fn().mockResolvedValue({ url: sessionUrl }) } },
-  };
+  } as unknown as Stripe;
 }
 
 describe("POST /api/checkout", () => {
@@ -114,7 +113,7 @@ describe("POST /api/checkout", () => {
     mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
     const stripe = fakeStripe();
-    mockedGetStripeClient.mockReturnValue(stripe as never);
+    mockedGetStripeClient.mockReturnValue(stripe);
 
     const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(200);
@@ -136,7 +135,7 @@ describe("POST /api/checkout", () => {
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.none()));
     mockedSaveCustomer.mockReturnValue(Effect.succeed(undefined));
     const stripe = fakeStripe();
-    mockedGetStripeClient.mockReturnValue(stripe as never);
+    mockedGetStripeClient.mockReturnValue(stripe);
 
     const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(200);
@@ -151,7 +150,7 @@ describe("POST /api/checkout", () => {
     mockedGetPack.mockReturnValue(Option.some(PACK));
     mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.fail({ message: "DB error" }));
-    mockedGetStripeClient.mockReturnValue(fakeStripe() as never);
+    mockedGetStripeClient.mockReturnValue(fakeStripe());
 
     const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(500);
@@ -166,7 +165,7 @@ describe("POST /api/checkout", () => {
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.none()));
     mockedSaveCustomer.mockReturnValue(Effect.fail({ message: "save failed" }));
     const stripe = fakeStripe();
-    mockedGetStripeClient.mockReturnValue(stripe as never);
+    mockedGetStripeClient.mockReturnValue(stripe);
 
     const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(500);
@@ -180,7 +179,7 @@ describe("POST /api/checkout", () => {
     mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
     const stripe = fakeStripe(null);
-    mockedGetStripeClient.mockReturnValue(stripe as never);
+    mockedGetStripeClient.mockReturnValue(stripe);
 
     const res = await POST(makeRequest({ pack_id: "pack_3" }));
     expect(res.status).toBe(500);
@@ -195,7 +194,7 @@ describe("POST /api/checkout", () => {
     mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
     const stripe = fakeStripe();
-    mockedGetStripeClient.mockReturnValue(stripe as never);
+    mockedGetStripeClient.mockReturnValue(stripe);
 
     const res = await POST(makeRequestWithoutOrigin({ pack_id: "pack_3" }));
     expect(res.status).toBe(200);
@@ -214,7 +213,7 @@ describe("POST /api/checkout", () => {
     mockedGetPack.mockReturnValue(Option.some(PACK));
     mockedGetPrice.mockReturnValue(Option.some("price_abc"));
     mockedGetCustomer.mockReturnValue(Effect.succeed(Option.some("cus_existing")));
-    mockedGetStripeClient.mockReturnValue(fakeStripe() as never);
+    mockedGetStripeClient.mockReturnValue(fakeStripe());
 
     const res = await POST(makeRequestWithoutOrigin({ pack_id: "pack_3" }));
     expect(res.status).toBe(500);

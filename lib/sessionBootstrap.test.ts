@@ -33,9 +33,6 @@ function mockSession(id: string): Session {
 function mockDeps(overrides: Partial<BootstrapDeps> = {}): BootstrapDeps {
   return {
     fetchSessions: vi.fn().mockReturnValue(Effect.succeed([])),
-    renameSession: vi.fn().mockResolvedValue(undefined),
-    setPendingAuthHandoff: vi.fn(),
-    setHasAttemptedEval: vi.fn(),
     redirectTo: vi.fn(),
     ...overrides,
   };
@@ -43,19 +40,16 @@ function mockDeps(overrides: Partial<BootstrapDeps> = {}): BootstrapDeps {
 
 describe("decideBootstrapAction", () => {
   it("returns redirect_login when no session", () => {
-    expect(decideBootstrapAction(false, ctx()).type).toBe("redirect_login");
+    expect(decideBootstrapAction(false).type).toBe("redirect_login");
   });
 
   it("returns resume_or_idle when session exists (with or without anonymous chat)", () => {
-    expect(decideBootstrapAction(true, ctx()).type).toBe("resume_or_idle");
+    expect(decideBootstrapAction(true).type).toBe("resume_or_idle");
     expect(
-      decideBootstrapAction(
-        true,
-        ctx({ hasAnonymousChat: true, hasAttemptedEval: true })
-      ).type
+      decideBootstrapAction(true).type
     ).toBe("resume_or_idle");
     expect(
-      decideBootstrapAction(true, ctx({ hasAnonymousChat: true })).type
+      decideBootstrapAction(true).type
     ).toBe("resume_or_idle");
   });
 });

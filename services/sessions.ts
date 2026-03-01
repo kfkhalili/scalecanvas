@@ -35,6 +35,8 @@ export function createSession(
     Effect.promise(() =>
       client
         .from("interview_sessions")
+        // `as never`: @supabase/ssr v0.5.2 passes wrong type args to SupabaseClient,
+        // causing Relation['Insert'] to resolve to `never`. Required until SSR is fixed.
         .insert(insertRow as never)
         .select()
         .single()
@@ -128,6 +130,7 @@ export function updateSession(
     Effect.promise(() =>
       client
         .from("interview_sessions")
+        // `as never`: @supabase/ssr v0.5.2 passes wrong type args to SupabaseClient.
         .update(dbFields as never)
         .eq("id", sessionId)
         .eq("user_id", userId)
@@ -174,6 +177,7 @@ export function appendTranscriptEntry(
     Effect.promise(() =>
       client
         .from("session_transcripts")
+        // `as never`: @supabase/ssr v0.5.2 passes wrong type args to SupabaseClient.
         .insert(insertRow as never)
         .select()
         .single()
@@ -231,6 +235,7 @@ export function saveCanvasState(
   const row = toCanvasDbInsert(sessionId, state);
   return pipe(
     Effect.promise(() =>
+      // `as never`: @supabase/ssr v0.5.2 passes wrong type args to SupabaseClient.
       client.from("canvas_states").upsert(row as never, { onConflict: "session_id" })
     ),
     Effect.flatMap(({ error }) =>

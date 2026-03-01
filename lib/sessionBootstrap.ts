@@ -17,8 +17,7 @@ export type BootstrapAction =
  * PostAuthRoot should take. Anonymous handoff always deducts one token (one trial = one session).
  */
 export function decideBootstrapAction(
-  hasSession: boolean,
-  _ctx: BootstrapContext
+  hasSession: boolean
 ): BootstrapAction {
   if (!hasSession) {
     return { type: "redirect_login" };
@@ -28,9 +27,6 @@ export function decideBootstrapAction(
 
 export type BootstrapDeps = {
   fetchSessions: () => Effect.Effect<ReadonlyArray<Session>, { message: string }>;
-  renameSession: (id: string, title: string) => Promise<void>;
-  setPendingAuthHandoff: (sessionId: Option.Option<string>) => void;
-  setHasAttemptedEval: (value: boolean) => void;
   redirectTo: (path: string) => void;
 };
 

@@ -12,14 +12,11 @@ export function shouldRefetchSessionsForCurrentSession(
   isAnonymous: boolean
 ): boolean {
   if (isAnonymous) return false;
-  return Option.match(currentSessionId, {
-    onNone: () => false,
-    onSome: (cid) => {
-      if (sessions.some((s) => s.id === cid)) return false;
-      return Option.match(lastRefetchedForSessionId, {
-        onNone: () => true,
-        onSome: (last) => last !== cid,
-      });
-    },
-  });
+  if (Option.isNone(currentSessionId)) return false;
+  const cid = currentSessionId.value;
+  if (sessions.some((s) => s.id === cid)) return false;
+  return (
+    Option.isNone(lastRefetchedForSessionId) ||
+    lastRefetchedForSessionId.value !== cid
+  );
 }

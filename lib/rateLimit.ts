@@ -77,3 +77,8 @@ export const HANDOFF_RATE_LIMIT: RateLimitConfig = {
   windowMs: 60_000,
   maxRequests: 5,
 };
+
+export const SESSIONS_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 60_000,
+  maxRequests: 10,
+};

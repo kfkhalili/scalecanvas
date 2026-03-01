@@ -59,6 +59,7 @@ export function saveStripeCustomerId(
       try: () =>
         client
           .from("stripe_customers")
+          // `as never`: @supabase/ssr v0.5.2 passes wrong type args to SupabaseClient.
           .insert({
             user_id: userId,
             stripe_customer_id: stripeCustomerId,

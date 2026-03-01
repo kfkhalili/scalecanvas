@@ -15,10 +15,13 @@ export async function GET(): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const providerOpt = await Effect.runPromise(
-    getNodeLibraryProviders(supabase, user.id)
+  const providerEither = await Effect.runPromise(
+    Effect.either(getNodeLibraryProviders(supabase, user.id))
   );
-  const providers = Option.getOrElse(providerOpt, () => []);
+  if (Either.isLeft(providerEither)) {
+    return NextResponse.json({ error: providerEither.left.message }, { status: 500 });
+  }
+  const providers = Option.getOrElse(providerEither.right, () => []);
   return NextResponse.json({ providers });
 }
 

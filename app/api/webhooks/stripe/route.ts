@@ -36,42 +36,40 @@ export async function POST(request: Request): Promise<NextResponse> {
       session.metadata as unknown as CheckoutMetadata | null
     );
 
-    await Option.match(metadataOpt, {
-      onNone: async () => {
+    if (Option.isNone(metadataOpt)) {
+      console.error("[stripe-webhook] Missing metadata on session:", session.id);
+    } else {
+      const metadata = metadataOpt.value;
+      if (!metadata.user_id || !metadata.pack_id || !metadata.tokens) {
         console.error("[stripe-webhook] Missing metadata on session:", session.id);
-      },
-      onSome: async (metadata) => {
-        if (!metadata.user_id || !metadata.pack_id || !metadata.tokens) {
-          console.error("[stripe-webhook] Missing metadata on session:", session.id);
-          return;
-        }
+      } else {
         const tokens = parseInt(metadata.tokens, 10);
         if (isNaN(tokens) || tokens <= 0) {
           console.error("[stripe-webhook] Invalid tokens metadata:", metadata.tokens);
-          return;
-        }
-        const supabase = await createServerClientInstance();
-        const either = await Effect.runPromise(
-          Effect.either(
-            creditTokensForPurchase(
-              supabase,
-              metadata.user_id,
-              session.id,
-              metadata.pack_id,
-              tokens
+        } else {
+          const supabase = await createServerClientInstance();
+          const either = await Effect.runPromise(
+            Effect.either(
+              creditTokensForPurchase(
+                supabase,
+                metadata.user_id,
+                session.id,
+                metadata.pack_id,
+                tokens
+              )
             )
-          )
-        );
-        Either.match(either, {
-          onLeft: (e) =>
-            console.error("[stripe-webhook] Failed to credit tokens:", e.message),
-          onRight: (newBalance) =>
-            console.log(
-              `[stripe-webhook] Credited ${tokens} tokens to ${metadata.user_id}. New balance: ${newBalance}`
-            ),
-        });
-      },
-    });
+          );
+          Either.match(either, {
+            onLeft: (e) =>
+              console.error("[stripe-webhook] Failed to credit tokens:", e.message),
+            onRight: (newBalance) =>
+              console.log(
+                `[stripe-webhook] Credited ${tokens} tokens to ${metadata.user_id}. New balance: ${newBalance}`
+              ),
+          });
+        }
+      }
+    }
   }
 
   return NextResponse.json({ received: true });

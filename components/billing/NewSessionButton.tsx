@@ -43,13 +43,12 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
   }, [refreshBalance]);
 
   const handleClick = (): void => {
-    Option.match(balanceOpt, {
-      onNone: () => setDialog({ kind: "no_tokens" }),
-      onSome: (tokens) =>
-        tokens > 0
-          ? setDialog({ kind: "confirm", balance: tokens })
-          : setDialog({ kind: "no_tokens" }),
-    });
+    if (Option.isNone(balanceOpt)) {
+      setDialog({ kind: "no_tokens" });
+    } else {
+      const tokens = balanceOpt.value;
+      setDialog(tokens > 0 ? { kind: "confirm", balance: tokens } : { kind: "no_tokens" });
+    }
     // Refresh balance in the background so the dialog value stays fresh
     refreshBalance();
   };
