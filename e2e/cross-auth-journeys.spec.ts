@@ -220,7 +220,7 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     await expect(page).toHaveURL(/\/[0-9a-f-]{36}$/, { timeout: 10_000 });
   });
 
-  test("anonymous → sign in (bypass) → handoff → simulate time expiry → canvas read-only and state correct after refresh", async ({
+  test("anonymous → sign in (bypass) → handoff → end interview → canvas read-only and state correct after refresh", async ({
     page,
     baseURL,
   }) => {
@@ -248,11 +248,13 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
 
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
 
-    const simulateBtn = page.getByRole("button", {
-      name: /simulate time expired/i,
-    });
-    await expect(simulateBtn).toBeVisible({ timeout: 5_000 });
-    await simulateBtn.click();
+    const endBtn = page.getByRole("button", { name: /end interview/i });
+    await expect(endBtn).toBeVisible({ timeout: 5_000 });
+    await endBtn.click();
+    // Confirm the dialog that appears after the first click
+    const confirmBtn = page.getByRole("button", { name: /end interview/i });
+    await expect(confirmBtn).toBeVisible({ timeout: 3_000 });
+    await confirmBtn.click();
 
     await expect(
       page.getByPlaceholder("This interview has ended.")
