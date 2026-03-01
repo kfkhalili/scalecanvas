@@ -107,6 +107,7 @@ function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
               height={20}
               className="h-5 w-5 shrink-0 object-contain"
               unoptimized
+              priority
             />
           ),
         })
@@ -295,6 +296,7 @@ export function NodeLibrary({ className = "", isAnonymous = false }: NodeLibrary
                     height={28}
                     className="h-7 w-7 object-contain"
                     unoptimized
+                    priority
                   />
                 ) : (
                   <icon.Icon className="h-7 w-7" aria-hidden />

@@ -2,7 +2,7 @@
 
 import { createPortal as _createPortal } from "react-dom";
 import { Effect, Option } from "effect";
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import {
   ReactFlow,
   Background,
@@ -24,6 +24,9 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { whenSome } from "@/lib/optionHelpers";
 import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
+
+// Defined at module level so ReactFlow always gets a stable reference (avoids warning #002)
+const EDGE_TYPES = { default: LabeledEdge };
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
 import { saveCanvasApi } from "@/services/sessionsClient";
 import {
@@ -234,11 +237,6 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
     onSome: (vp) => ({ x: vp.x, y: vp.y, zoom: vp.zoom }),
   });
 
-  const edgeTypes = useMemo(
-    () => ({ default: LabeledEdge }),
-    []
-  );
-
   return (
     <EdgeLabelProvider
         updateEdgeLabel={updateEdgeLabel}
@@ -264,7 +262,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
           markerEnd: { type: MarkerType.ArrowClosed },
           data: { label: "" },
         }}
-        edgeTypes={edgeTypes}
+        edgeTypes={EDGE_TYPES}
         nodeTypes={awsNodeTypes}
         fitView={Option.isNone(viewport)}
         fitViewOptions={{ padding: 0.2, maxZoom: 1.5 }}
