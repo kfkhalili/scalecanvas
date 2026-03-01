@@ -3,6 +3,7 @@
  */
 
 import type { z } from "zod";
+import type { Node, Edge, Viewport } from "@xyflow/react";
 import type { NodeLibraryProviderSchema } from "@/lib/api.schemas";
 
 export type Session = {
@@ -35,12 +36,8 @@ export type NodeData = {
   label?: string;
 };
 
-export type ReactFlowNode = {
-  id: string;
-  type?: string;
-  position: { x: number; y: number };
-  data: NodeData;
-};
+/** Typed alias for Node<NodeData> from @xyflow/react — backed by the library to prevent drift. */
+export type ReactFlowNode = Node<NodeData>;
 
 export type EdgeData = {
   label?: string;
@@ -49,20 +46,11 @@ export type EdgeData = {
   labelOffsetY?: number;
 };
 
-export type ReactFlowEdge = {
-  id: string;
-  source: string;
-  target: string;
-  sourceHandle?: string | null;
-  targetHandle?: string | null;
-  data?: EdgeData;
-};
+/** Typed alias for Edge<EdgeData> from @xyflow/react — backed by the library to prevent drift. */
+export type ReactFlowEdge = Edge<EdgeData>;
 
-export type Viewport = {
-  x: number;
-  y: number;
-  zoom: number;
-};
+/** Re-exported from @xyflow/react — { x, y, zoom }. */
+export type { Viewport };
 
 /** Readonly session for use in state/stores */
 export type ReadonlySession = Readonly<Session>;
