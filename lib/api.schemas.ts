@@ -83,11 +83,15 @@ export const MAX_CHAT_BODY_BYTES = 1_000_000;
 /** session_id must be a valid UUID when provided (interview_sessions.id). */
 export const SESSION_ID_MAX_LENGTH = 128;
 
+export const ChatPhaseSchema = z.enum(["opening", "design", "conclusion"]);
+
 export const ChatBodySchema = z.object({
   messages: z.array(MessageSchema).min(1).max(MAX_MESSAGES),
   nodes: z.array(NodeSchema).max(MAX_NODES).optional().default([]),
   edges: z.array(EdgeSchema).max(MAX_EDGES).optional().default([]),
   session_id: z.string().uuid().max(SESSION_ID_MAX_LENGTH).optional(),
+  phase: ChatPhaseSchema.optional(),
+  problem_text: z.string().max(10_000).optional(),
   data: z
     .object({
       messages: z.array(MessageSchema).optional(),
@@ -108,6 +112,8 @@ export const ConclusionBodySchema = z.object({
   messages: z.array(MessageSchema).max(MAX_MESSAGES),
   nodes: z.array(NodeSchema).max(MAX_NODES).optional().default([]),
   edges: z.array(EdgeSchema).max(MAX_EDGES).optional().default([]),
+  /** When true and allowed (dev or ALLOW_SIMULATE_EXPIRED), bypass elapsed-time check for testing. */
+  simulate_expired: z.boolean().optional(),
 });
 
 export type HandoffSuccessResponse = { created: true; session_id: string };

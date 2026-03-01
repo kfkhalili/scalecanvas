@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 import type { Session } from "@/lib/types";
@@ -9,14 +9,35 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/services/sessions", () => ({
   getSession: vi.fn(),
+  updateSession: vi.fn(),
+}));
+
+vi.mock("ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("ai")>();
+  return {
+    ...actual,
+    streamText: vi.fn((opts: { onFinish?: (arg: { text: string }) => void }) => {
+      queueMicrotask(() => opts.onFinish?.({ text: "Final summary." }));
+      return {
+        toDataStreamResponse: () =>
+          new Response(new ReadableStream(), { status: 200 }),
+      };
+    }),
+    convertToCoreMessages: vi.fn((msgs: { role: string; content: string }[]) => msgs),
+  };
+});
+
+vi.mock("@ai-sdk/amazon-bedrock", () => ({
+  createAmazonBedrock: vi.fn(() => vi.fn(() => ({}))),
 }));
 
 import { POST } from "./route";
 import { createServerClientInstance } from "@/lib/supabase/server";
-import { getSession } from "@/services/sessions";
+import { getSession, updateSession } from "@/services/sessions";
 
 const mockedCreateClient = vi.mocked(createServerClientInstance);
 const mockedGetSession = vi.mocked(getSession);
+const mockedUpdateSession = vi.mocked(updateSession);
 
 const SESSION_ID = "550e8400-e29b-41d4-a716-446655440000";
 const USER_ID = "user-1";
@@ -116,6 +137,37 @@ describe("POST /api/sessions/[id]/conclusion", () => {
     );
   });
 
+  it("when simulate_expired is true, bypasses time check (test flow)", async () => {
+    const origModel = process.env.BEDROCK_MODEL_ID;
+    const origRegion = process.env.AWS_REGION;
+    process.env.BEDROCK_MODEL_ID = "us.anthropic.claude-3-5-sonnet-v2";
+    process.env.AWS_REGION = "us-east-1";
+    mockedUpdateSession.mockReturnValue(Effect.succeed(sessionFixture({})));
+    try {
+      mockedCreateClient.mockResolvedValue(fakeSupabase({ id: USER_ID }));
+      const notExpiredSession = sessionFixture({
+        createdAt: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
+      });
+      mockedGetSession.mockReturnValue(Effect.succeed(notExpiredSession));
+      const res = await POST(
+        makeRequest({
+          messages: [{ role: "user", content: "Hi" }],
+          nodes: [],
+          edges: [],
+          simulate_expired: true,
+        }),
+        params()
+      );
+      expect(res.status).toBe(200);
+      expect(res.body).not.toBeNull();
+    } finally {
+      if (origModel !== undefined) process.env.BEDROCK_MODEL_ID = origModel;
+      else delete process.env.BEDROCK_MODEL_ID;
+      if (origRegion !== undefined) process.env.AWS_REGION = origRegion;
+      else delete process.env.AWS_REGION;
+    }
+  });
+
   it("returns 403 when conclusion summary already generated", async () => {
     mockedCreateClient.mockResolvedValue(fakeSupabase({ id: USER_ID }));
     const withConclusion = sessionFixture({
@@ -133,17 +185,54 @@ describe("POST /api/sessions/[id]/conclusion", () => {
     );
   });
 
-  it("returns 200 with ok true when valid and expired and no conclusion", async () => {
-    mockedCreateClient.mockResolvedValue(fakeSupabase({ id: USER_ID }));
-    const expiredNoConclusion = sessionFixture({});
-    mockedGetSession.mockReturnValue(Effect.succeed(expiredNoConclusion));
-    const res = await POST(
-      makeRequest({ messages: [], nodes: [], edges: [] }),
-      params()
-    );
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json).toEqual({ ok: true });
+  it("returns 503 when Bedrock env vars are missing", async () => {
+    const origModel = process.env.BEDROCK_MODEL_ID;
+    const origRegion = process.env.AWS_REGION;
+    delete process.env.BEDROCK_MODEL_ID;
+    delete process.env.AWS_REGION;
+    try {
+      mockedCreateClient.mockResolvedValue(fakeSupabase({ id: USER_ID }));
+      mockedGetSession.mockReturnValue(Effect.succeed(sessionFixture({})));
+      const res = await POST(
+        makeRequest({ messages: [], nodes: [], edges: [] }),
+        params()
+      );
+      expect(res.status).toBe(503);
+      const json = await res.json();
+      expect(json.error).toContain("BEDROCK_MODEL_ID");
+    } finally {
+      if (origModel !== undefined) process.env.BEDROCK_MODEL_ID = origModel;
+      if (origRegion !== undefined) process.env.AWS_REGION = origRegion;
+    }
+  });
+
+  it("returns 200 stream and persists summary when valid and Bedrock mocked", async () => {
+    const origModel = process.env.BEDROCK_MODEL_ID;
+    const origRegion = process.env.AWS_REGION;
+    process.env.BEDROCK_MODEL_ID = "us.anthropic.claude-3-5-sonnet-v2";
+    process.env.AWS_REGION = "us-east-1";
+    mockedUpdateSession.mockReturnValue(Effect.succeed(sessionFixture({})));
+    try {
+      mockedCreateClient.mockResolvedValue(fakeSupabase({ id: USER_ID }));
+      mockedGetSession.mockReturnValue(Effect.succeed(sessionFixture({})));
+      const res = await POST(
+        makeRequest({ messages: [{ role: "user", content: "Done" }], nodes: [], edges: [] }),
+        params()
+      );
+      expect(res.status).toBe(200);
+      expect(res.body).not.toBeNull();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockedUpdateSession).toHaveBeenCalledWith(
+        expect.anything(),
+        SESSION_ID,
+        { conclusionSummaryOpt: Option.some("Final summary.") }
+      );
+    } finally {
+      if (origModel !== undefined) process.env.BEDROCK_MODEL_ID = origModel;
+      else delete process.env.BEDROCK_MODEL_ID;
+      if (origRegion !== undefined) process.env.AWS_REGION = origRegion;
+      else delete process.env.AWS_REGION;
+    }
   });
 
   it("returns 400 for invalid JSON", async () => {

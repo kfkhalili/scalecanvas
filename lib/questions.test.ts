@@ -83,6 +83,20 @@ describe("getRandomTopic", () => {
     }
     expect(seen.size).toBe(INTERVIEW_TOPICS.length);
   });
+
+  it("maps to setInitialQuestion shape (anonymous path: comprehensive only)", () => {
+    const topic = getRandomTopic();
+    const initialQuestion = {
+      id: topic.id,
+      title: topic.title,
+      prompt: topic.comprehensivePrompt,
+      hints: [] as readonly string[],
+    };
+    expect(initialQuestion satisfies SystemDesignQuestion).toBe(initialQuestion);
+    expect(initialQuestion.prompt).toBe(topic.comprehensivePrompt);
+    expect(initialQuestion.id).toBe(topic.id);
+    expect(initialQuestion.title).toBe(topic.title);
+  });
 });
 
 describe("getRandomQuestion", () => {

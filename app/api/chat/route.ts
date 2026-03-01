@@ -7,7 +7,12 @@ import { createServerClientInstance } from "@/lib/supabase/server";
 import { getSession, updateSession } from "@/services/sessions";
 import { getSessionIfWithinTimeLimit } from "@/lib/chatGuardrails";
 import { parseCanvasState } from "@/lib/canvasParser";
-import { getSystemPrompt } from "@/lib/prompts";
+import {
+  getSystemPrompt,
+  getSystemPromptOpening,
+  getSystemPromptDesign,
+  getSystemPromptConclusion,
+} from "@/lib/prompts";
 import { checkRateLimit, CHAT_RATE_LIMIT } from "@/lib/rateLimit";
 import {
   ChatBodySchema,
@@ -108,6 +113,8 @@ export async function POST(
   let parsedNodes: { id: string; type?: string; position: { x: number; y: number }; data?: { label?: string } }[];
   let parsedEdges: { id: string; source: string; target: string; data?: { label?: string } }[];
   let sessionIdOpt: Option.Option<string>;
+  let phaseOpt: "opening" | "design" | "conclusion" | undefined;
+  let problemText = "";
   try {
     const text = await request.text();
     if (text.length > MAX_CHAT_BODY_BYTES) {
@@ -134,6 +141,8 @@ export async function POST(
     parsedNodes = parsed.nodes;
     parsedEdges = parsed.edges;
     sessionIdOpt = Option.fromNullable(parsed.session_id);
+    phaseOpt = parsed.phase;
+    problemText = parsed.problem_text ?? "";
   } catch (e) {
     console.error("[chat] 400 Parse error:", e);
     return NextResponse.json(
@@ -167,7 +176,14 @@ export async function POST(
     data: n.data ?? {},
   }));
   const canvasContext = parseCanvasState(nodesForParser, parsedEdges);
-  const systemPrompt = getSystemPrompt(canvasContext);
+  const systemPrompt =
+    phaseOpt === "opening"
+      ? getSystemPromptOpening(problemText)
+      : phaseOpt === "design"
+        ? getSystemPromptDesign(canvasContext)
+        : phaseOpt === "conclusion"
+          ? getSystemPromptConclusion()
+          : getSystemPrompt(canvasContext);
 
   const coreMessages = convertToCoreMessages(
     parsedMessages.map((m) => ({ role: m.role, content: m.content }))
