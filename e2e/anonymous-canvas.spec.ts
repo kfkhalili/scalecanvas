@@ -143,10 +143,30 @@ test.describe("Anonymous canvas persistence", () => {
     // Sanity check: zoom actually changed the scale.
     expect(beforeScale).not.toBe(initialScale);
 
+    // Wait for the new viewport to be flushed to localStorage before reloading.
+    // persistAnonymousWorkspace() is called synchronously on store change, but
+    // the zustand subscription fires in a microtask. On slow CI runners the
+    // reload can race ahead of the write, leaving the old scale in storage.
+    const targetScale = beforeScale!;
+    await page.waitForFunction(
+      (expected: number) => {
+        try {
+          const raw = localStorage.getItem("scalecanvas-anonymous-workspace");
+          if (!raw) return false;
+          const parsed = JSON.parse(raw) as { state?: { viewport?: { zoom?: number } } };
+          const zoom = parsed?.state?.viewport?.zoom;
+          return typeof zoom === "number" && Math.abs(zoom - expected) < 0.05;
+        } catch {
+          return false;
+        }
+      },
+      targetScale,
+      { timeout: 5_000 }
+    );
+
     await page.reload();
 
     // Wait for viewport to be restored from storage (rehydration can be async).
-    const targetScale = beforeScale!;
     await expect(async () => {
       const style = await viewport.getAttribute("style", { timeout: 2_000 });
       const scale = parseScale(style);
