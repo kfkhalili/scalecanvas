@@ -44,6 +44,7 @@ export default defineConfig({
     command: "pnpm dev",
     url: "http://localhost:3000",
     reuseExistingServer: true,
-    timeout: 30_000,
+    // 120 s for cold starts on CI; locally the server is usually already running.
+    timeout: 120_000,
   },
 });

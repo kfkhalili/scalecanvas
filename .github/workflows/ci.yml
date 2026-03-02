@@ -74,6 +74,21 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Start Next.js dev server
+        # Start in background so CI can track it as a real step.
+        # reuseExistingServer: true in playwright.config.ts means Playwright
+        # will use this instance instead of spawning its own.
+        run: pnpm dev &
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ steps.keys.outputs.anon_key }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.keys.outputs.service_key }}
+
+      - name: Wait for Next.js to be ready
+        run: |
+          timeout 120 bash -c \
+            'until curl -sf http://localhost:3000 > /dev/null 2>&1; do sleep 3; done'
+
       - name: E2E tests
         run: pnpm test:e2e
         env:
