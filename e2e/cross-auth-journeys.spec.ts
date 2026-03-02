@@ -256,6 +256,9 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     });
 
     await canvasSavedPromise;
+    // Canvas PUT is now in DB. Reload so InterviewSplitView re-fetches canvas
+    // (it only fetches on mount; it won't re-fetch while already on the session page).
+    await page.reload();
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
 
     const endBtn = page.getByRole("button", { name: /end interview/i });
