@@ -60,8 +60,31 @@ jobs:
         with:
           version: latest
 
+      - name: Cache Supabase Docker images
+        id: docker-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/supabase-images.tar
+          # Invalidate when config.toml changes (Postgres major version, CLI version, etc.)
+          key: supabase-docker-${{ runner.os }}-${{ hashFiles('supabase/config.toml') }}
+          restore-keys: supabase-docker-${{ runner.os }}-
+
+      - name: Load cached Docker images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/supabase-images.tar
+
       - name: Start local Supabase
-        run: supabase start
+        # Exclude services not needed for E2E: cuts download from ~800MB to ~250MB
+        run: |
+          supabase start \
+            -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,supavisor
+
+      - name: Save Docker images to cache
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        run: |
+          docker save \
+            $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>') \
+            -o /tmp/supabase-images.tar
 
       - name: Extract Supabase keys
         id: keys
