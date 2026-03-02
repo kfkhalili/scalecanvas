@@ -144,8 +144,18 @@ jobs:
         # supabase link + db push uses the Management API over HTTPS (port 443).
         # Direct --db-url Postgres connections fail on GitHub-hosted runners
         # because the runners have IPv6 disabled but Supabase resolves to IPv6.
+        #
+        # The repair step removes stale round-number migration history entries
+        # left over from the initial manual DB setup. These rows exist in the
+        # remote schema_migrations table but have no corresponding local file.
+        # "--status reverted" simply deletes those rows; it does not touch the
+        # schema itself. After repair, db push only applies genuinely new local
+        # migrations that are absent from the remote history.
         run: |
           supabase link --project-ref "$SUPABASE_PROJECT_ID"
+          supabase migration repair --status reverted \
+            20260219200000 20260219210000 20260219220000 20260219230000 \
+            20260221000000 20260221100000 20260221200000 || true
           supabase db push
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

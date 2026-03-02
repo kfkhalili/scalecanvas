@@ -234,6 +234,15 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
         handoffLog.push({ status: res.status(), body });
       }
     });
+    // Wait for the canvas PUT that fires from runBffHandoff (fire-and-forget).
+    // On CI the session page loads its canvas before the PUT completes without this.
+    const canvasSavedPromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/sessions/") &&
+        res.url().includes("/canvas") &&
+        res.request().method() === "PUT",
+      { timeout: 30_000 }
+    );
     await page.goto("/");
     await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: 20_000 }).catch(async (e) => {
       console.log("[e2e] waitForURL failed. handoff API calls:", JSON.stringify(handoffLog, null, 2));
@@ -246,6 +255,7 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
       throw e;
     });
 
+    await canvasSavedPromise;
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
 
     const endBtn = page.getByRole("button", { name: /end interview/i });
