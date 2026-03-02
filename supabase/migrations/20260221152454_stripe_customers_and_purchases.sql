@@ -1,7 +1,7 @@
 -- Stripe integration: customer mapping and purchase ledger for token packs.
 
 -- Maps Supabase user to Stripe customer (one-to-one).
-create table public.stripe_customers (
+create table if not exists public.stripe_customers (
   user_id uuid primary key references public.profiles (id) on delete cascade,
   stripe_customer_id text not null unique,
   created_at timestamptz not null default now()
@@ -9,12 +9,13 @@ create table public.stripe_customers (
 
 alter table public.stripe_customers enable row level security;
 
+drop policy if exists "Users can view own stripe customer" on public.stripe_customers;
 create policy "Users can view own stripe customer"
   on public.stripe_customers for select
   using (auth.uid() = user_id);
 
 -- Token purchase ledger; stripe_session_id is unique for idempotent webhook handling.
-create table public.token_purchases (
+create table if not exists public.token_purchases (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles (id) on delete cascade,
   stripe_session_id text not null unique,
@@ -25,6 +26,7 @@ create table public.token_purchases (
 
 alter table public.token_purchases enable row level security;
 
+drop policy if exists "Users can view own purchases" on public.token_purchases;
 create policy "Users can view own purchases"
   on public.token_purchases for select
   using (auth.uid() = user_id);

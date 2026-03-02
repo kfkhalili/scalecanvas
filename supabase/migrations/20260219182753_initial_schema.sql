@@ -1,7 +1,7 @@
 -- ScaleCanvas: profiles, interview_sessions, session_transcripts, canvas_states + RLS + profile trigger
 
 -- Profiles (one per auth user)
-create table public.profiles (
+create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text,
   full_name text,
@@ -12,17 +12,19 @@ create table public.profiles (
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "Users can view own profile" on public.profiles;
 create policy "Users can view own profile"
   on public.profiles for select
   using (auth.uid() = id);
 
+drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles for update
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
 -- Interview sessions
-create table public.interview_sessions (
+create table if not exists public.interview_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   title text,
@@ -32,25 +34,29 @@ create table public.interview_sessions (
 
 alter table public.interview_sessions enable row level security;
 
+drop policy if exists "Users can view own sessions" on public.interview_sessions;
 create policy "Users can view own sessions"
   on public.interview_sessions for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own sessions" on public.interview_sessions;
 create policy "Users can insert own sessions"
   on public.interview_sessions for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own sessions" on public.interview_sessions;
 create policy "Users can update own sessions"
   on public.interview_sessions for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own sessions" on public.interview_sessions;
 create policy "Users can delete own sessions"
   on public.interview_sessions for delete
   using (auth.uid() = user_id);
 
 -- Session transcripts
-create table public.session_transcripts (
+create table if not exists public.session_transcripts (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.interview_sessions (id) on delete cascade,
   role text not null check (role in ('user', 'assistant')),
@@ -58,11 +64,12 @@ create table public.session_transcripts (
   created_at timestamptz not null default now()
 );
 
-create index session_transcripts_session_id_created_at_idx
+create index if not exists session_transcripts_session_id_created_at_idx
   on public.session_transcripts (session_id, created_at);
 
 alter table public.session_transcripts enable row level security;
 
+drop policy if exists "Users can view transcripts of own sessions" on public.session_transcripts;
 create policy "Users can view transcripts of own sessions"
   on public.session_transcripts for select
   using (
@@ -72,6 +79,7 @@ create policy "Users can view transcripts of own sessions"
     )
   );
 
+drop policy if exists "Users can insert transcripts into own sessions" on public.session_transcripts;
 create policy "Users can insert transcripts into own sessions"
   on public.session_transcripts for insert
   with check (
@@ -82,7 +90,7 @@ create policy "Users can insert transcripts into own sessions"
   );
 
 -- Canvas states (one per session)
-create table public.canvas_states (
+create table if not exists public.canvas_states (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.interview_sessions (id) on delete cascade unique,
   nodes jsonb not null default '[]',
@@ -94,6 +102,7 @@ create table public.canvas_states (
 
 alter table public.canvas_states enable row level security;
 
+drop policy if exists "Users can view canvas of own sessions" on public.canvas_states;
 create policy "Users can view canvas of own sessions"
   on public.canvas_states for select
   using (
@@ -103,6 +112,7 @@ create policy "Users can view canvas of own sessions"
     )
   );
 
+drop policy if exists "Users can insert canvas for own sessions" on public.canvas_states;
 create policy "Users can insert canvas for own sessions"
   on public.canvas_states for insert
   with check (
@@ -112,6 +122,7 @@ create policy "Users can insert canvas for own sessions"
     )
   );
 
+drop policy if exists "Users can update canvas of own sessions" on public.canvas_states;
 create policy "Users can update canvas of own sessions"
   on public.canvas_states for update
   using (
@@ -146,6 +157,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();

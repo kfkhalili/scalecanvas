@@ -1,5 +1,5 @@
 -- Per-session settings (e.g. auto-review). One row per session.
-create table public.session_settings (
+create table if not exists public.session_settings (
   session_id uuid primary key references public.interview_sessions (id) on delete cascade,
   auto_review_enabled boolean not null default false,
   updated_at timestamptz not null default now()
@@ -7,6 +7,7 @@ create table public.session_settings (
 
 alter table public.session_settings enable row level security;
 
+drop policy if exists "Users can view settings of own sessions" on public.session_settings;
 create policy "Users can view settings of own sessions"
   on public.session_settings for select
   using (
@@ -16,6 +17,7 @@ create policy "Users can view settings of own sessions"
     )
   );
 
+drop policy if exists "Users can insert settings for own sessions" on public.session_settings;
 create policy "Users can insert settings for own sessions"
   on public.session_settings for insert
   with check (
@@ -25,6 +27,7 @@ create policy "Users can insert settings for own sessions"
     )
   );
 
+drop policy if exists "Users can update settings of own sessions" on public.session_settings;
 create policy "Users can update settings of own sessions"
   on public.session_settings for update
   using (
