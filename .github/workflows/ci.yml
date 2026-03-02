@@ -145,24 +145,18 @@ jobs:
         # Direct --db-url Postgres connections fail on GitHub-hosted runners
         # because the runners have IPv6 disabled but Supabase resolves to IPv6.
         #
-        # The remote DB was bootstrapped manually, so its schema_migrations
-        # history doesn't match local files. We reconcile in two steps:
-        #   1. Remove the 7 stale round-number rows (left from manual setup)
-        #      that have no local file counterpart.
-        #   2. Mark all 13 local migration files as already applied so that
-        #      db push doesn't try to re-run them against the existing schema.
-        # After this one-time repair, only genuinely new local migrations will
-        # be applied on future runs.
+        # The remote DB was bootstrapped manually with 7 stale round-number
+        # migration history rows that have no local file counterpart. Remove
+        # them so db push can reconcile properly.
+        # All 13 local migrations are idempotent (IF NOT EXISTS / CREATE OR
+        # REPLACE / DROP...IF EXISTS) so db push safely re-applies them:
+        # existing schema is a no-op; any missing columns or RPCs get added.
         run: |
           supabase link --project-ref "$SUPABASE_PROJECT_ID"
           supabase migration repair --status reverted \
             20260219200000 20260219210000 20260219220000 20260219230000 \
             20260221000000 20260221100000 20260221200000 || true
-          supabase migration repair --status applied \
-            20260219182753 20260220211112 20260221103317 20260221114328 \
-            20260221152454 20260221160118 20260221180955 20260221204022 \
-            20260221204237 20260221204427 20260224115726 20260226120000 \
-            20260226231616 || true
+          supabase db push
           supabase db push
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
