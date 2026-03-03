@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { CheckoutFeedback } from "@/components/billing/CheckoutFeedback";
@@ -23,6 +24,7 @@ export default function RootLayout({
           <CheckoutFeedback />
         </Suspense>
         <Toaster richColors position="top-center" />
+        <Analytics />
       </body>
     </html>
   );
