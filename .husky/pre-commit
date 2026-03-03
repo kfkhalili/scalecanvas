@@ -1,1 +1,2 @@
-pnpm lint && pnpm exec tsc --noEmit && pnpm test
+# Lint, typecheck, unit tests, and production build. Build must pass or CI/deploy will fail.
+pnpm lint && pnpm exec tsc --noEmit && pnpm test && pnpm run build
