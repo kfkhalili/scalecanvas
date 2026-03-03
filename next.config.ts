@@ -12,8 +12,8 @@ const securityHeaders = [
         ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
         : "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
-      // Allow profile avatars from Google OAuth and Supabase storage
-      "img-src 'self' data: https://unpkg.com https://*.googleusercontent.com https://*.supabase.co",
+      // Allow profile avatars from Google OAuth, GitHub, and Supabase storage
+      "img-src 'self' data: https://unpkg.com https://*.googleusercontent.com https://*.githubusercontent.com https://*.supabase.co",
       // Allow Supabase auth + realtime, Google OAuth endpoints
       // In dev, local Supabase runs on 127.0.0.1:54321
       isDev
@@ -55,6 +55,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "unpkg.com",
         pathname: "/aws-icons@3.2.0/**",
+      },
+      {
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com",
+        pathname: "/**",
       },
     ],
   },

@@ -289,6 +289,7 @@ function InterviewCountdownBadge({
   sessionIdOpt: Option.Option<string>;
 }): React.ReactElement | null {
   const sessions = useSessionStore((s) => s.sessions);
+  const isSessionActive = useSessionStore((s) => s.isSessionActive);
   const sessionId = Option.getOrUndefined(sessionIdOpt);
   const session =
     sessionId && sessionId !== "ephemeral"
@@ -299,6 +300,8 @@ function InterviewCountdownBadge({
   const containerRef = useRef<HTMLDivElement>(null);
   const [elapsed, setElapsed] = useState(false);
   const effectKey = countdownEffectKey(session);
+  /** When user ends interview early, show 0:00 and stop ticking. */
+  const treatAsElapsed = !isSessionActive;
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
@@ -319,10 +322,16 @@ function InterviewCountdownBadge({
           : `Time left: ${next.timeLabel}`;
       if (next.isElapsed) setElapsed(true);
     };
-    const current = getTimerDisplay(remainingMs(s));
+    const current = treatAsElapsed
+      ? getTimerDisplay(0)
+      : getTimerDisplay(remainingMs(s));
     apply(current);
     if (current.isElapsed) return;
     const interval = setInterval(() => {
+      if (treatAsElapsed) {
+        apply(getTimerDisplay(0));
+        return;
+      }
       const currentSession = sessionRef.current;
       if (!currentSession) return;
       const next = getTimerDisplay(remainingMs(currentSession));
@@ -330,9 +339,11 @@ function InterviewCountdownBadge({
       if (next.isElapsed) clearInterval(interval);
     }, 1000);
     return () => clearInterval(interval);
-  }, [effectKey]);
+  }, [effectKey, treatAsElapsed]);
   if (!session) return null;
-  const initial = getTimerDisplay(remainingMs(session));
+  const initial = treatAsElapsed
+    ? getTimerDisplay(0)
+    : getTimerDisplay(remainingMs(session));
   return (
     <div
       ref={containerRef}
