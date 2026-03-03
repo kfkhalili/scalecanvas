@@ -92,7 +92,15 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
     });
   };
 
-  const close = (): void => setDialog({ kind: "closed" });
+  const close = (): void => {
+    setDialog({ kind: "closed" });
+    (document.activeElement as HTMLElement | null)?.blur();
+  };
+
+  const openBuyTokens = (): void => {
+    setDialog({ kind: "no_tokens" });
+    refreshBalance();
+  };
 
   useEffect(() => {
     if (dialog.kind === "closed") return;
@@ -124,12 +132,27 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
         </button>
         {sidebarOpen &&
           Option.match(balanceOpt, {
-            onNone: () => null,
+            onNone: () => (
+              <button
+                type="button"
+                onClick={openBuyTokens}
+                aria-label="View token balance and buy more"
+                className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <Coins className="size-3.5" />
+                —
+              </button>
+            ),
             onSome: (balance) => (
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
+              <button
+                type="button"
+                onClick={openBuyTokens}
+                aria-label={`${balance} tokens. Click to buy more.`}
+                className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-ring"
+              >
                 <Coins className="size-3.5" />
                 {balance}
-              </span>
+              </button>
             ),
           })}
       </div>
@@ -184,11 +207,10 @@ export function NewSessionButton({ sidebarOpen }: NewSessionButtonProps): React.
               {(dialog.kind === "no_tokens" || dialog.kind === "buying") && (
                 <>
                   <h2 id="new-session-dialog-title" className="text-lg font-semibold text-foreground">
-                    Out of tokens
+                    Buy more tokens
                   </h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    You have no interview tokens remaining. Purchase more to continue
-                    practicing.
+                    Purchase interview tokens to practice system design interviews.
                   </p>
                   <div className="mt-4 flex flex-col gap-2">
                     {TOKEN_PACKS.map((pack) => (

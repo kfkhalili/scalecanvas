@@ -13,7 +13,9 @@ export function CheckoutFeedback(): React.ReactElement | null {
     if (shown.current) return;
     if (checkout === "success") {
       shown.current = true;
-      toast.success("Payment successful! Tokens have been added to your account.");
+      toast.success(
+        "Payment successful! Your tokens will be added in a moment—refresh if your balance doesn’t update."
+      );
     } else if (checkout === "cancel") {
       shown.current = true;
       toast.info("Checkout was cancelled.");
