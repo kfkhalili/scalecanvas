@@ -37,15 +37,29 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
 
     if (Option.isNone(metadataOpt)) {
-      console.error("[stripe-webhook] Missing metadata on session:", session.id);
+      console.error(
+        "[stripe-webhook] Missing metadata on session:",
+        session.id,
+        "- ensure checkout was created via /api/checkout with metadata"
+      );
     } else {
       const metadata = metadataOpt.value;
       if (!metadata.user_id || !metadata.pack_id || !metadata.tokens) {
-        console.error("[stripe-webhook] Missing metadata on session:", session.id);
+        console.error(
+          "[stripe-webhook] Missing required metadata (user_id, pack_id, tokens) on session:",
+          session.id,
+          "received:",
+          JSON.stringify(metadata)
+        );
       } else {
         const tokens = parseInt(metadata.tokens, 10);
         if (isNaN(tokens) || tokens <= 0) {
-          console.error("[stripe-webhook] Invalid tokens metadata:", metadata.tokens);
+          console.error(
+            "[stripe-webhook] Invalid tokens metadata:",
+            metadata.tokens,
+            "session:",
+            session.id
+          );
         } else {
           const supabase = await createServerClientInstance();
           const either = await Effect.runPromise(
@@ -59,14 +73,23 @@ export async function POST(request: Request): Promise<NextResponse> {
               )
             )
           );
-          Either.match(either, {
-            onLeft: (e) =>
-              console.error("[stripe-webhook] Failed to credit tokens:", e.message),
-            onRight: (newBalance) =>
-              console.log(
-                `[stripe-webhook] Credited ${tokens} tokens to ${metadata.user_id}. New balance: ${newBalance}`
-              ),
-          });
+          if (Either.isLeft(either)) {
+            console.error(
+              "[stripe-webhook] Failed to credit tokens:",
+              either.left.message,
+              "session:",
+              session.id,
+              "user_id:",
+              metadata.user_id
+            );
+            return NextResponse.json(
+              { error: "Token credit failed", detail: either.left.message },
+              { status: 500 }
+            );
+          }
+          console.log(
+            `[stripe-webhook] Credited ${tokens} tokens to ${metadata.user_id}. New balance: ${either.right}`
+          );
         }
       }
     }

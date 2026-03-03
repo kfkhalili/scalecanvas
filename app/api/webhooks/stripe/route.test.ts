@@ -184,7 +184,7 @@ describe("POST /api/webhooks/stripe", () => {
     expect(mockedCreditTokens).not.toHaveBeenCalled();
   });
 
-  it("returns 200 even when creditTokensForPurchase fails", async () => {
+  it("returns 500 when creditTokensForPurchase fails so Stripe retries", async () => {
     const fakeEvent = {
       type: "checkout.session.completed",
       data: {
@@ -208,8 +208,11 @@ describe("POST /api/webhooks/stripe", () => {
       body: JSON.stringify(fakeEvent),
     });
     const res = await POST(req);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
     expect(mockedCreditTokens).toHaveBeenCalled();
+    const json = await res.json();
+    expect(json.error).toBe("Token credit failed");
+    expect(json.detail).toBe("DB error");
   });
 
   it("returns 200 for non-checkout event types", async () => {
