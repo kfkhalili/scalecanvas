@@ -95,10 +95,13 @@ export async function POST(request: Request, { params }: Params) {
   }));
   const canvasContext = parseCanvasState(nodesForParser, parsed.data.edges);
   const systemPrompt = getSystemPromptConclusionTimeExpired(canvasContext);
-  const parsedMessages = parsed.data.messages.map((m) => ({
-    role: m.role,
-    content: extractContent(m.content),
-  }));
+  const parsedMessages = parsed.data.messages.map((m) => {
+    const content = extractContent(m.content);
+    return {
+      role: m.role,
+      content: content.trim() === "" ? " " : content,
+    };
+  });
   const lastRole = parsedMessages.length > 0 ? parsedMessages[parsedMessages.length - 1]?.role : undefined;
   const messagesForModel =
     lastRole === "user"

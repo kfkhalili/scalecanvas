@@ -309,7 +309,11 @@ export function ChatPanel({
         setQuestionTopicId(Option.some(topic.id));
         openingRequestedRef.current = sessionId;
         void append(
-          { role: "user", content: "", id: generateId() },
+          {
+            role: "user",
+            content: "Start the interview.",
+            id: generateId(),
+          },
           {
             body: {
               ...chatBody,

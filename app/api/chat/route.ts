@@ -110,10 +110,13 @@ export async function POST(
       );
     }
     const { data: parsed } = parseResult;
-    parsedMessages = parsed.messages.map((m) => ({
-      role: m.role,
-      content: extractContent(m.content),
-    }));
+    parsedMessages = parsed.messages.map((m) => {
+      const content = extractContent(m.content);
+      return {
+        role: m.role,
+        content: content.trim() === "" ? " " : content,
+      };
+    });
     parsedNodes = parsed.nodes;
     parsedEdges = parsed.edges;
     sessionIdOpt = Option.fromNullable(parsed.session_id);
