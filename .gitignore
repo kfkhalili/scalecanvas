@@ -1,6 +1,7 @@
 # Dependencies and build
 node_modules
 .next
+next-env.d.ts
 out
 .pnpm-store
 
