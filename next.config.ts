@@ -58,6 +58,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "unpkg.com",
+        pathname: "/gcp-icons@1.0.4/**",
+      },
+      {
+        protocol: "https",
         hostname: "avatars.githubusercontent.com",
         pathname: "/**",
       },

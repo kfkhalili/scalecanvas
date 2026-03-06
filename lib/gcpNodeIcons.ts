@@ -1,31 +1,34 @@
 import { Option } from "effect";
 
 /**
- * Maps GCP catalog node types to SVG filenames in public/icons/gcp/ (2025 set).
- * Icons are from https://cloud.google.com/icons (Core product + Category icons).
+ * GCP node types (service catalog) to gcp-icons package icon keys (kebab-case).
+ * Icons are loaded from unpkg CDN (gcp-icons@1.0.4), same pattern as aws-icons.
+ * @see https://www.npmjs.com/package/gcp-icons
  */
-const GCP_TYPE_TO_FILENAME: Record<string, string> = {
-  gcpCloudRun: "CloudRun-512-color-rgb.svg",
-  gcpGke: "GKE-512-color.svg",
-  gcpComputeEngine: "ComputeEngine-512-color-rgb.svg",
-  gcpCloudFunctions: "ServerlessComputing-512-color.svg",
-  gcpCloudStorage: "Cloud_Storage-512-color.svg",
-  gcpCloudSql: "CloudSQL-512-color.svg",
-  gcpCloudSpanner: "CloudSpanner-512-color.svg",
-  gcpAlloyDb: "AlloyDB-512-color.svg",
-  gcpBigQuery: "BigQuery-512-color.svg",
-  gcpApigee: "Apigee-512-color-rgb.svg",
-  gcpLoadBalancing: "Networking-512-color-rgb.svg",
-  gcpPubSub: "IntegrationServices-512-color.svg",
-  gcpVertexAi: "VertexAI-512-color.svg",
+const GCP_ICONS_BASE = "https://unpkg.com/gcp-icons@1.0.4/dist";
+
+const GCP_TYPE_TO_ICON_KEY: Record<string, string> = {
+  gcpCloudRun: "cloudrun-512-color-rgb",
+  gcpGke: "gke-512-color",
+  gcpComputeEngine: "computeengine-512-color-rgb",
+  gcpCloudFunctions: "serverlesscomputing-512-color",
+  gcpCloudStorage: "cloud-storage-512-color",
+  gcpCloudSql: "cloudsql-512-color",
+  gcpCloudSpanner: "cloudspanner-512-color",
+  gcpAlloyDb: "alloydb-512-color",
+  gcpBigQuery: "bigquery-512-color",
+  gcpApigee: "apigee-512-color-rgb",
+  gcpLoadBalancing: "networking-512-color-rgb",
+  gcpPubSub: "integrationservices-512-color",
+  gcpVertexAi: "vertexai-512-color",
 };
 
 export function getGcpIconUrl(type: string): Option.Option<string> {
-  const filename = GCP_TYPE_TO_FILENAME[type];
-  if (!filename) return Option.none();
-  return Option.some(`/icons/gcp/${filename}`);
+  const iconKey = GCP_TYPE_TO_ICON_KEY[type];
+  if (!iconKey) return Option.none();
+  return Option.some(`${GCP_ICONS_BASE}/icons/${iconKey}.svg`);
 }
 
 export function isGcpNodeType(type: string): boolean {
-  return type in GCP_TYPE_TO_FILENAME;
+  return type in GCP_TYPE_TO_ICON_KEY;
 }
