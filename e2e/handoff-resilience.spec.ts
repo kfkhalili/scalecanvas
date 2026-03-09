@@ -2,12 +2,12 @@ import { test, expect } from "@playwright/test";
 import { setupAuthenticatedPage, ensureUserAndResetTrial } from "./fixtures";
 import {
   isLocalSupabase,
-  E2E_HANDOFF_H3_USER_ID,
-  E2E_HANDOFF_H1_USER_ID,
-  E2E_HANDOFF_H2_USER_ID,
+  E2E_HANDOFF_DEDUP_USER_ID,
+  E2E_HANDOFF_CANVAS_USER_ID,
+  E2E_HANDOFF_TRANSCRIPT_USER_ID,
 } from "./env";
 
-test.describe("Handoff resilience (H1–H3 fixes)", () => {
+test.describe("Handoff resilience", () => {
   test.beforeEach(async () => {
     test.skip(
       !isLocalSupabase(),
@@ -15,15 +15,15 @@ test.describe("Handoff resilience (H1–H3 fixes)", () => {
     );
   });
 
-  test("H3 — only one handoff API call despite React Strict Mode double-fire", async ({
+  test("only one handoff API call despite React Strict Mode double-fire", async ({
     page,
     baseURL,
   }) => {
     await ensureUserAndResetTrial(
-      E2E_HANDOFF_H3_USER_ID,
-      "e2e-h3@example.com"
+      E2E_HANDOFF_DEDUP_USER_ID,
+      "e2e-handoff-dedup@example.com"
     );
-    await setupAuthenticatedPage(page, E2E_HANDOFF_H3_USER_ID, baseURL);
+    await setupAuthenticatedPage(page, E2E_HANDOFF_DEDUP_USER_ID, baseURL);
 
     // Track every POST to /api/auth/handoff
     const handoffCalls: { status: number; body: unknown }[] = [];
@@ -53,15 +53,15 @@ test.describe("Handoff resilience (H1–H3 fixes)", () => {
     expect(handoffCalls[0].status).toBe(201);
   });
 
-  test("H1 — canvas save retries on transient failure and persists after retry", async ({
+  test("canvas save retries on transient failure and persists after retry", async ({
     page,
     baseURL,
   }) => {
     await ensureUserAndResetTrial(
-      E2E_HANDOFF_H1_USER_ID,
-      "e2e-h1@example.com"
+      E2E_HANDOFF_CANVAS_USER_ID,
+      "e2e-handoff-canvas@example.com"
     );
-    await setupAuthenticatedPage(page, E2E_HANDOFF_H1_USER_ID, baseURL);
+    await setupAuthenticatedPage(page, E2E_HANDOFF_CANVAS_USER_ID, baseURL);
 
     // Intercept PUT /api/sessions/*/canvas: fail the first attempt, let retries through.
     let canvasPutCount = 0;
@@ -112,15 +112,15 @@ test.describe("Handoff resilience (H1–H3 fixes)", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("H2 — transcript save retries on transient failure and persists", async ({
+  test("transcript save retries on transient failure and persists", async ({
     page,
     baseURL,
   }) => {
     await ensureUserAndResetTrial(
-      E2E_HANDOFF_H2_USER_ID,
-      "e2e-h2@example.com"
+      E2E_HANDOFF_TRANSCRIPT_USER_ID,
+      "e2e-handoff-transcript@example.com"
     );
-    await setupAuthenticatedPage(page, E2E_HANDOFF_H2_USER_ID, baseURL);
+    await setupAuthenticatedPage(page, E2E_HANDOFF_TRANSCRIPT_USER_ID, baseURL);
 
     // Intercept POST to the transcript batch endpoint: abort the first attempt
     // so the saveWithBackoff retry logic is exercised, then let retries through.
