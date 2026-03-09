@@ -1,7 +1,7 @@
 "use client";
 
 import { Option } from "effect";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -29,6 +29,9 @@ import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
 export function PostAuthRoot(): React.ReactElement {
   const router = useRouter();
   const [storesReady, setStoresReady] = useState(false);
+  // One-shot guard: prevents double-firing if React Strict Mode remounts this
+  // effect or if storesReady toggles more than once during a rapid re-render.
+  const bootstrapCalledRef = useRef(false);
 
   useEffect(() => {
     loadAnonymousWorkspace();
@@ -37,6 +40,8 @@ export function PostAuthRoot(): React.ReactElement {
 
   useEffect(() => {
     if (!storesReady) return;
+    if (bootstrapCalledRef.current) return;
+    bootstrapCalledRef.current = true;
 
     const supabase = createBrowserClientInstance();
     const setHasAttemptedEval = useCanvasStore.getState().setHasAttemptedEval;
