@@ -5,6 +5,7 @@
  */
 
 import { Option } from "effect";
+import { toast } from "sonner";
 import type {
   ReactFlowNode,
   ReactFlowEdge,
@@ -128,6 +129,9 @@ export function loadAnonymousWorkspace(): boolean {
   return true;
 }
 
+/** Shown at most once per page load so we don't spam on every node drag. */
+let storageWarningShown = false;
+
 /**
  * Persist current canvas and handoff state to the single key.
  * Call when the anonymous view is active and either store changes.
@@ -156,7 +160,12 @@ export function persistAnonymousWorkspace(): void {
       JSON.stringify({ state, version: 0 })
     );
   } catch {
-    // quota or disabled
+    if (!storageWarningShown) {
+      storageWarningShown = true;
+      toast.warning(
+        "Your progress may not be saved. Storage is full or unavailable \u2014 sign in to keep your work."
+      );
+    }
   }
 }
 
