@@ -7,6 +7,7 @@ import type {
 import type {
   CreateSessionBody,
   AppendTranscriptBody,
+  AppendTranscriptBatchBody,
 } from "@/lib/api.schemas";
 
 /** JSON body shape when API returns an error (e.g. 4xx/5xx). */
@@ -49,7 +50,7 @@ export function apiGet<T>(path: string): Effect.Effect<T, ApiError> {
 
 function apiPost<T>(
   path: string,
-  body: CreateSessionBody | AppendTranscriptBody
+  body: CreateSessionBody | AppendTranscriptBody | AppendTranscriptBatchBody
 ): Effect.Effect<T, ApiError> {
   return pipe(
     Effect.tryPromise({
@@ -232,6 +233,19 @@ export function appendTranscriptApi(
   return apiPost<TranscriptEntry>(
     `${sessionsPath()}/${sessionId}/transcript`,
     { role, content }
+  );
+}
+
+export function appendTranscriptBatchApi(
+  sessionId: string,
+  entries: { id: string; role: "user" | "assistant"; content: string }[]
+): Effect.Effect<undefined, ApiError> {
+  return pipe(
+    apiPost<{ count: number }>(
+      `${sessionsPath()}/${sessionId}/transcript/batch`,
+      { entries }
+    ),
+    Effect.map(() => undefined)
   );
 }
 

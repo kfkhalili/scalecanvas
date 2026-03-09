@@ -24,6 +24,21 @@ export const AppendTranscriptBodySchema = z.object({
   content: z.string().min(1).max(50_000),
 });
 
+export const MAX_BATCH_ENTRIES = 500;
+
+export const AppendTranscriptBatchBodySchema = z.object({
+  entries: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(128),
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(50_000),
+      })
+    )
+    .min(1)
+    .max(MAX_BATCH_ENTRIES),
+});
+
 const NodeSchema = z.object({
   id: z.string(),
   type: z.string().optional(),
@@ -120,6 +135,7 @@ export type HandoffResponse = HandoffSuccessResponse | HandoffNotCreatedResponse
 export type CreateSessionBody = z.infer<typeof CreateSessionBodySchema>;
 export type UpdateSessionBody = z.infer<typeof UpdateSessionBodySchema>;
 export type AppendTranscriptBody = z.infer<typeof AppendTranscriptBodySchema>;
+export type AppendTranscriptBatchBody = z.infer<typeof AppendTranscriptBatchBodySchema>;
 export type CanvasBody = z.infer<typeof CanvasBodySchema>;
 export type ChatBody = z.infer<typeof ChatBodySchema>;
 export type CheckoutBody = z.infer<typeof CheckoutBodySchema>;

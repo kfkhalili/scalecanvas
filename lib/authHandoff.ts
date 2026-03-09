@@ -15,7 +15,7 @@ export type RunBffHandoffParams = {
   /** Persist filtered messages to the new session's transcript; called before onHandoffComplete. */
   persistTranscript: (
     sessionId: string,
-    entries: { role: "user" | "assistant"; content: string }[]
+    entries: { id: string; role: "user" | "assistant"; content: string }[]
   ) => Promise<void>;
   onCanvasSaveError: () => void;
   /** Called after transcript is persisted; receives sessionId and filtered messages so client can store handoff transcript and navigate. */
@@ -27,7 +27,7 @@ export type RunBffHandoffParams = {
  * Returns true if any attempt succeeds, false if all fail.
  * Delays: immediate → baseDelayMs → baseDelayMs×4 (e.g. 0ms → 600ms → 2400ms).
  */
-async function saveWithBackoff(
+export async function saveWithBackoff(
   saveFn: () => Promise<Either.Either<undefined, { message: string }>>,
   maxAttempts: number,
   baseDelayMs: number
@@ -77,12 +77,12 @@ export async function runBffHandoff(params: RunBffHandoffParams): Promise<void> 
       })
   );
 
-  const entries: { role: "user" | "assistant"; content: string }[] = [];
+  const entries: { id: string; role: "user" | "assistant"; content: string }[] = [];
   for (const m of filtered) {
     const role = m.role;
     const content = typeof m.content === "string" ? m.content : "";
     if ((role === "user" || role === "assistant") && content.length > 0) {
-      entries.push({ role, content });
+      entries.push({ id: m.id, role, content });
     }
   }
 

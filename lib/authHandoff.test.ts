@@ -53,7 +53,7 @@ describe("runBffHandoff", () => {
 
     expect(saveCanvasApi).toHaveBeenCalledWith(sessionId, canvasState);
     expect(persistTranscript).toHaveBeenCalledWith(sessionId, [
-      { role: "user", content: "Hello" },
+      { id: "user-1", role: "user", content: "Hello" },
     ]);
     expect(setMessages).toHaveBeenCalled();
     expect(onHandoffComplete).toHaveBeenCalledWith(sessionId, expect.any(Array));
@@ -156,8 +156,8 @@ describe("runBffHandoff", () => {
 
       // Empty string content excluded; non-empty entries preserved
       expect(persistTranscript).toHaveBeenCalledWith(sessionId, [
-        { role: "user", content: "Hello" },
-        { role: "assistant", content: "World" },
+        { id: "u1", role: "user", content: "Hello" },
+        { id: "a1", role: "assistant", content: "World" },
       ]);
     });
 
@@ -171,8 +171,8 @@ describe("runBffHandoff", () => {
       await run();
 
       expect(persistTranscript).toHaveBeenCalledWith(sessionId, [
-        { role: "user", content: "Describe S3" },
-        { role: "assistant", content: "S3 is object storage" },
+        { id: "u1", role: "user", content: "Describe S3" },
+        { id: "a1", role: "assistant", content: "S3 is object storage" },
       ]);
     });
 
@@ -186,9 +186,9 @@ describe("runBffHandoff", () => {
       await run();
 
       expect(persistTranscript).toHaveBeenCalledWith(sessionId, [
-        { role: "user", content: "Question" },
-        { role: "assistant", content: "Answer" },
-        { role: "user", content: "Follow-up" },
+        { id: "u1", role: "user", content: "Question" },
+        { id: "a1", role: "assistant", content: "Answer" },
+        { id: "u2", role: "user", content: "Follow-up" },
       ]);
     });
 

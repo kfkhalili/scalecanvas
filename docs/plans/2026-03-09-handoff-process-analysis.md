@@ -360,7 +360,7 @@ The teaser message ID is `plg-teaser-${Date.now()}`. If called twice within the 
 
 | # | Issue | Severity | Category | Impact | Fix Effort |
 |---|-------|----------|----------|--------|------------|
-| H1 | Canvas save fire-and-forget, 1 retry | 🔴 High | Data Loss | User's diagram silently lost | Medium |
+| H1 | Canvas save fire-and-forget, 1 retry | ✅ Resolved | Data Loss | User's diagram silently lost | Medium |
 | H2 | Transcript append no retry, partial failure | 🔴 High | Data Corruption | Incomplete chat history | Medium |
 | H3 | No handoff-in-progress guard | 🔴 High | Race Condition | Double API calls, state corruption | Low |
 | H4 | localStorage quota failure silent | 🔴 High | Data Loss | All anonymous work lost on redirect | Low |

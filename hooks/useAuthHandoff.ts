@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
-import { appendTranscriptApi, saveCanvasApi } from "@/services/sessionsClient";
-import { runBffHandoff } from "@/lib/authHandoff";
+import { appendTranscriptBatchApi, saveCanvasApi } from "@/services/sessionsClient";
+import { runBffHandoff, saveWithBackoff } from "@/lib/authHandoff";
 import { whenSome } from "@/lib/optionHelpers";
 import { toast } from "sonner";
 import type { TranscriptEntry } from "@/lib/types";
@@ -70,9 +70,18 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
         saveCanvasApi,
         setMessages,
         persistTranscript: async (sid, entries) => {
-          for (const { role, content } of entries) {
-            await Effect.runPromise(
-              Effect.either(appendTranscriptApi(sid, role, content))
+          if (entries.length === 0) return;
+          const saved = await saveWithBackoff(
+            () =>
+              Effect.runPromise(
+                Effect.either(appendTranscriptBatchApi(sid, entries))
+              ),
+            3,
+            600
+          );
+          if (!saved) {
+            toast.error(
+              "Part of your conversation couldn't be saved. Your diagram is safe — try refreshing to recover it."
             );
           }
         },
