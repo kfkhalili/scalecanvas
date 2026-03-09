@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Effect, Either } from "effect";
-import { runBffHandoff, saveWithBackoff, buildTranscriptEntries } from "./authHandoff";
+import { runBffHandoff, saveWithBackoff, buildTranscriptEntries, resolveHandoffMessages } from "./authHandoff";
 import { PLG_TEASER_MESSAGE } from "./plg";
 import type { CanvasState } from "@/lib/types";
 
@@ -340,6 +340,67 @@ describe("runBffHandoff", () => {
     });
   });
 
+  describe("transcript save retry", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("calls onTranscriptSaveError when all 3 transcript save attempts fail", async () => {
+      const onTranscriptSaveError = vi.fn();
+      const persistTranscript = vi.fn().mockResolvedValue(Either.left({ message: "DB error" }));
+      const onHandoffComplete = vi.fn();
+
+      const handoffPromise = runBffHandoff({
+        sessionId,
+        messages: [{ id: "u1", role: "user" as const, content: "Hello" }],
+        getCanvasState: () => canvasState,
+        saveCanvasApi: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+        setMessages: vi.fn(),
+        persistTranscript,
+        onCanvasSaveError: vi.fn(),
+        onTranscriptSaveError,
+        onHandoffComplete,
+      });
+      await vi.runAllTimersAsync();
+      await handoffPromise;
+
+      expect(persistTranscript).toHaveBeenCalledTimes(3);
+      expect(onTranscriptSaveError).toHaveBeenCalledTimes(1);
+      // Handoff still completes even when transcript fails
+      expect(onHandoffComplete).toHaveBeenCalled();
+    });
+
+    it("does not call onTranscriptSaveError when second transcript attempt succeeds", async () => {
+      let calls = 0;
+      const persistTranscript = vi.fn().mockImplementation(async () => {
+        calls++;
+        return calls === 1 ? Either.left({ message: "transient" }) : Either.right(undefined);
+      });
+      const onTranscriptSaveError = vi.fn();
+
+      const handoffPromise = runBffHandoff({
+        sessionId,
+        messages: [{ id: "u1", role: "user" as const, content: "Hello" }],
+        getCanvasState: () => canvasState,
+        saveCanvasApi: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+        setMessages: vi.fn(),
+        persistTranscript,
+        onCanvasSaveError: vi.fn(),
+        onTranscriptSaveError,
+        onHandoffComplete: vi.fn(),
+      });
+      await vi.runAllTimersAsync();
+      await handoffPromise;
+
+      expect(persistTranscript).toHaveBeenCalledTimes(2);
+      expect(onTranscriptSaveError).not.toHaveBeenCalled();
+    });
+  });
+
   it("setMessages is called with an updater function that ignores prev", async () => {
     const capturedArg: unknown[] = [];
     const setMessages = vi.fn().mockImplementation((arg: unknown) => {
@@ -472,6 +533,56 @@ describe("buildTranscriptEntries", () => {
 
   it("returns empty array for empty input", () => {
     expect(buildTranscriptEntries(sessionId, [], now)).toEqual([]);
+  });
+});
+
+describe("resolveHandoffMessages", () => {
+  const chatMessages = [
+    { id: "c1", role: "user" as const, content: "From useChat" },
+    { id: "c2", role: "assistant" as const, content: "Response" },
+  ];
+  const anonMessages = [
+    { id: "a1", role: "user", content: "From localStorage" },
+    { id: "a2", role: "assistant", content: "Stored response" },
+  ];
+
+  it("returns useChatMessages when they are non-empty", () => {
+    const result = resolveHandoffMessages(chatMessages, anonMessages);
+    expect(result).toBe(chatMessages);
+    expect(result).toHaveLength(2);
+  });
+
+  it("falls back to anonymousMessages when useChatMessages is empty", () => {
+    const result = resolveHandoffMessages([], anonMessages);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe("a1");
+    expect(result[0].role).toBe("user");
+    expect(result[0].content).toBe("From localStorage");
+  });
+
+  it("maps recognised roles (user, assistant, system, data) through unchanged", () => {
+    const anon = [
+      { id: "1", role: "user", content: "a" },
+      { id: "2", role: "assistant", content: "b" },
+      { id: "3", role: "system", content: "c" },
+      { id: "4", role: "data", content: "d" },
+    ];
+    const result = resolveHandoffMessages([], anon);
+    expect(result.map((m) => m.role)).toEqual(["user", "assistant", "system", "data"]);
+  });
+
+  it("defaults unrecognised roles to 'assistant'", () => {
+    const anon = [
+      { id: "1", role: "tool", content: "x" },
+      { id: "2", role: "anything", content: "y" },
+    ];
+    const result = resolveHandoffMessages([], anon);
+    expect(result[0].role).toBe("assistant");
+    expect(result[1].role).toBe("assistant");
+  });
+
+  it("returns empty array when both sources are empty", () => {
+    expect(resolveHandoffMessages([], [])).toEqual([]);
   });
 });
 

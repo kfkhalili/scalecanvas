@@ -7,6 +7,10 @@ export const E2E_JOURNEY_USER_ID = "e2e00000-0000-4000-8000-000000000001";
 export const E2E_JOURNEY_CONCLUSION_USER_ID = "e2e00000-0000-4000-8000-000000000002";
 /** Used by the JWT-bypass smoke test in cross-auth-jwt.spec.ts. */
 export const E2E_JWT_BYPASS_USER_ID = "e2e00000-0000-4000-8000-000000000003";
+/** Used by handoff resilience tests (H1/H2/H3 fixes). */
+export const E2E_HANDOFF_H3_USER_ID = "e2e00000-0000-4000-8000-000000000004";
+export const E2E_HANDOFF_H1_USER_ID = "e2e00000-0000-4000-8000-000000000005";
+export const E2E_HANDOFF_H2_USER_ID = "e2e00000-0000-4000-8000-000000000006";
 
 /**
  * JWT bypass only works with local Supabase (same JWT secret as e2e/jwtBypass.ts).

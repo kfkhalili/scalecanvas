@@ -125,11 +125,19 @@ describe("AppendTranscriptBatchBodySchema", () => {
     expect(
       AppendTranscriptBatchBodySchema.safeParse({
         entries: [
-          { id: "msg-1", role: "user", content: "Hello" },
-          { id: "msg-2", role: "assistant", content: "Hi" },
+          { id: "a0000000-0000-4000-8000-000000000001", role: "user", content: "Hello" },
+          { id: "a0000000-0000-4000-8000-000000000002", role: "assistant", content: "Hi" },
         ],
       }).success
     ).toBe(true);
+  });
+
+  it("rejects entry with non-UUID id", () => {
+    expect(
+      AppendTranscriptBatchBodySchema.safeParse({
+        entries: [{ id: "m1", role: "user", content: "Hello" }],
+      }).success
+    ).toBe(false);
   });
 
   it("rejects empty entries array", () => {
@@ -143,7 +151,7 @@ describe("AppendTranscriptBatchBodySchema", () => {
   it("rejects entry with invalid role", () => {
     expect(
       AppendTranscriptBatchBodySchema.safeParse({
-        entries: [{ id: "msg-1", role: "system", content: "Hi" }],
+        entries: [{ id: "a0000000-0000-4000-8000-000000000001", role: "system", content: "Hi" }],
       }).success
     ).toBe(false);
   });
@@ -151,7 +159,7 @@ describe("AppendTranscriptBatchBodySchema", () => {
   it("rejects entry with empty content", () => {
     expect(
       AppendTranscriptBatchBodySchema.safeParse({
-        entries: [{ id: "msg-1", role: "user", content: "" }],
+        entries: [{ id: "a0000000-0000-4000-8000-000000000001", role: "user", content: "" }],
       }).success
     ).toBe(false);
   });
@@ -159,7 +167,7 @@ describe("AppendTranscriptBatchBodySchema", () => {
   it("rejects entry with content exceeding 50K chars", () => {
     expect(
       AppendTranscriptBatchBodySchema.safeParse({
-        entries: [{ id: "msg-1", role: "user", content: "x".repeat(50_001) }],
+        entries: [{ id: "a0000000-0000-4000-8000-000000000001", role: "user", content: "x".repeat(50_001) }],
       }).success
     ).toBe(false);
   });
@@ -174,7 +182,7 @@ describe("AppendTranscriptBatchBodySchema", () => {
 
   it(`rejects arrays exceeding ${MAX_BATCH_ENTRIES} entries`, () => {
     const entries = Array.from({ length: MAX_BATCH_ENTRIES + 1 }, (_, i) => ({
-      id: `msg-${i}`,
+      id: `a0000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
       role: "user" as const,
       content: "x",
     }));

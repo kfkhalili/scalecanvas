@@ -30,7 +30,7 @@ export const AppendTranscriptBatchBodySchema = z.object({
   entries: z
     .array(
       z.object({
-        id: z.string().min(1).max(128),
+        id: z.string().uuid(),
         role: z.enum(["user", "assistant"]),
         content: z.string().min(1).max(50_000),
       })

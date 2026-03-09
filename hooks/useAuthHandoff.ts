@@ -8,7 +8,7 @@ import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
 import { appendTranscriptBatchApi, saveCanvasApi } from "@/services/sessionsClient";
-import { runBffHandoff, buildTranscriptEntries } from "@/lib/authHandoff";
+import { runBffHandoff, buildTranscriptEntries, resolveHandoffMessages } from "@/lib/authHandoff";
 import { whenSome } from "@/lib/optionHelpers";
 import { toast } from "sonner";
 
@@ -47,20 +47,7 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
       loadAnonymousWorkspace();
 
       const anonMsgs = useAuthHandoffStore.getState().anonymousMessages;
-      const messagesToUse: Message[] =
-        messages.length > 0
-          ? messages
-          : anonMsgs.map((m) => ({
-              id: m.id,
-              role:
-                m.role === "user" ||
-                m.role === "assistant" ||
-                m.role === "system" ||
-                m.role === "data"
-                  ? (m.role as Message["role"])
-                  : ("assistant" as const),
-              content: m.content,
-            }));
+      const messagesToUse = resolveHandoffMessages(messages, anonMsgs);
 
       void runBffHandoff({
         sessionId: pendingSessionId,

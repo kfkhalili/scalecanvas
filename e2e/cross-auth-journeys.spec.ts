@@ -1,11 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
-import { bypassOAuthAndInject, getAuthCookieForHeader, mintServiceRoleToken } from "./jwtBypass";
+import { mintServiceRoleToken } from "./jwtBypass";
+import { setupAuthenticatedPage } from "./fixtures";
 import {
   isLocalSupabase,
   E2E_JOURNEY_USER_ID,
   E2E_JOURNEY_CONCLUSION_USER_ID,
 } from "./env";
-const ANONYMOUS_WORKSPACE_KEY = "scalecanvas-anonymous-workspace";
 
 function nodeByLabel(page: Page, label: string) {
   return page.locator(".react-flow__node").filter({ hasText: label });
@@ -19,82 +19,6 @@ async function dragServiceToCanvas(page: Page, label: string): Promise<void> {
   const source = page.getByText(label, { exact: true }).first();
   const canvas = page.locator(".react-flow");
   await source.dragTo(canvas);
-}
-
-const anonymousWorkspaceWithLambda = {
-  state: {
-    anonymousMessages: [{ id: "m1", role: "user", content: "Hello" }],
-    questionTitle: "URL Shortener",
-    questionTopicId: null,
-    nodes: [
-      {
-        id: "n1",
-        type: "awsLambda",
-        position: { x: 100, y: 100 },
-        data: { label: "Lambda" },
-      },
-    ],
-    edges: [] as unknown[],
-    hasAttemptedEval: true,
-    viewport: undefined,
-  },
-  version: 0,
-};
-
-/**
- * Seeds the anonymous workspace into localStorage, injects a minted auth cookie,
- * and installs a route interceptor that appends that cookie to every SSR request.
- * Call before page.goto() in each test.
- */
-async function setupAuthenticatedPage(
-  page: Page,
-  userId: string,
-  baseURL: string | undefined
-): Promise<void> {
-  await page.addInitScript(() => {
-    (window as Window & { __E2E_DEBUG__?: boolean }).__E2E_DEBUG__ = true;
-  });
-  await page.addInitScript(
-    ({ key, payload }: { key: string; payload: string }) => {
-      localStorage.setItem(key, payload);
-    },
-    {
-      key: ANONYMOUS_WORKSPACE_KEY,
-      payload: JSON.stringify(anonymousWorkspaceWithLambda),
-    }
-  );
-
-  await bypassOAuthAndInject(
-    page,
-    userId,
-    baseURL ?? "http://localhost:3000"
-  );
-
-  const origin = (baseURL ?? "http://localhost:3000").replace(/\/$/, "");
-  const originRegex = new RegExp(
-    "^" + origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(/.*)?$"
-  );
-  const { name: authCookieName, value: authCookieValue } = getAuthCookieForHeader(userId);
-  await page.addInitScript(
-    ({ name, value }: { name: string; value: string }) => {
-      document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=3600; SameSite=Lax`;
-    },
-    { name: authCookieName, value: authCookieValue }
-  );
-  const cookieHeader = `${authCookieName}=${authCookieValue}`;
-  await page.route(originRegex, (route) => {
-    const req = route.request();
-    const headersCopy: Record<string, string> = { ...req.headers() };
-    headersCopy["cookie"] = headersCopy["cookie"]
-      ? `${headersCopy["cookie"]}; ${cookieHeader}`
-      : cookieHeader;
-
-    // Use route.continue for ALL request types (including documents).
-    // route.fulfill() changes Chromium's address-space for the page from
-    // "local" to "public", triggering Private Network Access (PNA) checks
-    // that block subsequent fetches to 127.0.0.1 (Supabase GoTrue).
-    void route.continue({ headers: headersCopy });
-  });
 }
 
 test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {

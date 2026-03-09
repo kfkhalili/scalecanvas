@@ -28,8 +28,8 @@ function buildParams() {
 }
 
 const VALID_ENTRIES = [
-  { id: "msg-1", role: "user" as const, content: "Hello" },
-  { id: "msg-2", role: "assistant" as const, content: "Hi there" },
+  { id: "b0000000-0000-4000-8000-000000000001", role: "user" as const, content: "Hello" },
+  { id: "b0000000-0000-4000-8000-000000000002", role: "assistant" as const, content: "Hi there" },
 ];
 
 function buildPost(body: unknown): Request {
@@ -80,7 +80,7 @@ describe("POST /api/sessions/[id]/transcript/batch", () => {
   it("returns 400 when an entry has invalid role", async () => {
     mockedCreate.mockResolvedValue(fakeSupabase({ id: "user-1" }));
     const res = await POST(
-      buildPost({ entries: [{ id: "msg-1", role: "system", content: "Hi" }] }),
+      buildPost({ entries: [{ id: "b0000000-0000-4000-8000-000000000001", role: "system", content: "Hi" }] }),
       buildParams()
     );
     expect(res.status).toBe(400);
@@ -89,7 +89,7 @@ describe("POST /api/sessions/[id]/transcript/batch", () => {
   it("returns 400 when an entry has empty content", async () => {
     mockedCreate.mockResolvedValue(fakeSupabase({ id: "user-1" }));
     const res = await POST(
-      buildPost({ entries: [{ id: "msg-1", role: "user", content: "" }] }),
+      buildPost({ entries: [{ id: "b0000000-0000-4000-8000-000000000001", role: "user", content: "" }] }),
       buildParams()
     );
     expect(res.status).toBe(400);
@@ -98,7 +98,7 @@ describe("POST /api/sessions/[id]/transcript/batch", () => {
   it("returns 400 when an entry has content exceeding 50 000 chars", async () => {
     mockedCreate.mockResolvedValue(fakeSupabase({ id: "user-1" }));
     const res = await POST(
-      buildPost({ entries: [{ id: "msg-1", role: "user", content: "x".repeat(50_001) }] }),
+      buildPost({ entries: [{ id: "b0000000-0000-4000-8000-000000000001", role: "user", content: "x".repeat(50_001) }] }),
       buildParams()
     );
     expect(res.status).toBe(400);

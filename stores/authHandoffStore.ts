@@ -7,6 +7,26 @@ export type AnonymousMessage = { id: string; role: string; content: string };
 
 type HandoffTranscript = { sessionId: string; entries: TranscriptEntry[] };
 
+const PENDING_SESSION_KEY = "scalecanvas-pending-session";
+
+/** Read `pendingSessionId` from sessionStorage (survives page navigations within a tab). */
+function readPendingSession(): Option.Option<string> {
+  if (typeof window === "undefined") return Option.none();
+  const stored = sessionStorage.getItem(PENDING_SESSION_KEY);
+  return stored ? Option.some(stored) : Option.none();
+}
+
+/** Sync `pendingSessionId` to sessionStorage so it survives hard navigations. */
+function writePendingSession(opt: Option.Option<string>): void {
+  if (typeof window === "undefined") return;
+  const raw = Option.getOrNull(opt);
+  if (raw !== null) {
+    sessionStorage.setItem(PENDING_SESSION_KEY, raw);
+  } else {
+    sessionStorage.removeItem(PENDING_SESSION_KEY);
+  }
+}
+
 type AuthHandoffStore = {
   /** When set, ChatPanel should run BFF handoff then clear and navigate to this session. */
   pendingSessionId: Option.Option<string>;
@@ -26,8 +46,11 @@ type AuthHandoffStore = {
 };
 
 export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
-  pendingSessionId: Option.none(),
-  setPendingAuthHandoff: (sessionId) => set({ pendingSessionId: sessionId }),
+  pendingSessionId: readPendingSession(),
+  setPendingAuthHandoff: (sessionId) => {
+    writePendingSession(sessionId);
+    set({ pendingSessionId: sessionId });
+  },
   handoffTranscript: Option.none(),
   setHandoffTranscript: (data) => set({ handoffTranscript: data }),
   anonymousMessages: [],

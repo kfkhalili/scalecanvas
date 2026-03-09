@@ -2,6 +2,7 @@ import { Effect, Either } from "effect";
 import type { Message } from "ai";
 import { isTeaserMessage } from "@/lib/plg";
 import type { CanvasState, TranscriptEntry } from "@/lib/types";
+import type { AnonymousMessage } from "@/stores/authHandoffStore";
 
 export type RunBffHandoffParams = {
   sessionId: string;
@@ -120,5 +121,31 @@ export function buildTranscriptEntries(
     ) as "user" | "assistant",
     content: typeof m.content === "string" ? m.content : "",
     createdAt: now,
+  }));
+}
+
+/**
+ * Resolves which messages to use for the handoff transcript.
+ *
+ * If `useChatMessages` (from the active useChat hook) is non-empty, those are
+ * used directly. Otherwise falls back to `anonymousMessages` (from localStorage
+ * via the auth handoff store), mapping their free-form `role` string to the
+ * `Message["role"]` union with unrecognised roles defaulting to `"assistant"`.
+ */
+export function resolveHandoffMessages(
+  useChatMessages: Message[],
+  anonymousMessages: AnonymousMessage[],
+): Message[] {
+  if (useChatMessages.length > 0) return useChatMessages;
+  return anonymousMessages.map((m) => ({
+    id: m.id,
+    role:
+      m.role === "user" ||
+      m.role === "assistant" ||
+      m.role === "system" ||
+      m.role === "data"
+        ? (m.role as Message["role"])
+        : ("assistant" as const),
+    content: m.content,
   }));
 }
