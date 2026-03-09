@@ -21,7 +21,7 @@ export type RunBffHandoffParams = {
     entries: { id: string; role: "user" | "assistant"; content: string }[]
   ) => Promise<Either.Either<undefined, { message: string }>>;
   onCanvasSaveError: () => void;
-  onTranscriptSaveError: () => void;
+  onTranscriptSaveError?: () => void;
   /** Called after transcript is persisted; receives sessionId and filtered messages so client can store handoff transcript and navigate. */
   onHandoffComplete: (sessionId: string, filteredMessages: Message[]) => void;
 };
@@ -97,7 +97,7 @@ export async function runBffHandoff(params: RunBffHandoffParams): Promise<void> 
       3,
       600
     );
-    if (!transcriptSaved) onTranscriptSaveError();
+    if (!transcriptSaved) onTranscriptSaveError?.();
   }
   setMessages(() => filtered);
   onHandoffComplete(sessionId, filtered);

@@ -4,7 +4,6 @@ import type { Session } from "@/lib/types";
 
 export type BootstrapContext = {
   readonly hasAnonymousChat: boolean;
-  readonly hasAttemptedEval: boolean;
   readonly questionTitle: Option.Option<string>;
 };
 

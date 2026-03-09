@@ -12,7 +12,6 @@ import type { Session } from "@/lib/types";
 function ctx(overrides: Partial<BootstrapContext> = {}): BootstrapContext {
   return {
     hasAnonymousChat: false,
-    hasAttemptedEval: false,
     questionTitle: Option.none(),
     ...overrides,
   };

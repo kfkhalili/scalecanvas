@@ -74,7 +74,6 @@ export function PostAuthRoot(): React.ReactElement {
 
       const ctx: BootstrapContext = {
         hasAnonymousChat,
-        hasAttemptedEval: false,
         questionTitle,
       };
 
