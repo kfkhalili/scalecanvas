@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Effect, Option } from "effect";
 import type { Message } from "ai";
 import { useRouter } from "next/navigation";
@@ -24,9 +24,12 @@ export type UseAuthHandoffParams = {
  * - On first detection: loads the anonymous workspace, persists the canvas and
  *   transcript to the new session, then navigates to it.
  *
+ * Returns `isHandoffInProgress` which is true from the moment a pending session
+ * is detected until `onHandoffComplete` fires, letting the caller show a saving indicator.
+ *
  * Reads canvas and auth-handoff stores directly; takes only `useChat` outputs as params.
  */
-export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams): void {
+export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams): { isHandoffInProgress: boolean } {
   const router = useRouter();
   const pendingSessionIdOpt = useAuthHandoffStore((s) => s.pendingSessionId);
   const setPendingAuthHandoff = useAuthHandoffStore((s) => s.setPendingAuthHandoff);
@@ -36,11 +39,13 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
 
   const handoffDoneRef = useRef<string | null>(null);
+  const [isHandoffInProgress, setIsHandoffInProgress] = useState(false);
 
   useEffect(() => {
     whenSome(pendingSessionIdOpt, (pendingSessionId) => {
       if (handoffDoneRef.current === pendingSessionId) return;
       handoffDoneRef.current = pendingSessionId;
+      setIsHandoffInProgress(true);
 
       loadAnonymousWorkspace();
 
@@ -78,6 +83,7 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
             "Your diagram couldn't be saved. You can keep working; try refreshing later to see if it's there."
           ),
         onHandoffComplete: (sid, filteredMsgs) => {
+          setIsHandoffInProgress(false);
           const now = new Date().toISOString();
           const entries: TranscriptEntry[] = filteredMsgs.map((m) => ({
             id: m.id,
@@ -107,4 +113,6 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
     setAnonymousMessages,
     setQuestionTitle,
   ]);
+
+  return { isHandoffInProgress };
 }

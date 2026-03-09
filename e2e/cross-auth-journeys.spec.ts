@@ -234,8 +234,8 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
         handoffLog.push({ status: res.status(), body });
       }
     });
-    // Wait for the canvas PUT that fires from runBffHandoff (fire-and-forget).
-    // On CI the session page loads its canvas before the PUT completes without this.
+    // Wait for the canvas PUT from runBffHandoff (awaited before navigation, but
+    // we still capture it here to assert it completed before reading the canvas).
     const canvasSavedPromise = page.waitForResponse(
       (res) =>
         res.url().includes("/api/sessions/") &&
