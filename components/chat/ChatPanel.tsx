@@ -5,7 +5,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
 import { generateId } from "ai";
-import { Lightbulb, Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { Lightbulb, Maximize2, Minimize2 } from "lucide-react";
 import { getRandomQuestion, getRandomTopic, getTopicById, getTopicByTitle } from "@/lib/questions";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useQuestionStore } from "@/stores/questionStore";
@@ -411,7 +411,7 @@ export function ChatPanel({
   const { requestEndInterview, showEndInterviewButton } =
     useConclusionRequest({ sessionId, isAnonymous, isConcluded, messages, setMessages });
 
-  const { isHandoffInProgress } = useAuthHandoff({ messages, setMessages });
+  useAuthHandoff({ messages, setMessages });
 
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -568,12 +568,6 @@ export function ChatPanel({
           </div>
         )}
       </div>
-      {isHandoffInProgress && (
-        <div className="flex shrink-0 items-center gap-2 border-t border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          <span>Saving your session…</span>
-        </div>
-      )}
       <form
         ref={formRef}
         onSubmit={onFormSubmit}
