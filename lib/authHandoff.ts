@@ -23,9 +23,32 @@ export type RunBffHandoffParams = {
 };
 
 /**
- * Orchestrates the BFF handoff after auth: persist canvas (fire-and-forget),
- * filter out teaser, persist chat to new session transcript, update local messages, then call onHandoffComplete.
- * On canvas save failure invokes onCanvasSaveError (e.g. show toast).
+ * Attempts saveFn up to maxAttempts times with exponential backoff between retries.
+ * Returns true if any attempt succeeds, false if all fail.
+ * Delays: immediate → baseDelayMs → baseDelayMs×4 (e.g. 0ms → 600ms → 2400ms).
+ */
+async function saveWithBackoff(
+  saveFn: () => Promise<Either.Either<undefined, { message: string }>>,
+  maxAttempts: number,
+  baseDelayMs: number
+): Promise<boolean> {
+  let delayMs = baseDelayMs;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      delayMs *= 4;
+    }
+    const result = await saveFn();
+    if (Either.isRight(result)) return true;
+  }
+  return false;
+}
+
+/**
+ * Orchestrates the BFF handoff after auth: await canvas persist (up to 3 attempts with
+ * exponential backoff so navigation cannot abort an in-flight save), filter out teaser,
+ * persist chat to new session transcript, update local messages, then call onHandoffComplete.
+ * On permanent canvas save failure invokes onCanvasSaveError then continues with handoff.
  */
 export async function runBffHandoff(params: RunBffHandoffParams): Promise<void> {
   const {
@@ -43,17 +66,8 @@ export async function runBffHandoff(params: RunBffHandoffParams): Promise<void> 
   const trySave = () =>
     Effect.runPromise(Effect.either(saveCanvasApi(sessionId, state)));
 
-  void trySave().then((first) => {
-    if (Either.isRight(first)) return;
-    setTimeout(() => {
-      void trySave().then((second) =>
-        Either.match(second, {
-          onLeft: onCanvasSaveError,
-          onRight: () => {},
-        })
-      );
-    }, 400);
-  });
+  const saved = await saveWithBackoff(trySave, 3, 600);
+  if (!saved) onCanvasSaveError();
 
   const filtered = messages.filter(
     (m) =>

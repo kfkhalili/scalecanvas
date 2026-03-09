@@ -132,6 +132,9 @@ function apiPut(path: string, body: CanvasState): Effect.Effect<undefined, ApiEr
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
           credentials: "include",
+          // keepalive ensures the browser completes this request even if the page
+          // navigates away immediately after firing it (anonymous session migration).
+          keepalive: true,
         }),
       catch: (e) => ({
         message: e instanceof Error ? e.message : "Network error",

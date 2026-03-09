@@ -61,32 +61,6 @@ describe("runBffHandoff", () => {
     expect(onCanvasSaveError).not.toHaveBeenCalled();
   });
 
-  it("calls onCanvasSaveError when saveCanvasApi returns err", async () => {
-    const saveCanvasApi = vi.fn().mockReturnValue(Effect.fail({ message: "Network error" }));
-    const setMessages = vi.fn();
-    const persistTranscript = vi.fn().mockResolvedValue(undefined);
-    const onHandoffComplete = vi.fn();
-    const onCanvasSaveError = vi.fn();
-
-    await runBffHandoff({
-      sessionId,
-      messages: messagesWithTeaser,
-      getCanvasState: () => canvasState,
-      saveCanvasApi,
-      setMessages,
-      persistTranscript,
-      onCanvasSaveError,
-      onHandoffComplete,
-    });
-
-    await vi.waitFor(() => {
-      expect(onCanvasSaveError).toHaveBeenCalledTimes(1);
-    });
-    expect(setMessages).toHaveBeenCalled();
-    expect(persistTranscript).toHaveBeenCalled();
-    expect(onHandoffComplete).toHaveBeenCalledWith(sessionId, expect.any(Array));
-  });
-
   it("sends exact canvas state from getCanvasState to saveCanvasApi (nodes and edges)", async () => {
     const stateWithNodes: CanvasState = {
       nodes: [
@@ -149,7 +123,6 @@ describe("runBffHandoff", () => {
       onHandoffComplete: vi.fn(),
     });
 
-    await new Promise((r) => setTimeout(r, 50));
     expect(onCanvasSaveError).not.toHaveBeenCalled();
   });
 
@@ -240,6 +213,54 @@ describe("runBffHandoff", () => {
       vi.useRealTimers();
     });
 
+    it("calls onCanvasSaveError when all 3 attempts fail, then still completes handoff", async () => {
+      const saveCanvasApi = vi.fn().mockReturnValue(Effect.fail({ message: "Network error" }));
+      const setMessages = vi.fn();
+      const persistTranscript = vi.fn().mockResolvedValue(undefined);
+      const onHandoffComplete = vi.fn();
+      const onCanvasSaveError = vi.fn();
+
+      const handoffPromise = runBffHandoff({
+        sessionId,
+        messages: messagesWithTeaser,
+        getCanvasState: () => canvasState,
+        saveCanvasApi,
+        setMessages,
+        persistTranscript,
+        onCanvasSaveError,
+        onHandoffComplete,
+      });
+      await vi.runAllTimersAsync();
+      await handoffPromise;
+
+      expect(onCanvasSaveError).toHaveBeenCalledTimes(1);
+      expect(setMessages).toHaveBeenCalled();
+      expect(persistTranscript).toHaveBeenCalled();
+      expect(onHandoffComplete).toHaveBeenCalledWith(sessionId, expect.any(Array));
+    });
+
+    it("calls onCanvasSaveError before persistTranscript on permanent failure", async () => {
+      const callOrder: string[] = [];
+      const saveCanvasApi = vi.fn().mockReturnValue(Effect.fail({ message: "error" }));
+      const onCanvasSaveError = vi.fn(() => { callOrder.push("onCanvasSaveError"); });
+      const persistTranscript = vi.fn().mockImplementation(async () => { callOrder.push("persistTranscript"); });
+
+      const handoffPromise = runBffHandoff({
+        sessionId,
+        messages: [],
+        getCanvasState: () => canvasState,
+        saveCanvasApi,
+        setMessages: vi.fn(),
+        persistTranscript,
+        onCanvasSaveError,
+        onHandoffComplete: vi.fn(),
+      });
+      await vi.runAllTimersAsync();
+      await handoffPromise;
+
+      expect(callOrder).toEqual(["onCanvasSaveError", "persistTranscript"]);
+    });
+
     it("does not call onCanvasSaveError when second save attempt succeeds", async () => {
       let callCount = 0;
       const saveCanvasApi = vi.fn().mockImplementation(() => {
@@ -260,16 +281,41 @@ describe("runBffHandoff", () => {
         onCanvasSaveError,
         onHandoffComplete: vi.fn(),
       });
-      await handoffPromise;
-
-      // Advance past the 400ms retry delay
       await vi.runAllTimersAsync();
+      await handoffPromise;
 
       expect(saveCanvasApi).toHaveBeenCalledTimes(2);
       expect(onCanvasSaveError).not.toHaveBeenCalled();
     });
 
-    it("calls onCanvasSaveError exactly once when both save attempts fail", async () => {
+    it("does not call onCanvasSaveError when third save attempt succeeds", async () => {
+      let callCount = 0;
+      const saveCanvasApi = vi.fn().mockImplementation(() => {
+        callCount++;
+        return callCount < 3
+          ? Effect.fail({ message: "transient error" })
+          : Effect.succeed(undefined);
+      });
+      const onCanvasSaveError = vi.fn();
+
+      const handoffPromise = runBffHandoff({
+        sessionId,
+        messages: [],
+        getCanvasState: () => canvasState,
+        saveCanvasApi,
+        setMessages: vi.fn(),
+        persistTranscript: vi.fn().mockResolvedValue(undefined),
+        onCanvasSaveError,
+        onHandoffComplete: vi.fn(),
+      });
+      await vi.runAllTimersAsync();
+      await handoffPromise;
+
+      expect(saveCanvasApi).toHaveBeenCalledTimes(3);
+      expect(onCanvasSaveError).not.toHaveBeenCalled();
+    });
+
+    it("calls onCanvasSaveError exactly once when all 3 save attempts fail", async () => {
       const saveCanvasApi = vi.fn().mockReturnValue(
         Effect.fail({ message: "persistent error" })
       );
@@ -285,10 +331,10 @@ describe("runBffHandoff", () => {
         onCanvasSaveError,
         onHandoffComplete: vi.fn(),
       });
-      await handoffPromise;
       await vi.runAllTimersAsync();
+      await handoffPromise;
 
-      expect(saveCanvasApi).toHaveBeenCalledTimes(2);
+      expect(saveCanvasApi).toHaveBeenCalledTimes(3);
       expect(onCanvasSaveError).toHaveBeenCalledTimes(1);
     });
   });
