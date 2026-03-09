@@ -3,6 +3,7 @@
 import { Option } from "effect";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
@@ -86,6 +87,11 @@ export function PostAuthRoot(): React.ReactElement {
         clearAnonymousState: () => {
           useAuthHandoffStore.getState().setAnonymousMessages([]);
           useAuthHandoffStore.getState().setQuestionTitle(Option.none());
+        },
+        notifyTrialAlreadyClaimed: () => {
+          toast.info(
+            "Your trial session was already created. Resuming your existing session."
+          );
         },
       };
 

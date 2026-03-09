@@ -144,6 +144,33 @@ describe("executeBootstrapAction: handoff", () => {
     expect(deps.redirectTo).toHaveBeenCalledWith("/s-existing");
   });
 
+  it("calls notifyTrialAlreadyClaimed when created is false", async () => {
+    const notifyTrialAlreadyClaimed = vi.fn();
+    const deps = mockDeps({
+      doHandoff: vi.fn().mockReturnValue(
+        Effect.succeed<HandoffResult>({ created: false })
+      ),
+      notifyTrialAlreadyClaimed,
+    });
+    await executeBootstrapAction(
+      { type: "handoff" },
+      ctx({ hasAnonymousChat: true }),
+      deps
+    );
+    expect(notifyTrialAlreadyClaimed).toHaveBeenCalledOnce();
+  });
+
+  it("does not throw when notifyTrialAlreadyClaimed is omitted", async () => {
+    const deps = mockDeps({
+      doHandoff: vi.fn().mockReturnValue(
+        Effect.succeed<HandoffResult>({ created: false })
+      ),
+    });
+    await expect(
+      executeBootstrapAction({ type: "handoff" }, ctx({ hasAnonymousChat: true }), deps)
+    ).resolves.toBeUndefined();
+  });
+
   it("clears anonymous state and redirects to most recent session when handoff fails", async () => {
     const deps = mockDeps({
       doHandoff: vi.fn().mockReturnValue(Effect.fail({ message: "network error" })),

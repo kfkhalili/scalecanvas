@@ -71,11 +71,17 @@ export function InterviewSplitView({
         setCanvasReady(true);
         setHandoffReady(true);
       });
-      const unsubCanvas = useCanvasStore.subscribe(() => persistAnonymousWorkspace());
-      const unsubHandoff = useAuthHandoffStore.subscribe(() => persistAnonymousWorkspace());
+      let persistTimer: ReturnType<typeof setTimeout> | null = null;
+      const schedulePersist = (): void => {
+        if (persistTimer !== null) clearTimeout(persistTimer);
+        persistTimer = setTimeout(persistAnonymousWorkspace, 500);
+      };
+      const unsubCanvas = useCanvasStore.subscribe(schedulePersist);
+      const unsubHandoff = useAuthHandoffStore.subscribe(schedulePersist);
       return () => {
         unsubCanvas();
         unsubHandoff();
+        if (persistTimer !== null) clearTimeout(persistTimer);
       };
     }
     queueMicrotask(() => setHandoffReady(true));

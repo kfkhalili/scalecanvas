@@ -363,13 +363,13 @@ The teaser message ID is `plg-teaser-${Date.now()}`. If called twice within the 
 | H1 | Canvas save fire-and-forget, 1 retry | ✅ Resolved | Data Loss | User's diagram silently lost | Medium |
 | H2 | Transcript append no retry, partial failure | ✅ Resolved | Data Corruption | Incomplete chat history | Medium |
 | H3 | No handoff-in-progress guard | ✅ Resolved | Race Condition | Double API calls, state corruption | Low |
-| H4 | localStorage quota failure silent | 🔴 High | Data Loss | All anonymous work lost on redirect | Low |
-| H5 | Canvas save arrives after page fetch | 🔴 High | Race Condition | Blank canvas on session page | Medium |
+| H4 | localStorage quota failure silent | ✅ Resolved | Data Loss | All anonymous work lost on redirect | Low |
+| H5 | Canvas save arrives after page fetch | ✅ Resolved | Race Condition | Blank canvas on session page | Medium |
 | M1 | Sequential transcript N+1 requests | ✅ Resolved | Performance | 2–5s blocking delay | Medium |
-| M2 | localStorage writes per store change | 🟠 Medium | Performance | UI jank on slow devices | Low |
-| M3 | "Trial claimed" no feedback | 🟠 Medium | UX | User confusion | Low |
-| M4 | Missing Retry-After header | 🟠 Medium | API Contract | Client can't backoff intelligently | Low |
-| M5 | No progress during transcript save | 🟠 Medium | UX | App appears frozen | Low |
+| M2 | localStorage writes per store change | ✅ Resolved | Performance | UI jank on slow devices | Low |
+| M3 | "Trial claimed" no feedback | ✅ Resolved | UX | User confusion | Low |
+| M4 | Missing Retry-After header | ✅ Resolved | API Contract | Client can't backoff intelligently | Low |
+| M5 | No progress during transcript save | ✅ Resolved | UX | App appears frozen | Low |
 | L1 | Option/null type mismatch | 🟡 Low | Maintenance | Future refactor risk | Low |
 | L2 | Legacy migration no sunset | 🟡 Low | Maintenance | Dead code | Low |
 | L3 | Double `loadAnonymousWorkspace` call | 🟡 Low | Redundancy | Minor wasted work | Low |
@@ -382,58 +382,23 @@ The teaser message ID is `plg-teaser-${Date.now()}`. If called twice within the 
 
 ### Immediate (This Sprint)
 
-1. **H3 — Add handoff-in-progress guard** in `PostAuthRoot`
-   - Add `useRef<boolean>(false)` checked before calling `executeBootstrapAction`
-   - Effort: ~30 min, high impact
-
-2. **H4 — Toast on localStorage write failure**
-   - In `persistAnonymousWorkspace`, catch and show toast on first failure
-   - Effort: ~30 min
-
-3. **H1 — Await canvas save with retry**
-   - Change canvas save from fire-and-forget to awaited with 3 retries (exponential backoff)
-   - Block `onHandoffComplete` until canvas is confirmed saved or exhausts retries
-   - Show persistent error banner (not toast) on failure
-   - Effort: ~2 hours
+1. **H3 — Add handoff-in-progress guard** ✅ Done
+2. **H4 — Toast on localStorage write failure** ✅ Done
+3. **H1 — Await canvas save with retry** ✅ Done (3 retries, exponential backoff via `saveWithBackoff`)
 
 ### Short-Term (Next Sprint)
 
-4. **H2 — Batch transcript insert endpoint**
-   - Create `POST /api/sessions/[id]/transcript/batch` accepting `{ entries: Array<{role, content}> }`
-   - Server-side: single `INSERT INTO ... VALUES ...` or RPC
-   - Add idempotency key (client-generated batch ID)
-   - Effort: ~4 hours
-
-5. **H5 — Ensure canvas is written before navigation** (partially resolved by H1)
-   - If H1 is implemented, H5 is naturally fixed
-   - Additional: Add explicit "handoff phase" state machine (pending → saving → complete) instead of relying on `isPendingHandoffSession` timing
-
-6. **M3 — Toast for "trial already claimed"**
-   - In `executeBootstrapAction`, when `result.created === false`, show explanatory toast
-   - Effort: ~15 min
-
-7. **M5 — Progress indicator during transcript save**
-   - Show toast with progress count during batch save
-   - Effort: ~30 min
+4. **H2 — Batch transcript insert endpoint** ✅ Done (`POST /api/sessions/[id]/transcript/batch`)
+5. **H5 — Ensure canvas written before navigation** ✅ Done (resolved by H1 — canvas fully awaited before `onHandoffComplete`)
+6. **M3 — Toast for "trial already claimed"** ✅ Done (`notifyTrialAlreadyClaimed` dep in `executeBootstrapAction`)
+7. **M5 — Progress indicator during transcript save** ✅ Done (loading toast + batch means single in-flight request)
 
 ### Medium-Term
 
-8. **M1 — Batch transcript endpoint** (same as action 4)
-
-9. **M2 — Debounce localStorage writes**
-   - Replace direct subscribe with debounced callback (500ms)
-   - Skip viewport-only changes
-   - Effort: ~1 hour
-
-10. **M4 — Add Retry-After to handoff 429 response**
-    - Compute retry delay from rate-limit window, include in response header
-    - Effort: ~30 min
-
-11. **L1–L5 — Maintenance cleanup**
-    - Remove legacy migration code if no users on old format
-    - Deduplicate `loadAnonymousWorkspace` calls
-    - Replace `queueMicrotask` with explicit ready state from load function
-    - Effort: ~2 hours total
+8. **M1 — Batch transcript endpoint** ✅ Done (same as action 4)
+9. **M2 — Debounce localStorage writes** ✅ Done (500ms debounce via `schedulePersist` in `InterviewSplitView`)
+10. **M4 — Add Retry-After to handoff 429 response** ✅ Done (`Retry-After` header computed from `resetAt`)
+11. **L1–L5 — Maintenance cleanup** (L2 deferred — legacy migration kept until user-base migration confirmed)
 
 ### Long-Term
 

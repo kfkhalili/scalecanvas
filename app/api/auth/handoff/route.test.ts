@@ -97,4 +97,18 @@ describe("POST /api/auth/handoff", () => {
       Option.none()
     );
   });
+
+  it("returns 429 with Retry-After header when rate limited", async () => {
+    mockedCreateClient.mockResolvedValue(fakeSupabase({ id: "user-1" }));
+    const resetAt = new Date(Date.now() + 30_000).toISOString();
+    mockedCheckRateLimit.mockReturnValue(
+      Effect.fail({ allowed: false, remaining: 0, resetAt })
+    );
+    const res = await POST(makeRequest({ question_title: "test" }));
+    expect(res.status).toBe(429);
+    const retryAfter = res.headers.get("Retry-After");
+    expect(retryAfter).not.toBeNull();
+    expect(Number(retryAfter)).toBeGreaterThanOrEqual(1);
+    expect(Number(retryAfter)).toBeLessThanOrEqual(30);
+  });
 });
