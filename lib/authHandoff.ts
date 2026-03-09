@@ -1,7 +1,7 @@
 import { Effect, Either } from "effect";
 import type { Message } from "ai";
 import { isTeaserMessage } from "@/lib/plg";
-import type { CanvasState } from "@/lib/types";
+import type { CanvasState, TranscriptEntry } from "@/lib/types";
 
 export type RunBffHandoffParams = {
   sessionId: string;
@@ -12,12 +12,16 @@ export type RunBffHandoffParams = {
     state: CanvasState
   ) => Effect.Effect<undefined, { message: string }>;
   setMessages: (messagesOrUpdater: Message[] | ((prev: Message[]) => Message[])) => void;
-  /** Persist filtered messages to the new session's transcript; called before onHandoffComplete. */
+  /**
+   * Raw save attempt for transcript entries. Called with the full batch; must return
+   * an Either so the caller can detect failure and trigger retry via saveWithBackoff.
+   */
   persistTranscript: (
     sessionId: string,
     entries: { id: string; role: "user" | "assistant"; content: string }[]
-  ) => Promise<void>;
+  ) => Promise<Either.Either<undefined, { message: string }>>;
   onCanvasSaveError: () => void;
+  onTranscriptSaveError: () => void;
   /** Called after transcript is persisted; receives sessionId and filtered messages so client can store handoff transcript and navigate. */
   onHandoffComplete: (sessionId: string, filteredMessages: Message[]) => void;
 };
@@ -59,6 +63,7 @@ export async function runBffHandoff(params: RunBffHandoffParams): Promise<void> 
     setMessages,
     persistTranscript,
     onCanvasSaveError,
+    onTranscriptSaveError,
     onHandoffComplete,
   } = params;
 
@@ -86,7 +91,34 @@ export async function runBffHandoff(params: RunBffHandoffParams): Promise<void> 
     }
   }
 
-  await persistTranscript(sessionId, entries);
+  if (entries.length > 0) {
+    const transcriptSaved = await saveWithBackoff(
+      () => persistTranscript(sessionId, entries),
+      3,
+      600
+    );
+    if (!transcriptSaved) onTranscriptSaveError();
+  }
   setMessages(() => filtered);
   onHandoffComplete(sessionId, filtered);
+}
+
+/**
+ * Builds the in-memory TranscriptEntry array shown immediately after handoff
+ * (before the session page fetches from DB).
+ */
+export function buildTranscriptEntries(
+  sessionId: string,
+  filteredMsgs: Message[],
+  now: string
+): TranscriptEntry[] {
+  return filteredMsgs.map((m) => ({
+    id: m.id,
+    sessionId,
+    role: (
+      m.role === "user" || m.role === "assistant" ? m.role : "assistant"
+    ) as "user" | "assistant",
+    content: typeof m.content === "string" ? m.content : "",
+    createdAt: now,
+  }));
 }

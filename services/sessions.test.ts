@@ -7,6 +7,7 @@ import {
   getSession,
   updateSession,
   deleteSession,
+  appendTranscriptBatch,
 } from "./sessions";
 import type { ServerSupabaseClient } from "@/lib/supabase/server";
 import type { DbInterviewSession } from "@/lib/database.aliases";
@@ -29,6 +30,7 @@ type MockUpdateSingle = {
 
 /** Captures the argument passed to `.update(fields)` so tests can assert on the exact keys. */
 type UpdateCapture = { fields: unknown };
+type UpsertCapture = { rows: unknown; options: unknown };
 
 function mockSupabaseClient(overrides: {
   insertSingle?: MockInsertSingle;
@@ -38,6 +40,10 @@ function mockSupabaseClient(overrides: {
   deleteEq?: MockDelete;
   /** Pass an object; `.fields` will be set to the argument of `.update()`. */
   updateCapture?: UpdateCapture;
+  /** Resolves value returned by `.upsert()`. */
+  upsertResult?: { error: PostgresError | null };
+  /** Captures args passed to `.upsert()`. */
+  upsertCapture?: UpsertCapture;
 } = {}): ServerSupabaseClient {
   const insertSingle: MockInsertSingle =
     overrides.insertSingle ?? { data: null, error: null };
@@ -48,11 +54,19 @@ function mockSupabaseClient(overrides: {
   const updateEqSingle: MockUpdateSingle =
     overrides.updateEqSingle ?? { data: null, error: null };
   const updateCapture = overrides.updateCapture;
+  const upsertCapture = overrides.upsertCapture;
   const chain = {
     insert: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue(insertSingle),
       }),
+    }),
+    upsert: vi.fn().mockImplementation((rows: unknown, options: unknown) => {
+      if (upsertCapture) {
+        upsertCapture.rows = rows;
+        upsertCapture.options = options;
+      }
+      return Promise.resolve(overrides.upsertResult ?? { error: null });
     }),
     select: vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
@@ -347,5 +361,53 @@ describe("deleteSession", () => {
     });
     const result = await runEffect(deleteSession(client, "sess-1", "user-1"));
     expect(Either.isRight(result)).toBe(true);
+  });
+});
+
+describe("appendTranscriptBatch", () => {
+  const sessionId = "sess-1";
+  const entries = [
+    { id: "msg-1", role: "user" as const, content: "Hello" },
+    { id: "msg-2", role: "assistant" as const, content: "Hi there" },
+  ];
+
+  it("returns ok(undefined) when upsert succeeds", async () => {
+    const client = mockSupabaseClient({ upsertResult: { error: null } });
+    const result = await runEffect(appendTranscriptBatch(client, sessionId, entries));
+    expect(Either.isRight(result)).toBe(true);
+  });
+
+  it("returns ok(undefined) for empty entries without calling supabase", async () => {
+    const client = mockSupabaseClient();
+    const fromSpy = vi.spyOn(client, "from");
+    const result = await runEffect(appendTranscriptBatch(client, sessionId, []));
+    expect(Either.isRight(result)).toBe(true);
+    expect(fromSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns fail when upsert returns a DB error", async () => {
+    const client = mockSupabaseClient({ upsertResult: { error: { message: "conflict" } } });
+    const result = await runEffect(appendTranscriptBatch(client, sessionId, entries));
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isLeft(result)) {
+      expect(result.left.message).toBe("conflict");
+    }
+  });
+
+  it("upserts rows with correct shape: id, session_id, role, content", async () => {
+    const cap: UpsertCapture = { rows: null, options: null };
+    const client = mockSupabaseClient({ upsertCapture: cap });
+    await runEffect(appendTranscriptBatch(client, sessionId, entries));
+    const rows = cap.rows as { id: string; session_id: string; role: string; content: string }[];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ id: "msg-1", session_id: sessionId, role: "user", content: "Hello" });
+    expect(rows[1]).toMatchObject({ id: "msg-2", session_id: sessionId, role: "assistant", content: "Hi there" });
+  });
+
+  it("calls upsert with ignoreDuplicates: true for idempotent retry safety", async () => {
+    const cap: UpsertCapture = { rows: null, options: null };
+    const client = mockSupabaseClient({ upsertCapture: cap });
+    await runEffect(appendTranscriptBatch(client, sessionId, entries));
+    expect(cap.options).toEqual({ ignoreDuplicates: true });
   });
 });

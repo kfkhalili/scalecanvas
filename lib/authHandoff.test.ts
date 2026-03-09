@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Effect } from "effect";
-import { runBffHandoff } from "./authHandoff";
+import { Effect, Either } from "effect";
+import { runBffHandoff, saveWithBackoff, buildTranscriptEntries } from "./authHandoff";
 import { PLG_TEASER_MESSAGE } from "./plg";
 import type { CanvasState } from "@/lib/types";
 
@@ -30,6 +30,7 @@ describe("runBffHandoff", () => {
     });
     const persistTranscript = vi.fn().mockImplementation(async () => {
       callOrder.push("persistTranscript");
+      return Either.right(undefined);
     });
     const onHandoffComplete = vi.fn((sid: string, filteredMsgs: { id: string; content?: string }[]) => {
       callOrder.push("onHandoffComplete");
@@ -77,7 +78,7 @@ describe("runBffHandoff", () => {
       getCanvasState,
       saveCanvasApi,
       setMessages: vi.fn(),
-      persistTranscript: vi.fn().mockResolvedValue(undefined),
+      persistTranscript: vi.fn().mockResolvedValue(Either.right(undefined)),
       onCanvasSaveError: vi.fn(),
       onHandoffComplete: vi.fn(),
     });
@@ -98,7 +99,7 @@ describe("runBffHandoff", () => {
       getCanvasState: () => emptyState,
       saveCanvasApi,
       setMessages: vi.fn(),
-      persistTranscript: vi.fn().mockResolvedValue(undefined),
+      persistTranscript: vi.fn().mockResolvedValue(Either.right(undefined)),
       onCanvasSaveError: vi.fn(),
       onHandoffComplete: vi.fn(),
     });
@@ -118,7 +119,7 @@ describe("runBffHandoff", () => {
       getCanvasState: () => canvasState,
       saveCanvasApi,
       setMessages: vi.fn(),
-      persistTranscript: vi.fn().mockResolvedValue(undefined),
+      persistTranscript: vi.fn().mockResolvedValue(Either.right(undefined)),
       onCanvasSaveError,
       onHandoffComplete: vi.fn(),
     });
@@ -128,7 +129,7 @@ describe("runBffHandoff", () => {
 
   describe("transcript entry filtering", () => {
     const makeHandoff = (messages: Parameters<typeof runBffHandoff>[0]["messages"]) => {
-      const persistTranscript = vi.fn().mockResolvedValue(undefined);
+      const persistTranscript = vi.fn().mockResolvedValue(Either.right(undefined));
       return {
         persistTranscript,
         run: () =>
@@ -192,7 +193,7 @@ describe("runBffHandoff", () => {
       ]);
     });
 
-    it("calls persistTranscript with empty array when all messages are teaser or empty", async () => {
+    it("does not call persistTranscript when all messages are teaser or empty", async () => {
       const { persistTranscript, run } = makeHandoff([
         { id: "plg-teaser-1", role: "assistant" as const, content: PLG_TEASER_MESSAGE },
         { id: "u1", role: "user" as const, content: "" },
@@ -200,7 +201,7 @@ describe("runBffHandoff", () => {
 
       await run();
 
-      expect(persistTranscript).toHaveBeenCalledWith(sessionId, []);
+      expect(persistTranscript).not.toHaveBeenCalled();
     });
   });
 
@@ -216,7 +217,7 @@ describe("runBffHandoff", () => {
     it("calls onCanvasSaveError when all 3 attempts fail, then still completes handoff", async () => {
       const saveCanvasApi = vi.fn().mockReturnValue(Effect.fail({ message: "Network error" }));
       const setMessages = vi.fn();
-      const persistTranscript = vi.fn().mockResolvedValue(undefined);
+      const persistTranscript = vi.fn().mockResolvedValue(Either.right(undefined));
       const onHandoffComplete = vi.fn();
       const onCanvasSaveError = vi.fn();
 
@@ -243,11 +244,11 @@ describe("runBffHandoff", () => {
       const callOrder: string[] = [];
       const saveCanvasApi = vi.fn().mockReturnValue(Effect.fail({ message: "error" }));
       const onCanvasSaveError = vi.fn(() => { callOrder.push("onCanvasSaveError"); });
-      const persistTranscript = vi.fn().mockImplementation(async () => { callOrder.push("persistTranscript"); });
+      const persistTranscript = vi.fn().mockImplementation(async () => { callOrder.push("persistTranscript"); return Either.right(undefined); });
 
       const handoffPromise = runBffHandoff({
         sessionId,
-        messages: [],
+        messages: [{ id: "u1", role: "user" as const, content: "Hello" }],
         getCanvasState: () => canvasState,
         saveCanvasApi,
         setMessages: vi.fn(),
@@ -277,7 +278,7 @@ describe("runBffHandoff", () => {
         getCanvasState: () => canvasState,
         saveCanvasApi,
         setMessages: vi.fn(),
-        persistTranscript: vi.fn().mockResolvedValue(undefined),
+        persistTranscript: vi.fn().mockResolvedValue(Either.right(undefined)),
         onCanvasSaveError,
         onHandoffComplete: vi.fn(),
       });
@@ -304,7 +305,7 @@ describe("runBffHandoff", () => {
         getCanvasState: () => canvasState,
         saveCanvasApi,
         setMessages: vi.fn(),
-        persistTranscript: vi.fn().mockResolvedValue(undefined),
+        persistTranscript: vi.fn().mockResolvedValue(Either.right(undefined)),
         onCanvasSaveError,
         onHandoffComplete: vi.fn(),
       });
@@ -327,7 +328,7 @@ describe("runBffHandoff", () => {
         getCanvasState: () => canvasState,
         saveCanvasApi,
         setMessages: vi.fn(),
-        persistTranscript: vi.fn().mockResolvedValue(undefined),
+        persistTranscript: vi.fn().mockResolvedValue(Either.right(undefined)),
         onCanvasSaveError,
         onHandoffComplete: vi.fn(),
       });
@@ -351,7 +352,7 @@ describe("runBffHandoff", () => {
       getCanvasState: () => canvasState,
       saveCanvasApi: vi.fn().mockReturnValue(Effect.succeed(undefined)),
       setMessages,
-      persistTranscript: vi.fn().mockResolvedValue(undefined),
+      persistTranscript: vi.fn().mockResolvedValue(Either.right(undefined)),
       onCanvasSaveError: vi.fn(),
       onHandoffComplete: vi.fn(),
     });
@@ -364,6 +365,113 @@ describe("runBffHandoff", () => {
     const result = updater([]);
     expect(result).toHaveLength(1);
     expect((result[0] as { id: string }).id).toBe("u1");
+  });
+});
+
+describe("saveWithBackoff", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns true when the first attempt succeeds (no delays)", async () => {
+    const saveFn = vi.fn().mockResolvedValue(Either.right(undefined));
+    const result = await saveWithBackoff(saveFn, 3, 600);
+    expect(result).toBe(true);
+    expect(saveFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns true when the second attempt succeeds", async () => {
+    let calls = 0;
+    const saveFn = vi.fn().mockImplementation(async () => {
+      calls++;
+      return calls === 1 ? Either.left({ message: "fail" }) : Either.right(undefined);
+    });
+    const p = saveWithBackoff(saveFn, 3, 600);
+    await vi.runAllTimersAsync();
+    expect(await p).toBe(true);
+    expect(saveFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns true when the third attempt succeeds", async () => {
+    let calls = 0;
+    const saveFn = vi.fn().mockImplementation(async () => {
+      calls++;
+      return calls < 3 ? Either.left({ message: "fail" }) : Either.right(undefined);
+    });
+    const p = saveWithBackoff(saveFn, 3, 600);
+    await vi.runAllTimersAsync();
+    expect(await p).toBe(true);
+    expect(saveFn).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns false when all attempts fail", async () => {
+    const saveFn = vi.fn().mockResolvedValue(Either.left({ message: "error" }));
+    const p = saveWithBackoff(saveFn, 3, 600);
+    await vi.runAllTimersAsync();
+    expect(await p).toBe(false);
+    expect(saveFn).toHaveBeenCalledTimes(3);
+  });
+
+  it("uses exponential backoff: attempt 1 is immediate, attempt 2 waits baseDelayMs, attempt 3 waits 4×baseDelayMs", async () => {
+    const callTimes: number[] = [];
+    const saveFn = vi.fn().mockImplementation(async () => {
+      callTimes.push(Date.now());
+      return Either.left({ message: "fail" });
+    });
+    const p = saveWithBackoff(saveFn, 3, 600);
+    await vi.runAllTimersAsync();
+    await p;
+    expect(callTimes).toHaveLength(3);
+    expect(callTimes[1] - callTimes[0]).toBeGreaterThanOrEqual(600);
+    expect(callTimes[2] - callTimes[1]).toBeGreaterThanOrEqual(2400);
+  });
+
+  it("respects maxAttempts: stops after exactly maxAttempts calls", async () => {
+    const saveFn = vi.fn().mockResolvedValue(Either.left({ message: "fail" }));
+    const p = saveWithBackoff(saveFn, 2, 100);
+    await vi.runAllTimersAsync();
+    await p;
+    expect(saveFn).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("buildTranscriptEntries", () => {
+  const sessionId = "sess-abc";
+  const now = "2026-03-09T12:00:00.000Z";
+
+  it("maps user and assistant messages to TranscriptEntry with all fields", () => {
+    const msgs = [
+      { id: "u1", role: "user" as const, content: "Hello" },
+      { id: "a1", role: "assistant" as const, content: "Hi there" },
+    ];
+    const entries = buildTranscriptEntries(sessionId, msgs, now);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toEqual({ id: "u1", sessionId, role: "user", content: "Hello", createdAt: now });
+    expect(entries[1]).toEqual({ id: "a1", sessionId, role: "assistant", content: "Hi there", createdAt: now });
+  });
+
+  it("normalises non-user/assistant role to 'assistant'", () => {
+    const msgs = [
+      { id: "d1", role: "data" as const, content: "stream" },
+    ];
+    const entries = buildTranscriptEntries(sessionId, msgs, now);
+    expect(entries[0].role).toBe("assistant");
+  });
+
+  it("coerces non-string content to empty string", () => {
+    const msgs = [
+      // Simulate a message whose content is not a plain string (e.g. parts array)
+      { id: "a1", role: "assistant" as const, content: [{ type: "text", text: "hi" }] as unknown as string },
+    ];
+    const entries = buildTranscriptEntries(sessionId, msgs, now);
+    expect(entries[0].content).toBe("");
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(buildTranscriptEntries(sessionId, [], now)).toEqual([]);
   });
 });
 

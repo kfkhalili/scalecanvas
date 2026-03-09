@@ -8,10 +8,9 @@ import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
 import { appendTranscriptBatchApi, saveCanvasApi } from "@/services/sessionsClient";
-import { runBffHandoff, saveWithBackoff } from "@/lib/authHandoff";
+import { runBffHandoff, buildTranscriptEntries } from "@/lib/authHandoff";
 import { whenSome } from "@/lib/optionHelpers";
 import { toast } from "sonner";
-import type { TranscriptEntry } from "@/lib/types";
 
 export type UseAuthHandoffParams = {
   messages: Message[];
@@ -69,21 +68,14 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
         getCanvasState,
         saveCanvasApi,
         setMessages,
-        persistTranscript: async (sid, entries) => {
-          if (entries.length === 0) return;
-          const saved = await saveWithBackoff(
-            () =>
-              Effect.runPromise(
-                Effect.either(appendTranscriptBatchApi(sid, entries))
-              ),
-            3,
-            600
+        persistTranscript: (sid, entries) =>
+            Effect.runPromise(
+              Effect.either(appendTranscriptBatchApi(sid, entries))
+            ),
+        onTranscriptSaveError: () => {
+          toast.error(
+            "Part of your conversation couldn't be saved. Your diagram is safe — try refreshing to recover it."
           );
-          if (!saved) {
-            toast.error(
-              "Part of your conversation couldn't be saved. Your diagram is safe — try refreshing to recover it."
-            );
-          }
         },
         onCanvasSaveError: () => {
           toast.dismiss(loadingToastId);
@@ -93,16 +85,7 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
         },
         onHandoffComplete: (sid, filteredMsgs) => {
           toast.dismiss(loadingToastId);
-          const now = new Date().toISOString();
-          const entries: TranscriptEntry[] = filteredMsgs.map((m) => ({
-            id: m.id,
-            sessionId: sid,
-            role: (
-              m.role === "user" || m.role === "assistant" ? m.role : "assistant"
-            ) as "user" | "assistant",
-            content: typeof m.content === "string" ? m.content : "",
-            createdAt: now,
-          }));
+          const entries = buildTranscriptEntries(sid, filteredMsgs, new Date().toISOString());
           setHandoffTranscript(Option.some({ sessionId: sid, entries }));
           setPendingAuthHandoff(Option.none());
           setAnonymousMessages([]);

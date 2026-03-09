@@ -4,11 +4,7 @@ import type {
   TranscriptEntry,
   CanvasState,
 } from "@/lib/types";
-import type {
-  CreateSessionBody,
-  AppendTranscriptBody,
-  AppendTranscriptBatchBody,
-} from "@/lib/api.schemas";
+
 
 /** JSON body shape when API returns an error (e.g. 4xx/5xx). */
 type ApiErrorResponse = { error?: string };
@@ -50,7 +46,7 @@ export function apiGet<T>(path: string): Effect.Effect<T, ApiError> {
 
 function apiPost<T>(
   path: string,
-  body: CreateSessionBody | AppendTranscriptBody | AppendTranscriptBatchBody
+  body: Record<string, unknown>
 ): Effect.Effect<T, ApiError> {
   return pipe(
     Effect.tryPromise({
