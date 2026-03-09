@@ -73,8 +73,9 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
               Effect.either(appendTranscriptBatchApi(sid, entries))
             ),
         onTranscriptSaveError: () => {
+          toast.dismiss(loadingToastId);
           toast.error(
-            "Part of your conversation couldn't be saved. Your diagram is safe — try refreshing to recover it."
+            "Part of your conversation couldn't be saved. Sign in again to retry the session transfer."
           );
         },
         onCanvasSaveError: () => {

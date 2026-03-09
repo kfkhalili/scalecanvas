@@ -361,11 +361,11 @@ The teaser message ID is `plg-teaser-${Date.now()}`. If called twice within the 
 | # | Issue | Severity | Category | Impact | Fix Effort |
 |---|-------|----------|----------|--------|------------|
 | H1 | Canvas save fire-and-forget, 1 retry | ✅ Resolved | Data Loss | User's diagram silently lost | Medium |
-| H2 | Transcript append no retry, partial failure | 🔴 High | Data Corruption | Incomplete chat history | Medium |
+| H2 | Transcript append no retry, partial failure | ✅ Resolved | Data Corruption | Incomplete chat history | Medium |
 | H3 | No handoff-in-progress guard | 🔴 High | Race Condition | Double API calls, state corruption | Low |
 | H4 | localStorage quota failure silent | 🔴 High | Data Loss | All anonymous work lost on redirect | Low |
 | H5 | Canvas save arrives after page fetch | 🔴 High | Race Condition | Blank canvas on session page | Medium |
-| M1 | Sequential transcript N+1 requests | 🟠 Medium | Performance | 2–5s blocking delay | Medium |
+| M1 | Sequential transcript N+1 requests | ✅ Resolved | Performance | 2–5s blocking delay | Medium |
 | M2 | localStorage writes per store change | 🟠 Medium | Performance | UI jank on slow devices | Low |
 | M3 | "Trial claimed" no feedback | 🟠 Medium | UX | User confusion | Low |
 | M4 | Missing Retry-After header | 🟠 Medium | API Contract | Client can't backoff intelligently | Low |
