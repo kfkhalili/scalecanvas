@@ -17,6 +17,7 @@ import {
   type BootstrapDeps,
 } from "@/lib/sessionBootstrap";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 
 /**
  * Renders the workspace at / when the user is logged in. After rehydrating
@@ -43,6 +44,8 @@ export function PostAuthRoot(): React.ReactElement {
     if (!storesReady) return;
     if (bootstrapCalledRef.current) return;
     bootstrapCalledRef.current = true;
+
+    useWorkspaceStore.getState().enterBootstrapping();
 
     const supabase = createBrowserClientInstance();
     const setHasAttemptedEval = useCanvasStore.getState().setHasAttemptedEval;

@@ -18,7 +18,6 @@ beforeEach(() => {
   useSessionStore.setState({
     currentSessionId: Option.none(),
     sessions: [],
-    isSessionActive: true,
   });
 });
 

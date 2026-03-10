@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal as _createPortal } from "react-dom";
-import { Effect, Option } from "effect";
+import { Option } from "effect";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import {
   ReactFlow,
@@ -21,14 +21,15 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import { whenSome } from "@/lib/optionHelpers";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { canInteract } from "@/lib/workspacePhase";
 import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
 
 // Defined at module level so ReactFlow always gets a stable reference (avoids warning #002)
 const EDGE_TYPES = { default: LabeledEdge };
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
-import { saveCanvasApi } from "@/services/sessionsClient";
+import { getPersistence } from "@/lib/persistenceLifecycle";
 import {
   getDiagramShortcutEntries,
   computeShortcutsPanelPosition,
@@ -41,8 +42,6 @@ import {
 } from "@/lib/chatGuardrails";
 import { HelpCircle, Timer } from "lucide-react";
 
-const SAVE_DEBOUNCE_MS = 800;
-
 type FlowCanvasInnerProps = {
   sessionIdOpt: Option.Option<string>;
 };
@@ -52,9 +51,8 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
   const storeEdges = useCanvasStore((s) => s.edges);
   const viewport = useCanvasStore((s) => s.viewport);
   const setCanvasState = useCanvasStore((s) => s.setCanvasState);
-  const getCanvasState = useCanvasStore((s) => s.getCanvasState);
   const setViewport = useCanvasStore((s) => s.setViewport);
-  const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
 
   const initialNodes = [...storeNodes];
   const initialEdges = [...storeEdges];
@@ -62,7 +60,6 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactFlowInstance = useReactFlow();
 
   /**
@@ -210,27 +207,12 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
     [reactFlowInstance, setNodes, isSessionActive]
   );
 
+  // Notify persistence layer that canvas data changed. The lifecycle
+  // manager owns debounce, flush-on-unload, and the write function —
+  // this component just signals "dirty".
   useEffect(() => {
-    if (!isSessionActive) return;
-    whenSome(sessionIdOpt, (sessionId) => {
-      if (sessionId === "ephemeral") return;
-      if (saveTimeoutRef.current !== null) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      saveTimeoutRef.current = setTimeout(() => {
-        saveTimeoutRef.current = null;
-        const state = getCanvasState();
-        void Effect.runPromise(
-          Effect.either(saveCanvasApi(sessionId, state))
-        ).then(() => {});
-      }, SAVE_DEBOUNCE_MS);
-    });
-    return () => {
-      if (saveTimeoutRef.current !== null) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [sessionIdOpt, nodes, edges, viewport, getCanvasState, isSessionActive]);
+    getPersistence().markDirty();
+  }, [nodes, edges, viewport]);
 
   const defaultViewport: RfViewport = Option.match(viewport, {
     onNone: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -289,7 +271,7 @@ function InterviewCountdownBadge({
   sessionIdOpt: Option.Option<string>;
 }): React.ReactElement | null {
   const sessions = useSessionStore((s) => s.sessions);
-  const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
   const sessionId = Option.getOrUndefined(sessionIdOpt);
   const session =
     sessionId && sessionId !== "ephemeral"
@@ -372,8 +354,21 @@ function InterviewCountdownBadge({
 
 export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElement {
   const evaluateActionOpt = useCanvasStore((s) => s.evaluateAction);
-  const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  // Subscribe to persistence state for the data-save-status attribute.
+  const [saveStatus, setSaveStatus] = useState<string>("idle");
+  useEffect(() => {
+    const update = (): void => {
+      const s = getPersistence().getState();
+      const status = s.isSaving ? "saving" : s.error ? "error" : s.isDirty ? "dirty" : "saved";
+      setSaveStatus(status);
+    };
+    update();
+    return getPersistence().subscribe(update);
+  }, []);
+
   const [panelPosition, setPanelPosition] = useState<{
     bottom: number;
     left: number;
@@ -458,6 +453,7 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
     <div
       className="relative h-full w-full"
       style={{ minHeight: 400, minWidth: 300 }}
+      data-save-status={saveStatus}
     >
       {shortcutsPanel}
       <InterviewCountdownBadge sessionIdOpt={sessionIdOpt} />

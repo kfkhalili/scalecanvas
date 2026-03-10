@@ -43,6 +43,9 @@ type AuthHandoffStore = {
   /** Stable topic id for the anonymous interview; keeps question consistent across refreshes. */
   questionTopicId: Option.Option<string>;
   setQuestionTopicId: (id: Option.Option<string>) => void;
+  /** Whether authHandoffStore has been rehydrated from localStorage (anonymous workspace restore). */
+  rehydrated: boolean;
+  setRehydrated: (value: boolean) => void;
 };
 
 export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
@@ -59,5 +62,7 @@ export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
   setQuestionTitle: (title) => set({ questionTitle: title }),
   questionTopicId: Option.none(),
   setQuestionTopicId: (id) => set({ questionTopicId: id }),
+  rehydrated: false,
+  setRehydrated: (rehydrated) => set({ rehydrated }),
 }));
 

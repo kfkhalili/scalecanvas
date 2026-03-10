@@ -14,13 +14,17 @@ import { useTranscriptStore } from "@/stores/transcriptStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import {
   loadAnonymousWorkspace,
-  persistAnonymousWorkspace,
 } from "@/stores/anonymousWorkspaceStorage";
 import {
   fetchCanvas,
   fetchTranscript,
-  saveCanvasApi,
 } from "@/services/sessionsClient";
+import {
+  initPersistenceBridge,
+  teardownPersistence,
+  getPersistence,
+} from "@/lib/persistenceLifecycle";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { isSessionContentReady } from "@/lib/sessionLoading";
 import { whenSome } from "@/lib/optionHelpers";
 import type { TranscriptEntry } from "@/lib/types";
@@ -46,7 +50,6 @@ export function InterviewSplitView({
   isConcluded = false,
 }: InterviewSplitViewProps): React.ReactElement {
   const setCanvasState = useCanvasStore((s) => s.setCanvasState);
-  const getCanvasState = useCanvasStore((s) => s.getCanvasState);
   const setCurrentSessionId = useSessionStore((s) => s.setCurrentSessionId);
   const setEntries = useTranscriptStore((s) => s.setEntries);
   const entries = useTranscriptStore((s) => s.entries);
@@ -57,44 +60,40 @@ export function InterviewSplitView({
   const loadingTranscriptSessionIdRef = useRef<string | null>(null);
 
   const [canvasReady, setCanvasReady] = useState(false);
-  /** When true, authHandoffStore has been rehydrated so anonymous chat/canvas can be restored as one unit. */
-  const [handoffReady, setHandoffReady] = useState(false);
-  const [transcriptForSessionOpt, setTranscriptForSessionOpt] = useState<
-    Option.Option<TranscriptEntry[]>
-  >(sessionId ? Option.none() : Option.some([]));
+  const handoffReady = useAuthHandoffStore((s) => s.rehydrated);
+  const transcriptReady = useTranscriptStore((s) => s.transcriptReady);
 
   useEffect(() => {
+    const ws = useWorkspaceStore.getState();
+    ws.reset();
+    const cleanupBridge = initPersistenceBridge();
+
     // Anonymous: single key (anonymousWorkspaceStorage) holds chat + canvas as one unit.
     if (!sessionId) {
       loadAnonymousWorkspace();
+      if (isAnonymous) {
+        ws.enterAnonymous();
+      }
       queueMicrotask(() => {
         setCanvasReady(true);
-        setHandoffReady(true);
+        useAuthHandoffStore.getState().setRehydrated(true);
       });
-      let persistTimer: ReturnType<typeof setTimeout> | null = null;
-      const schedulePersist = (): void => {
-        if (persistTimer !== null) clearTimeout(persistTimer);
-        persistTimer = setTimeout(persistAnonymousWorkspace, 500);
-      };
-      const flushPersist = (): void => {
-        if (persistTimer !== null) {
-          clearTimeout(persistTimer);
-          persistTimer = null;
-          persistAnonymousWorkspace();
-        }
-      };
-      window.addEventListener("beforeunload", flushPersist);
-      const unsubCanvas = useCanvasStore.subscribe(schedulePersist);
-      const unsubHandoff = useAuthHandoffStore.subscribe(schedulePersist);
       return () => {
-        unsubCanvas();
-        unsubHandoff();
-        window.removeEventListener("beforeunload", flushPersist);
-        flushPersist();
+        cleanupBridge();
+        teardownPersistence();
       };
     }
-    queueMicrotask(() => setHandoffReady(true));
-  }, [sessionId]);
+    // Authenticated: workspace store drives persistence via bridge.
+    ws.loadSession(sessionId);
+    if (isConcluded) {
+      ws.deactivateSession();
+    }
+    queueMicrotask(() => useAuthHandoffStore.getState().setRehydrated(true));
+    return () => {
+      cleanupBridge();
+      teardownPersistence();
+    };
+  }, [sessionId, isConcluded, isAnonymous]);
 
   useEffect(() => {
     if (sessionId) {
@@ -133,10 +132,7 @@ export function InterviewSplitView({
     }
 
     if (prevId !== null && prevId !== sessionId) {
-      const state = getCanvasState();
-      void Effect.runPromise(
-        Effect.either(saveCanvasApi(prevId, state))
-      ).then(() => {});
+      void getPersistence().flush();
     }
 
     loadingCanvasSessionIdRef.current = sessionId;
@@ -157,12 +153,12 @@ export function InterviewSplitView({
         setCanvasReady(true);
       }
     );
-  }, [sessionId, isAnonymous, pendingSessionIdOpt, setCanvasState, getCanvasState]);
+  }, [sessionId, isAnonymous, pendingSessionIdOpt, setCanvasState]);
 
   useEffect(() => {
     if (!sessionId) {
       queueMicrotask(() => {
-        setTranscriptForSessionOpt(Option.some([]));
+        useTranscriptStore.getState().setTranscriptReady(true);
         setEntries([]);
       });
       return;
@@ -175,7 +171,7 @@ export function InterviewSplitView({
     );
     let cleanup: (() => void) | undefined;
     whenSome(matched, (handoff) => {
-      setTranscriptForSessionOpt(Option.some(handoff.entries));
+      useTranscriptStore.getState().setTranscriptReady(true);
       setEntries(handoff.entries);
       const t = setTimeout(() => setHandoffTranscript(Option.none()), 0);
       cleanup = () => clearTimeout(t);
@@ -199,28 +195,23 @@ export function InterviewSplitView({
         })
       );
       queueMicrotask(() => {
-        setTranscriptForSessionOpt(Option.some(entriesFromAnonymous));
+        useTranscriptStore.getState().setTranscriptReady(true);
         setEntries(entriesFromAnonymous);
       });
       return;
     }
 
     loadingTranscriptSessionIdRef.current = sessionId;
-    queueMicrotask(() => setTranscriptForSessionOpt(Option.none()));
+    queueMicrotask(() => useTranscriptStore.getState().setTranscriptReady(false));
     void Effect.runPromise(Effect.either(fetchTranscript(sessionId))).then(
       (result) => {
         const stale = loadingTranscriptSessionIdRef.current !== sessionId;
         if (stale) return;
         Either.match(result, {
-          onLeft: () => {
-            setTranscriptForSessionOpt(Option.some([]));
-            setEntries([]);
-          },
-          onRight: (list) => {
-            setTranscriptForSessionOpt(Option.some(list));
-            setEntries(list);
-          },
+          onLeft: () => setEntries([]),
+          onRight: (list) => setEntries(list),
         });
+        useTranscriptStore.getState().setTranscriptReady(true);
       }
     );
   }, [sessionId, pendingSessionIdOpt, setEntries, setHandoffTranscript]);
@@ -228,12 +219,7 @@ export function InterviewSplitView({
   const sessionReady =
     !sessionId && isAnonymous
       ? canvasReady && handoffReady
-      : isSessionContentReady(
-          sessionId,
-          canvasReady,
-          Option.isSome(transcriptForSessionOpt)
-        );
-  const initialEntries = Option.getOrElse(transcriptForSessionOpt, () => entries);
+      : isSessionContentReady(sessionId, canvasReady, transcriptReady);
 
   return (
     <div className="flex h-full w-full">
@@ -263,9 +249,8 @@ export function InterviewSplitView({
                 <ChatPanel
                   key={sessionId ?? "anon"}
                   sessionId={sessionId}
-                  initialEntries={initialEntries}
+                  initialEntries={entries}
                   isAnonymous={isAnonymous}
-                  handoffRehydrated={!sessionId ? handoffReady : true}
                   isTrial={isTrial}
                   isConcluded={isConcluded}
                 />
