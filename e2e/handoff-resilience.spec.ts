@@ -42,8 +42,9 @@ test.describe("Handoff resilience", () => {
     // Wait for the handoff to complete and navigate to the session page
     await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: 20_000 });
 
-    // Give extra time for any stray duplicate calls to arrive
-    await page.waitForTimeout(2_000);
+    // Wait for the canvas to render and settle — once it has a save status,
+    // the page is fully loaded and no more handoff calls should fire.
+    await page.waitForSelector("[data-save-status]", { timeout: 10_000 });
 
     // The bootstrapCalledRef guard should prevent more than one handoff API call
     expect(

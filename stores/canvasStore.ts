@@ -32,12 +32,15 @@ type CanvasStore = {
   evaluateAction: Option.Option<EvaluateAction>;
   /** PLG: true after anonymous user clicks Evaluate or sends chat; survives OAuth redirect. */
   hasAttemptedEval: boolean;
+  /** True once canvas data is ready for display (fetched or loaded from storage). */
+  canvasReady: boolean;
   setNodes: (nodes: ReadonlyArray<ReactFlowNode>) => void;
   setEdges: (edges: ReadonlyArray<ReactFlowEdge>) => void;
   setViewport: (viewport: Option.Option<Viewport>) => void;
   setCanvasState: (state: CanvasState) => void;
   setEvaluateAction: (action: Option.Option<EvaluateAction>) => void;
   setHasAttemptedEval: (value: boolean) => void;
+  setCanvasReady: (ready: boolean) => void;
   getCanvasState: () => CanvasState;
 
   // Domain actions for controlled ReactFlow mode
@@ -60,11 +63,13 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
   viewport: Option.none(),
   evaluateAction: Option.none(),
   hasAttemptedEval: false,
+  canvasReady: false,
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
   setViewport: (viewport) => set({ viewport }),
   setEvaluateAction: (action) => set({ evaluateAction: action }),
   setHasAttemptedEval: (hasAttemptedEval) => set({ hasAttemptedEval }),
+  setCanvasReady: (canvasReady) => set({ canvasReady }),
   setCanvasState: (state) =>
     set({
       nodes: state.nodes,

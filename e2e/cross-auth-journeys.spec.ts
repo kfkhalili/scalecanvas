@@ -222,14 +222,12 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
 
     const countBefore = await getNodeCount(page);
     await dragServiceToCanvas(page, "S3");
-    await page.waitForTimeout(500);
-    expect(await getNodeCount(page)).toBe(countBefore);
+    await expect.poll(() => getNodeCount(page), { timeout: 2_000 }).toBe(countBefore);
 
     await page.reload();
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
     expect(await getNodeCount(page)).toBe(1);
     await dragServiceToCanvas(page, "S3");
-    await page.waitForTimeout(500);
-    expect(await getNodeCount(page)).toBe(1);
+    await expect.poll(() => getNodeCount(page), { timeout: 2_000 }).toBe(1);
   });
 });

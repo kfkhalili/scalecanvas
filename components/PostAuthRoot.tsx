@@ -30,18 +30,15 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
  */
 export function PostAuthRoot(): React.ReactElement {
   const router = useRouter();
-  const [storesReady, setStoresReady] = useState(false);
   // One-shot guard: prevents double-firing if React Strict Mode remounts this
   // effect or if storesReady toggles more than once during a rapid re-render.
   const bootstrapCalledRef = useRef(false);
-
-  useEffect(() => {
+  const [storesReady] = useState(() => {
     loadAnonymousWorkspace();
-    queueMicrotask(() => setStoresReady(true));
-  }, []);
+    return true;
+  });
 
   useEffect(() => {
-    if (!storesReady) return;
     if (bootstrapCalledRef.current) return;
     bootstrapCalledRef.current = true;
 
@@ -100,7 +97,7 @@ export function PostAuthRoot(): React.ReactElement {
 
       void executeBootstrapAction(action, ctx, deps);
     });
-  }, [storesReady, router]);
+  }, [router]);
 
   if (!storesReady) {
     return (
