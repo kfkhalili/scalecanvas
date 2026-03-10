@@ -76,12 +76,21 @@ export function InterviewSplitView({
         if (persistTimer !== null) clearTimeout(persistTimer);
         persistTimer = setTimeout(persistAnonymousWorkspace, 500);
       };
+      const flushPersist = (): void => {
+        if (persistTimer !== null) {
+          clearTimeout(persistTimer);
+          persistTimer = null;
+          persistAnonymousWorkspace();
+        }
+      };
+      window.addEventListener("beforeunload", flushPersist);
       const unsubCanvas = useCanvasStore.subscribe(schedulePersist);
       const unsubHandoff = useAuthHandoffStore.subscribe(schedulePersist);
       return () => {
         unsubCanvas();
         unsubHandoff();
-        if (persistTimer !== null) clearTimeout(persistTimer);
+        window.removeEventListener("beforeunload", flushPersist);
+        flushPersist();
       };
     }
     queueMicrotask(() => setHandoffReady(true));
