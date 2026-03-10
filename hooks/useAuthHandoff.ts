@@ -37,11 +37,13 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
 
   const handoffDoneRef = useRef<string | null>(null);
+  const setHandoffStatus = useAuthHandoffStore((s) => s.setHandoffStatus);
 
   useEffect(() => {
     whenSome(pendingSessionIdOpt, (pendingSessionId) => {
       if (handoffDoneRef.current === pendingSessionId) return;
       handoffDoneRef.current = pendingSessionId;
+      setHandoffStatus("in-progress");
       const loadingToastId = toast.loading("Saving your session…");
 
       loadAnonymousWorkspace();
@@ -61,18 +63,21 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
             ),
         onTranscriptSaveError: () => {
           toast.dismiss(loadingToastId);
+          setHandoffStatus("error");
           toast.error(
             "Part of your conversation couldn't be saved. Sign in again to retry the session transfer."
           );
         },
         onCanvasSaveError: () => {
           toast.dismiss(loadingToastId);
+          setHandoffStatus("error");
           toast.error(
             "Your diagram couldn't be saved. You can keep working; try refreshing later to see if it's there."
           );
         },
         onHandoffComplete: (sid, filteredMsgs) => {
           toast.dismiss(loadingToastId);
+          setHandoffStatus("done");
           const entries = buildTranscriptEntries(sid, filteredMsgs, new Date().toISOString());
           setHandoffTranscript(Option.some({ sessionId: sid, entries }));
           setPendingAuthHandoff(Option.none());
@@ -92,6 +97,7 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
     setHandoffTranscript,
     setAnonymousMessages,
     setQuestionTitle,
+    setHandoffStatus,
   ]);
 
 }

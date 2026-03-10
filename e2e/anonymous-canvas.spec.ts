@@ -49,6 +49,7 @@ test.describe("Anonymous canvas persistence", () => {
 
     // Refresh
     await page.reload();
+    await page.waitForLoadState("load");
 
     // Node must still be visible after reload (rehydrated from anonymous workspace).
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
@@ -75,6 +76,7 @@ test.describe("Anonymous canvas persistence", () => {
     // persistence without depending on internal edge rendering details that are
     // flaky under automation.
     await page.reload();
+    await page.waitForLoadState("load");
 
     await expect(nodeByLabel(page, "API Gateway")).toBeVisible({ timeout: 10_000 });
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
@@ -88,6 +90,7 @@ test.describe("Anonymous canvas persistence", () => {
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
 
     await page.reload();
+    await page.waitForLoadState("load");
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
 
     // Zoom out with scroll
@@ -109,6 +112,7 @@ test.describe("Anonymous canvas persistence", () => {
     await expect(page.locator(".react-flow__node")).toHaveCount(0, { timeout: 5_000 });
 
     await page.reload();
+    await page.waitForLoadState("load");
 
     // Still no nodes
     await expect(page.locator(".react-flow__node")).toHaveCount(0, { timeout: 5_000 });
@@ -165,6 +169,7 @@ test.describe("Anonymous canvas persistence", () => {
     );
 
     await page.reload();
+    await page.waitForLoadState("load");
 
     // Wait for viewport to be restored from storage (rehydration can be async).
     await expect(async () => {

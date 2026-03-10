@@ -27,6 +27,8 @@ function writePendingSession(opt: Option.Option<string>): void {
   }
 }
 
+export type HandoffStatus = "idle" | "in-progress" | "done" | "error";
+
 type AuthHandoffStore = {
   /** When set, ChatPanel should run BFF handoff then clear and navigate to this session. */
   pendingSessionId: Option.Option<string>;
@@ -46,6 +48,9 @@ type AuthHandoffStore = {
   /** Whether authHandoffStore has been rehydrated from localStorage (anonymous workspace restore). */
   rehydrated: boolean;
   setRehydrated: (value: boolean) => void;
+  /** Observable handoff lifecycle state for UI and tests. */
+  handoffStatus: HandoffStatus;
+  setHandoffStatus: (status: HandoffStatus) => void;
 };
 
 export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
@@ -64,5 +69,7 @@ export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
   setQuestionTopicId: (id) => set({ questionTopicId: id }),
   rehydrated: false,
   setRehydrated: (rehydrated) => set({ rehydrated }),
+  handoffStatus: "idle",
+  setHandoffStatus: (handoffStatus) => set({ handoffStatus }),
 }));
 

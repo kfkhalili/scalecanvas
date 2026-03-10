@@ -4,7 +4,7 @@ import { Effect, Option } from "effect";
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
-import { generateId } from "ai";
+
 import { Lightbulb, Maximize2, Minimize2 } from "lucide-react";
 import { getRandomQuestion, getRandomTopic, getTopicById, getTopicByTitle } from "@/lib/questions";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -94,6 +94,7 @@ export function ChatPanel({
     useChat({
       api: "/api/chat",
       fetch: fetchWithGuardrail,
+      generateId: () => crypto.randomUUID(),
       initialMessages: initialEntries.map(toMessage),
       body: chatBody,
       onFinish: (message) => {
@@ -164,7 +165,7 @@ export function ChatPanel({
         setMessages((prev) => [
           ...prev,
           {
-            id: `err-${Date.now()}`,
+            id: crypto.randomUUID(),
             role: "assistant",
             content: message,
           },
@@ -262,7 +263,7 @@ export function ChatPanel({
           setQuestionTopicId(Option.some(topicFromTitle.id));
           setMessages([
             {
-              id: generateId(),
+              id: crypto.randomUUID(),
               role: "assistant",
               content: topicFromTitle.comprehensivePrompt,
             },
@@ -282,7 +283,7 @@ export function ChatPanel({
         setQuestionTopicId(Option.some(topic.id));
         setMessages([
           {
-            id: generateId(),
+            id: crypto.randomUUID(),
             role: "assistant",
             content: topic.comprehensivePrompt,
           },
@@ -312,7 +313,7 @@ export function ChatPanel({
           {
             role: "user",
             content: "Start the interview.",
-            id: generateId(),
+            id: crypto.randomUUID(),
           },
           {
             body: {
@@ -333,7 +334,7 @@ export function ChatPanel({
       }
       setMessages([
         {
-          id: generateId(),
+          id: crypto.randomUUID(),
           role: "assistant",
           content: question.prompt,
         },
@@ -502,7 +503,7 @@ export function ChatPanel({
     whenSome(activeQuestionOpt, (activeQuestion) => {
       if (!hasMoreHints) return;
       const hintMessage = {
-        id: generateId(),
+        id: crypto.randomUUID(),
         role: "assistant" as const,
         content: activeQuestion.hints[hintIndex],
       };

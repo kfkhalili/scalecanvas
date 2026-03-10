@@ -239,3 +239,55 @@ export async function ensureUserAndResetTrial(
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Test cleanup
+// ---------------------------------------------------------------------------
+
+/**
+ * Deletes all sessions (and cascading transcripts) for a user.
+ * Call in `test.afterEach` to prevent cross-test contamination.
+ */
+export async function cleanupUserSessions(userId: string): Promise<void> {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+  const serviceToken = mintServiceRoleToken();
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/interview_sessions?user_id=eq.${userId}`,
+    {
+      method: "DELETE",
+      headers: {
+        apikey: serviceToken,
+        Authorization: `Bearer ${serviceToken}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+    },
+  );
+  if (!res.ok) {
+    console.warn(`[e2e cleanup] Failed to delete sessions for ${userId}: ${res.status}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Error response logging
+// ---------------------------------------------------------------------------
+
+/**
+ * Installs a response listener that logs non-2xx API responses.
+ * Call in `test.beforeEach` after `page` is available.
+ */
+export function installApiErrorLogger(page: Page): void {
+  page.on("response", (res) => {
+    const url = res.url();
+    if (!url.includes("/api/") && !url.includes("/rest/v1/")) return;
+    if (res.status() < 400) return;
+    void res.text().then((body) => {
+      console.warn(
+        `[e2e api-error] ${res.request().method()} ${url} → ${res.status()}\n${body.slice(0, 500)}`,
+      );
+    }).catch(() => {
+      // Response body may not be available
+    });
+  });
+}

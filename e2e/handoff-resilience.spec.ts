@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { setupAuthenticatedPage, ensureUserAndResetTrial } from "./fixtures";
+import { setupAuthenticatedPage, ensureUserAndResetTrial, cleanupUserSessions, installApiErrorLogger } from "./fixtures";
 import {
   isLocalSupabase,
   E2E_HANDOFF_DEDUP_USER_ID,
@@ -23,6 +23,7 @@ test.describe("Handoff resilience", () => {
       E2E_HANDOFF_DEDUP_USER_ID,
       "e2e-handoff-dedup@example.com"
     );
+    installApiErrorLogger(page);
     await setupAuthenticatedPage(page, E2E_HANDOFF_DEDUP_USER_ID, baseURL);
 
     // Track every POST to /api/auth/handoff
@@ -62,6 +63,7 @@ test.describe("Handoff resilience", () => {
       E2E_HANDOFF_CANVAS_USER_ID,
       "e2e-handoff-canvas@example.com"
     );
+    installApiErrorLogger(page);
     await setupAuthenticatedPage(page, E2E_HANDOFF_CANVAS_USER_ID, baseURL);
 
     // Intercept PUT /api/sessions/*/canvas: fail the first attempt, let retries through.
@@ -127,6 +129,7 @@ test.describe("Handoff resilience", () => {
       E2E_HANDOFF_TRANSCRIPT_USER_ID,
       "e2e-handoff-transcript@example.com"
     );
+    installApiErrorLogger(page);
     await setupAuthenticatedPage(page, E2E_HANDOFF_TRANSCRIPT_USER_ID, baseURL);
 
     // Intercept POST to the transcript batch endpoint: abort the first attempt
@@ -166,5 +169,13 @@ test.describe("Handoff resilience", () => {
       batchPostCount,
       `Expected ≥2 transcript batch POST attempts (1 failed + 1 succeeded), got ${batchPostCount}`
     ).toBeGreaterThanOrEqual(2);
+  });
+
+  test.afterEach(async () => {
+    await Promise.all([
+      cleanupUserSessions(E2E_HANDOFF_DEDUP_USER_ID),
+      cleanupUserSessions(E2E_HANDOFF_CANVAS_USER_ID),
+      cleanupUserSessions(E2E_HANDOFF_TRANSCRIPT_USER_ID),
+    ]);
   });
 });

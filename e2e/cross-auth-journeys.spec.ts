@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mintServiceRoleToken } from "./jwtBypass";
-import { setupAuthenticatedPage } from "./fixtures";
+import { setupAuthenticatedPage, cleanupUserSessions, installApiErrorLogger } from "./fixtures";
 import {
   isLocalSupabase,
   E2E_JOURNEY_USER_ID,
@@ -106,6 +106,7 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     page,
     baseURL,
   }) => {
+    installApiErrorLogger(page);
     await setupAuthenticatedPage(page, E2E_JOURNEY_USER_ID, baseURL);
 
     const handoffCalls: { status: number }[] = [];
@@ -116,7 +117,9 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
 
     const handoffResPromise = page.waitForResponse(
       (res) =>
-        res.url().includes("/api/auth/handoff") && res.request().method() === "POST",
+        res.url().includes("/api/auth/handoff") &&
+        res.request().method() === "POST" &&
+        res.status() < 400,
       { timeout: 20_000 }
     );
 
@@ -148,6 +151,7 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     page,
     baseURL,
   }) => {
+    installApiErrorLogger(page);
     await setupAuthenticatedPage(page, E2E_JOURNEY_CONCLUSION_USER_ID, baseURL);
 
     const handoffLog: { status: number; body: unknown }[] = [];
@@ -229,5 +233,10 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     expect(await getNodeCount(page)).toBe(1);
     await dragServiceToCanvas(page, "S3");
     await expect.poll(() => getNodeCount(page), { timeout: 2_000 }).toBe(1);
+  });
+
+  test.afterEach(async () => {
+    await cleanupUserSessions(E2E_JOURNEY_USER_ID);
+    await cleanupUserSessions(E2E_JOURNEY_CONCLUSION_USER_ID);
   });
 });

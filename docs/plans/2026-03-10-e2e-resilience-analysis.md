@@ -3,6 +3,7 @@
 **Date**: 2026-03-10
 **Scope**: Root-cause analysis of E2E debugging difficulty for handoff resilience tests (H1–H3)
 **Prior art**: `2026-03-09-handoff-process-analysis.md`
+**Updated**: 2026-03-10 — post architecture challenge completion
 
 ---
 
@@ -150,17 +151,17 @@ The codebase's functional style (pure functions, `Effect`/`Either`, `Option`, no
 | 3 | 🔴 | **Persist `pendingSessionId` to sessionStorage** via `readPendingSession`/`writePendingSession` helpers in `authHandoffStore.ts`. Survives hard navigation within a tab; clears on tab close. | RC1 (ephemeral store) | ✅ Done |
 | 4 | 🟠 | **Extract shared E2E fixtures**: Created `e2e/fixtures.ts` with `setupAuthenticatedPage()`, `ensureUserAndResetTrial()`, and `anonymousWorkspaceWithLambda`. Both spec files now import from it. | RC4 (GoTrue fragility, duplication) | ✅ Done |
 | 5 | 🟠 | **Document Playwright route interception rules** in `e2e/README.md`: when to use `fulfill` vs `abort` vs `fallback`, PNA implications, and the address-space trap. | RC5 (hidden semantics) | ✅ Done |
-| 6 | 🟡 | **Add branded `TranscriptEntryId` type**: `type TranscriptEntryId = string & { readonly _brand: unique symbol }`. Constructor validates UUID format. Catches non-UUID IDs at compile time. | RC2 (type system gap) | Open |
+| 6 | 🟡 | **Add branded `TranscriptEntryId` type**: `type TranscriptEntryId = string & { readonly _brand: unique symbol }`. Constructor validates UUID format. Catches non-UUID IDs at compile time. | RC2 (type system gap) | ✅ Won’t Fix — Zod validates at API boundary; IDs are now UUIDs at source (#8). Branded type adds complexity without proportional benefit. |
 | 7 | 🟡 | **Test transcript retry path in unit tests**: `authHandoff.test.ts` — added 2 tests: all-fail and second-attempt-success. | RC3 (unit test gap) | ✅ Done |
-| 8 | ℹ️ | **Consider making anonymous message IDs UUIDs at creation time**: In `ChatPanel` and `InterviewSplitView`, use `crypto.randomUUID()` instead of arbitrary string IDs. Eliminates the format mismatch at the source. | RC2 (prevention) | Open |
+| 8 | ℹ️ | **Consider making anonymous message IDs UUIDs at creation time**: In `ChatPanel` and `InterviewSplitView`, use `crypto.randomUUID()` instead of arbitrary string IDs. Eliminates the format mismatch at the source. | RC2 (prevention) | ✅ Resolved — replaced all `generateId()` with `crypto.randomUUID()` in ChatPanel; added `generateId: () => crypto.randomUUID()` to useChat options |
 
 ### E2E-Specific Hardening
 
 | # | Severity | Action | Status |
 |---|----------|--------|--------|
 | 9 | 🟠 | **Add Playwright `retries: 1` locally** (was 0). Flaky timing issues self-heal without manual re-runs. | ✅ Done |
-| 10 | 🟡 | **Add `test.afterEach` cleanup**: Delete created sessions and transcripts after each test. Prevents cross-test contamination from orphaned data. | Open |
-| 11 | 🟡 | **Log response bodies on non-2xx in all E2E interceptors**: A shared helper that logs error responses would surface root causes faster. | Open |
+| 10 | 🟡 | **Add `test.afterEach` cleanup**: Delete created sessions and transcripts after each test. Prevents cross-test contamination from orphaned data. | ✅ Resolved — added `cleanupUserSessions` helper and `afterEach` hooks in both cross-auth and handoff-resilience specs |
+| 11 | 🟡 | **Log response bodies on non-2xx in all E2E interceptors**: A shared helper that logs error responses would surface root causes faster. | ✅ Resolved — added `installApiErrorLogger` helper and wired into all test cases |
 
 ---
 

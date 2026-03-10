@@ -348,6 +348,7 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
       className="relative h-full w-full"
       style={{ minHeight: 400, minWidth: 300 }}
       data-save-status={saveStatus}
+      data-read-only={!isSessionActive}
     >
       {shortcutsPanel}
       <InterviewCountdownBadge sessionIdOpt={sessionIdOpt} />
