@@ -2,33 +2,36 @@
 
 **Date:** 2026-03-10
 **Prior report:** [2026-03-10-e2e-flaky-debounce-race.md](2026-03-10-e2e-flaky-debounce-race.md) (findings #1 and #2 resolved)
+**Updated:** 2026-03-10 — post architecture challenge completion (branch `feat/handoff-canvas-persistence`)
 
 ---
 
 ## Executive Summary
 
-Systematic audit of the codebase for patterns that produce race conditions, flaky tests, and implicit durability assumptions. Found **14 findings** across 5 categories. The core architectural issue is that **no persistence operation surfaces observable "saving / saved / failed" state**, forcing both the UI and tests to rely on timing heuristics.
+Systematic audit of the codebase for patterns that produce race conditions, flaky tests, and implicit durability assumptions. Found **14 findings** across 5 categories. The core architectural issue — **no persistence operation surfaces observable "saving / saved / failed" state** — has been resolved by the `PersistenceService` layer (`lib/persistence.ts`) and `data-save-status` DOM attribute.
+
+**Current status:** 10 of 14 findings resolved. 4 remain open (S4, S5, S10, S11 — all 🟡 Low / 🟠 Medium severity).
 
 ---
 
 ## Findings Table
 
-| # | Severity | Category | File | Line(s) | Finding |
-|---|----------|----------|------|---------|---------|
-| S1 | 🔴 High | Durability | `components/canvas/FlowCanvas.tsx` | 220–232 | Canvas save debounce (800 ms) clears timer on unmount without flushing; no `beforeunload` handler |
-| S2 | 🔴 High | Durability | `components/canvas/FlowCanvas.tsx` | 224–225 | `saveCanvasApi` result is discarded (`.then(() => {})`) — save errors are silently swallowed |
-| S3 | 🟠 Medium | Observable state | `stores/canvasStore.ts` | — | No `isSaving`, `isDirty`, `lastSavedAt`, or `saveError` state in canvas store |
-| S4 | 🟠 Medium | Observable state | `stores/anonymousWorkspaceStorage.ts` | 139–170 | `persistAnonymousWorkspace()` returns `void` — callers cannot observe success/failure |
-| S5 | 🟠 Medium | Observable state | `hooks/useAuthHandoff.ts` | 52 | `runBffHandoff` shows a loading toast but no store state tracks handoff progress |
-| S6 | 🟡 Low | Implicit ordering | `components/interview/InterviewSplitView.tsx` | 70, 96, 131, 143, 164, 201, 209 | 7 uses of `queueMicrotask` for state sequencing — fragile if any dependency becomes async |
-| S7 | 🟡 Low | Implicit ordering | `components/PostAuthRoot.tsx` | 39 | `queueMicrotask(() => setStoresReady(true))` assumes `loadAnonymousWorkspace()` is synchronous |
-| S8 | 🟠 Medium | Test timing | `e2e/handoff-resilience.spec.ts` | 46 | `page.waitForTimeout(2_000)` — magic sleep to wait for "stray duplicate calls" |
-| S9 | 🟠 Medium | Test timing | `e2e/cross-auth-journeys.spec.ts` | 225, 232 | Two `page.waitForTimeout(500)` magic sleeps — flaky if CI is slower |
-| S10 | 🟠 Medium | Test timing | `e2e/cross-auth-journeys.spec.ts` | 117–121 | `handoffResPromise` has no `res.status() < 400` filter — accepts failed handoff calls |
-| S11 | 🟡 Low | Test timing | `e2e/anonymous-canvas.spec.ts` | 51, 77, 90, 111, 167 | 5 `page.reload()` calls without `waitForLoadState('load')` — works because anonymous persist is now sync-flushed on beforeunload, but pattern is fragile |
-| S12 | 🟡 Low | Test timing | `e2e/cross-auth-journeys.spec.ts` | 228 | `page.reload()` without preceding assertion that the save has committed |
-| S13 | 🟠 Medium | Durability | `components/canvas/FlowCanvas.tsx` | 330 | `setInterval` for countdown timer — harmless for data, but leaking timer on HMR re-renders is possible |
-| S14 | 🟡 Low | Implicit ordering | `components/interview/InterviewSplitView.tsx` | 180 | `setTimeout(() => setHandoffTranscript(Option.none()), 0)` — kicks state update to next task to avoid React warning, but ordering is non-obvious |
+| # | Severity | Category | File | Line(s) | Finding | Status |
+|---|----------|----------|------|---------|---------|--------|
+| S1 | 🔴 High | Durability | `components/canvas/FlowCanvas.tsx` | 220–232 | Canvas save debounce (800 ms) clears timer on unmount without flushing; no `beforeunload` handler | ✅ Resolved — `PersistenceService` handles debounce + flush |
+| S2 | 🔴 High | Durability | `components/canvas/FlowCanvas.tsx` | 224–225 | `saveCanvasApi` result is discarded (`.then(() => {})`) — save errors are silently swallowed | ✅ Resolved — `PersistState.error` tracks failures |
+| S3 | 🟠 Medium | Observable state | `stores/canvasStore.ts` | — | No `isSaving`, `isDirty`, `lastSavedAt`, or `saveError` state in canvas store | ✅ Resolved — `PersistState` in `lib/persistence.ts` + `data-save-status` in DOM |
+| S4 | 🟠 Medium | Observable state | `stores/anonymousWorkspaceStorage.ts` | 139–170 | `persistAnonymousWorkspace()` returns `void` — callers cannot observe success/failure | Superseded — `PersistenceService` handles anonymous persistence with observable state |
+| S5 | 🟠 Medium | Observable state | `hooks/useAuthHandoff.ts` | 52 | `runBffHandoff` shows a loading toast but no store state tracks handoff progress | Open |
+| S6 | 🟡 Low | Implicit ordering | `components/interview/InterviewSplitView.tsx` | 70, 96, 131, 143, 164, 201, 209 | 7 uses of `queueMicrotask` for state sequencing — fragile if any dependency becomes async | ✅ Resolved — 0 queueMicrotask calls remain |
+| S7 | 🟡 Low | Implicit ordering | `components/PostAuthRoot.tsx` | 39 | `queueMicrotask(() => setStoresReady(true))` assumes `loadAnonymousWorkspace()` is synchronous | ✅ Resolved — replaced with `useState` lazy initializer |
+| S8 | 🟠 Medium | Test timing | `e2e/handoff-resilience.spec.ts` | 46 | `page.waitForTimeout(2_000)` — magic sleep to wait for "stray duplicate calls" | ✅ Resolved — `waitForSelector("[data-save-status]")` |
+| S9 | 🟠 Medium | Test timing | `e2e/cross-auth-journeys.spec.ts` | 225, 232 | Two `page.waitForTimeout(500)` magic sleeps — flaky if CI is slower | ✅ Resolved — `expect.poll(() => getNodeCount(page))` |
+| S10 | 🟠 Medium | Test timing | `e2e/cross-auth-journeys.spec.ts` | 117–121 | `handoffResPromise` has no `res.status() < 400` filter — accepts failed handoff calls | Open |
+| S11 | 🟡 Low | Test timing | `e2e/anonymous-canvas.spec.ts` | 51, 77, 90, 111, 167 | 5 `page.reload()` calls without `waitForLoadState('load')` — works because anonymous persist is now sync-flushed on beforeunload, but pattern is fragile | Open |
+| S12 | 🟡 Low | Test timing | `e2e/cross-auth-journeys.spec.ts` | 228 | `page.reload()` without preceding assertion that the save has committed | ✅ Resolved — `waitForLoadState("load")` added |
+| S13 | 🟠 Medium | Durability | `components/canvas/FlowCanvas.tsx` | 330 | `setInterval` for countdown timer — harmless for data, but leaking timer on HMR re-renders is possible | ✅ Resolved — `clearInterval` on both elapsed and unmount |
+| S14 | 🟡 Low | Implicit ordering | `components/interview/InterviewSplitView.tsx` | 180 | `setTimeout(() => setHandoffTranscript(Option.none()), 0)` — kicks state update to next task to avoid React warning, but ordering is non-obvious | ✅ Resolved — pattern removed in refactor |
 
 ---
 
@@ -199,15 +202,15 @@ This enables:
 
 ## Prioritised Action List
 
-| Priority | Action | Fixes | Effort |
-|----------|--------|-------|--------|
-| 1 | Add save lifecycle state to `canvasStore` (`isDirty`, `isSaving`, `lastSavedAt`, `saveError`) | S2, S3 | Small |
-| 2 | Flush `FlowCanvas` debounce on unmount + `beforeunload` (same pattern as InterviewSplitView fix) | S1 | Small |
-| 3 | Consume save lifecycle in `FlowCanvas`: update store on save start/success/error | S2, S3 | Small |
-| 4 | Add `data-save-status` attribute to canvas container for e2e testability | S8, S9, S11, S12 | Small |
-| 5 | Add `res.status() < 400` to remaining `waitForResponse` calls in e2e tests | S10 | Trivial |
-| 6 | Replace `waitForTimeout` magic sleeps with observable DOM state assertions | S8, S9 | Small |
-| 7 | Add `data-read-only` attribute to canvas when concluded | S9 | Trivial |
-| 8 | Make `persistAnonymousWorkspace` return `boolean` | S4 | Trivial |
-| 9 | Add `handoffStatus` to `authHandoffStore` | S5 | Small |
-| 10 | Document `queueMicrotask` invariants with inline comments | S6, S7, S14 | Trivial |
+| Priority | Action | Fixes | Effort | Status |
+|----------|--------|-------|--------|--------|
+| 1 | Add save lifecycle state to `canvasStore` (`isDirty`, `isSaving`, `lastSavedAt`, `saveError`) | S2, S3 | Small | ✅ Done — `PersistState` in `lib/persistence.ts` |
+| 2 | Flush `FlowCanvas` debounce on unmount + `beforeunload` (same pattern as InterviewSplitView fix) | S1 | Small | ✅ Done — `PersistenceService.flush()` |
+| 3 | Consume save lifecycle in `FlowCanvas`: update store on save start/success/error | S2, S3 | Small | ✅ Done — subscribes to `PersistState` |
+| 4 | Add `data-save-status` attribute to canvas container for e2e testability | S8, S9, S11, S12 | Small | ✅ Done |
+| 5 | Add `res.status() < 400` to remaining `waitForResponse` calls in e2e tests | S10 | Trivial | Open |
+| 6 | Replace `waitForTimeout` magic sleeps with observable DOM state assertions | S8, S9 | Small | ✅ Done — `expect.poll` + `waitForSelector` |
+| 7 | Add `data-read-only` attribute to canvas when concluded | S9 | Trivial | Open |
+| 8 | Make `persistAnonymousWorkspace` return `boolean` | S4 | Trivial | Superseded — `PersistenceService` |
+| 9 | Add `handoffStatus` to `authHandoffStore` | S5 | Small | Open |
+| 10 | Document `queueMicrotask` invariants with inline comments | S6, S7, S14 | Trivial | ✅ N/A — 0 queueMicrotask calls remain |

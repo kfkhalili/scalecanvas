@@ -1,7 +1,36 @@
 # Architecture Challenge: Burn It Down and Rebuild Right
 
 **Date:** 2026-03-10
+**Status:** ✅ **COMPLETE** — All 8 migration steps delivered across commits `36c2486`…`0a3a478` on branch `feat/handoff-canvas-persistence`.
 **Context:** Pre-production prototype. No users. No migrations to protect. Everything is on the table.
+
+---
+
+## Completion Summary
+
+| Migration Step | Status | Commit(s) |
+|----------------|--------|-----------|
+| 1. Extract `PersistenceService` interface + `createLocalPersistence` | ✅ Done | `36c2486` |
+| 2. Move anonymous debounce/flush into persistence layer | ✅ Done | `36c2486` |
+| 3. Create `createApiPersistence` wrapping `saveCanvasApi` | ✅ Done | `36c2486` |
+| 4. Add `saveStatus` to canvas + `data-save-status` in DOM | ✅ Done | `36c2486` |
+| 5. Model `WorkspacePhase` discriminated union in `workspaceStore` | ✅ Done | `36c2486` |
+| 6. Move orchestration out of InterviewSplitView | ✅ Done | `0a3a478` (`useSessionContent` extraction) |
+| 7. Decide Effect vs async/await | ✅ Decided: Keep Effect (justified per [effect audit](2026-03-10-effect-audit.md)) | `60bc2d9` |
+| 8. Switch FlowCanvas to controlled mode | ✅ Done | `7c7b42d` |
+
+### Outcomes vs Promises
+
+| Promise ("What This Gets You") | Outcome |
+|-------------------------------|---------|
+| 200 lines of orchestration in components → ~50 lines | InterviewSplitView: 266→117 lines. PostAuthRoot: merged 2 effects into 1. |
+| 12 variables encoding 5 states → 1 discriminated union | `WorkspacePhase` in `stores/workspaceStore.ts` with `ts-pattern` exhaustive match |
+| 2 divergent persistence codepaths → 1 interface | `PersistenceService` in `lib/persistence.ts`, 2 implementations |
+| Fire-and-forget saves → observable state | `PersistState` { isDirty, isSaving, lastSavedAt, error } |
+| Magic sleeps in E2E → deterministic waits | `data-save-status` attribute; `expect.poll` and `waitForSelector` |
+| Effect decision | Kept — zero anti-patterns per [effect audit](2026-03-10-effect-audit.md) |
+| Reference-equality sync loop → controlled ReactFlow | Controlled mode; store is single source of truth |
+| 7 queueMicrotask calls → explicit transitions | 0 queueMicrotask calls remaining |
 
 ---
 
