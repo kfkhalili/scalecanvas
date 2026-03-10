@@ -164,7 +164,8 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
       (res) =>
         res.url().includes("/api/sessions/") &&
         res.url().includes("/canvas") &&
-        res.request().method() === "PUT",
+        res.request().method() === "PUT" &&
+        res.status() < 400,
       { timeout: 30_000 }
     );
     await page.goto("/");
@@ -180,9 +181,13 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     });
 
     await canvasSavedPromise;
-    // Canvas PUT is now in DB. Reload so InterviewSplitView re-fetches canvas
+    // Confirm Lambda is rendered before reloading so we know the initial render
+    // has settled and we're not reloading mid-flight.
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    // Reload so InterviewSplitView re-fetches canvas from DB
     // (it only fetches on mount; it won't re-fetch while already on the session page).
     await page.reload();
+    await page.waitForLoadState("load");
     await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
 
     const endBtn = page.getByRole("button", { name: /end interview/i });

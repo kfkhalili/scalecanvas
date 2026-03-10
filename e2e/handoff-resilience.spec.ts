@@ -105,8 +105,14 @@ test.describe("Handoff resilience", () => {
       `Expected ≥2 canvas PUT attempts (1 failed + 1 succeeded), got ${canvasPutCount}`
     ).toBeGreaterThanOrEqual(2);
 
-    // Verify canvas was actually persisted: reload and check node is visible
+    // Confirm Lambda rendered before reloading so the initial render has settled.
+    await expect(
+      page.locator(".react-flow__node").filter({ hasText: "Lambda" })
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Verify canvas was actually persisted: reload and check node is still visible
     await page.reload();
+    await page.waitForLoadState("load");
     await expect(
       page.locator(".react-flow__node").filter({ hasText: "Lambda" })
     ).toBeVisible({ timeout: 10_000 });
