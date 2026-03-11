@@ -6,14 +6,21 @@ on:
   pull_request:
     branches: [main]
 
-# supabase/setup-cli@v1 has no Node.js 24 build yet.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# supabase/setup-cli@v1 and pnpm/action-setup@v4 have no Node.js 24 builds yet.
 # Force Node.js 24 so the workflow stays green after the June 2026 cutoff.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -23,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install
@@ -45,7 +52,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: placeholder
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -55,7 +62,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install
@@ -63,11 +70,11 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.75.0
 
       - name: Cache Supabase Docker images
         id: docker-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/supabase-images.tar
           # Invalidate when config.toml changes (Postgres major version, CLI version, etc.)
@@ -93,21 +100,21 @@ jobs:
 
       - name: Verify Supabase is healthy
         run: |
-          supabase status -o json | python3 -c "
-import json, sys
-status = json.load(sys.stdin)
-for svc in ['DB URL', 'API URL', 'Auth URL']:
-    if svc not in status:
-        print(f'Missing service: {svc}', file=sys.stderr)
-        sys.exit(1)
-print('Supabase services healthy')
-"
+          supabase status
+          curl -sf http://127.0.0.1:54321/rest/v1/ -o /dev/null
+          curl -sf http://127.0.0.1:54321/auth/v1/health -o /dev/null
+          echo "Supabase services healthy"
 
       - name: Extract Supabase keys
         id: keys
         run: |
-          ANON_KEY=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['ANON_KEY'])")
-          SERVICE_KEY=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['SERVICE_ROLE_KEY'])")
+          ANON_KEY=$(supabase status -o env | grep ANON_KEY | cut -d= -f2- | tr -d '"')
+          SERVICE_KEY=$(supabase status -o env | grep SERVICE_ROLE_KEY | cut -d= -f2- | tr -d '"')
+          if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_KEY" ]; then
+            echo "::error::Failed to extract Supabase keys"
+            supabase status
+            exit 1
+          fi
           echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
           echo "service_key=$SERVICE_KEY" >> "$GITHUB_OUTPUT"
 
@@ -138,7 +145,7 @@ print('Supabase services healthy')
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: playwright-report/
@@ -148,14 +155,14 @@ print('Supabase services healthy')
     needs: [check, e2e]
     # Only deploy migrations on pushes to main (not on PRs)
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production
     steps:
       - uses: actions/checkout@v5
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.75.0
 
       - name: Push migrations to production
         # supabase link + db push uses the Management API over HTTPS (port 443).
