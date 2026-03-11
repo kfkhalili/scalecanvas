@@ -1,10 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mintServiceRoleToken } from "./jwtBypass";
-import { setupAuthenticatedPage, ensureUserAndResetTrial, cleanupUserSessions, installApiErrorLogger } from "./fixtures";
+import { setupAuthenticatedPage, ensureUserAndResetTrial, cleanupUserSessions, installApiErrorLogger, assertNoUnexpected5xx } from "./fixtures";
 import {
   isLocalSupabase,
   E2E_JOURNEY_USER_ID,
   E2E_JOURNEY_CONCLUSION_USER_ID,
+  TIMEOUT_NAVIGATION,
+  TIMEOUT_SERVER,
+  TIMEOUT_VISIBLE,
+  TIMEOUT_SHORT,
+  TIMEOUT_POLL,
 } from "./env";
 
 function nodeByLabel(page: Page, label: string) {
@@ -38,7 +43,7 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     page,
     baseURL,
   }) => {
-    installApiErrorLogger(page);
+    const apiErrors = installApiErrorLogger(page);
     await setupAuthenticatedPage(page, E2E_JOURNEY_USER_ID, baseURL);
 
     const handoffCalls: { status: number }[] = [];
@@ -52,7 +57,7 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
         res.url().includes("/api/auth/handoff") &&
         res.request().method() === "POST" &&
         res.status() < 400,
-      { timeout: 20_000 }
+      { timeout: TIMEOUT_NAVIGATION }
     );
 
     await page.goto("/");
@@ -76,14 +81,15 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     expect(handoffBody.created).toBe(true);
     expect(handoffBody.session_id).toBeDefined();
 
-    await expect(page).toHaveURL(/\/[0-9a-f-]{36}$/, { timeout: 10_000 });
+    await expect(page).toHaveURL(/\/[0-9a-f-]{36}$/, { timeout: TIMEOUT_VISIBLE });
+    assertNoUnexpected5xx(apiErrors);
   });
 
   test("anonymous → sign in (bypass) → handoff → end interview → canvas read-only and state correct after refresh", async ({
     page,
     baseURL,
   }) => {
-    installApiErrorLogger(page);
+    const apiErrors = installApiErrorLogger(page);
     await setupAuthenticatedPage(page, E2E_JOURNEY_CONCLUSION_USER_ID, baseURL);
 
     const handoffLog: { status: number; body: unknown }[] = [];
@@ -102,10 +108,10 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
         res.url().includes("/canvas") &&
         res.request().method() === "PUT" &&
         res.status() < 400,
-      { timeout: 30_000 }
+      { timeout: TIMEOUT_SERVER }
     );
     await page.goto("/");
-    await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: 20_000 }).catch(async (e) => {
+    await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: TIMEOUT_NAVIGATION }).catch(async (e) => {
       console.log("[e2e] waitForURL failed. handoff API calls:", JSON.stringify(handoffLog, null, 2));
       const loading = await page.getByText("Loading session…").isVisible().catch(() => false);
       const signInVisible = await page.getByRole("button", { name: /sign in with google/i }).isVisible().catch(() => false);
@@ -119,26 +125,29 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     await canvasSavedPromise;
     // Confirm Lambda is rendered before reloading so we know the initial render
     // has settled and we're not reloading mid-flight.
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
     // Reload so InterviewSplitView re-fetches canvas from DB
     // (it only fetches on mount; it won't re-fetch while already on the session page).
     await page.reload();
     await page.waitForLoadState("load");
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
 
     const endBtn = page.getByRole("button", { name: /end interview/i });
-    await expect(endBtn).toBeVisible({ timeout: 5_000 });
+    await expect(endBtn).toBeVisible({ timeout: TIMEOUT_SHORT });
     await endBtn.click();
     // Confirm the dialog that appears after the first click
     const confirmBtn = page.getByRole("button", { name: /end interview/i });
-    await expect(confirmBtn).toBeVisible({ timeout: 3_000 });
+    await expect(confirmBtn).toBeVisible({ timeout: TIMEOUT_SHORT });
     await confirmBtn.click();
 
     await expect(
       page.getByPlaceholder("This interview has ended.")
-    ).toBeVisible({ timeout: 30_000 });
+    ).toBeVisible({ timeout: TIMEOUT_SERVER });
 
     // Persist conclusion to DB so that after reload the server returns isConcluded=true.
+    // In e2e, Bedrock is unavailable so the conclusion API cannot stream a real summary.
+    // We PATCH directly via PostgREST instead. The conclusion API's onFinish persistence
+    // logic is covered by unit tests (app/api/sessions/[id]/conclusion/route.test.ts).
     const sessionUrl = page.url();
     const concludedSessionMatch = sessionUrl.match(/\/([0-9a-f-]{36})$/i);
     if (concludedSessionMatch) {
@@ -158,13 +167,14 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
 
     const countBefore = await getNodeCount(page);
     await dragServiceToCanvas(page, "S3");
-    await expect.poll(() => getNodeCount(page), { timeout: 2_000 }).toBe(countBefore);
+    await expect.poll(() => getNodeCount(page), { timeout: TIMEOUT_POLL }).toBe(countBefore);
 
     await page.reload();
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
     expect(await getNodeCount(page)).toBe(1);
     await dragServiceToCanvas(page, "S3");
-    await expect.poll(() => getNodeCount(page), { timeout: 2_000 }).toBe(1);
+    await expect.poll(() => getNodeCount(page), { timeout: TIMEOUT_POLL }).toBe(1);
+    assertNoUnexpected5xx(apiErrors);
   });
 
   test.afterEach(async ({}, testInfo) => {

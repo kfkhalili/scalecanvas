@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Option } from "effect";
 import { useCanvasStore } from "./canvasStore";
+import { useWorkspaceStore } from "./workspaceStore";
 import { getSampleCanvasState } from "@/lib/__fixtures__/canvas";
 import type { ReactFlowNode, ReactFlowEdge } from "@/lib/types";
 
@@ -138,6 +139,8 @@ describe("canvasStore", () => {
     };
 
     it("addNode appends a node", () => {
+      useWorkspaceStore.getState().reset();
+      useWorkspaceStore.getState().enterAnonymous();
       useCanvasStore.getState().setNodes([nodeA]);
       useCanvasStore.getState().addNode(nodeB);
       expect(useCanvasStore.getState().nodes).toHaveLength(2);

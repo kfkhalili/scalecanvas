@@ -6,11 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+# supabase/setup-cli@v1 has no Node.js 24 build yet.
+# Force Node.js 24 so the workflow stays green after the June 2026 cutoff.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v4
         with:
@@ -42,7 +47,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v4
         with:
@@ -85,6 +90,18 @@ jobs:
           docker save \
             $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>') \
             -o /tmp/supabase-images.tar
+
+      - name: Verify Supabase is healthy
+        run: |
+          supabase status -o json | python3 -c "
+import json, sys
+status = json.load(sys.stdin)
+for svc in ['DB URL', 'API URL', 'Auth URL']:
+    if svc not in status:
+        print(f'Missing service: {svc}', file=sys.stderr)
+        sys.exit(1)
+print('Supabase services healthy')
+"
 
       - name: Extract Supabase keys
         id: keys
@@ -134,7 +151,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: supabase/setup-cli@v1
         with:

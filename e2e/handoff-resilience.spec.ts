@@ -1,10 +1,13 @@
 import { test, expect } from "@playwright/test";
-import { setupAuthenticatedPage, ensureUserAndResetTrial, cleanupUserSessions, installApiErrorLogger } from "./fixtures";
+import { setupAuthenticatedPage, ensureUserAndResetTrial, cleanupUserSessions, installApiErrorLogger, assertNoUnexpected5xx } from "./fixtures";
 import {
   isLocalSupabase,
   E2E_HANDOFF_DEDUP_USER_ID,
   E2E_HANDOFF_CANVAS_USER_ID,
   E2E_HANDOFF_TRANSCRIPT_USER_ID,
+  TIMEOUT_NAVIGATION,
+  TIMEOUT_SERVER,
+  TIMEOUT_VISIBLE,
 } from "./env";
 
 test.describe("Handoff resilience", () => {
@@ -23,7 +26,7 @@ test.describe("Handoff resilience", () => {
       E2E_HANDOFF_DEDUP_USER_ID,
       "e2e-handoff-dedup@example.com"
     );
-    installApiErrorLogger(page);
+    const apiErrors = installApiErrorLogger(page);
     await setupAuthenticatedPage(page, E2E_HANDOFF_DEDUP_USER_ID, baseURL);
 
     // Track every POST to /api/auth/handoff
@@ -41,11 +44,11 @@ test.describe("Handoff resilience", () => {
     await page.goto("/");
 
     // Wait for the handoff to complete and navigate to the session page
-    await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: 20_000 });
+    await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: TIMEOUT_NAVIGATION });
 
     // Wait for the canvas to render and settle — once it has a save status,
     // the page is fully loaded and no more handoff calls should fire.
-    await page.waitForSelector("[data-save-status]", { timeout: 10_000 });
+    await page.waitForSelector("[data-save-status]", { timeout: TIMEOUT_VISIBLE });
 
     // The bootstrapCalledRef guard should prevent more than one handoff API call
     expect(
@@ -53,6 +56,7 @@ test.describe("Handoff resilience", () => {
       `Expected exactly 1 handoff call, got ${handoffCalls.length}: ${JSON.stringify(handoffCalls)}`
     ).toBe(1);
     expect(handoffCalls[0].status).toBe(201);
+    assertNoUnexpected5xx(apiErrors);
   });
 
   test("canvas save retries on transient failure and persists after retry", async ({
@@ -75,12 +79,10 @@ test.describe("Handoff resilience", () => {
       }
       canvasPutCount++;
       if (canvasPutCount === 1) {
-        // Simulate a transient server error on the first attempt
-        void route.fulfill({
-          status: 500,
-          contentType: "application/json",
-          body: JSON.stringify({ error: "Transient failure" }),
-        });
+        // Simulate a network-level failure on the first attempt.
+        // Use abort (not fulfill) to preserve Chromium's "local" address-space
+        // classification — see e2e/README.md on PNA.
+        void route.abort("failed");
       } else {
         // Fall through to the auth cookie injection route
         void route.fallback();
@@ -94,11 +96,11 @@ test.describe("Handoff resilience", () => {
         res.url().includes("/canvas") &&
         res.request().method() === "PUT" &&
         res.status() < 400,
-      { timeout: 30_000 }
+      { timeout: TIMEOUT_SERVER }
     );
 
     await page.goto("/");
-    await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: 20_000 });
+    await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: TIMEOUT_NAVIGATION });
 
     await canvasSuccessPromise;
 
@@ -111,14 +113,14 @@ test.describe("Handoff resilience", () => {
     // Confirm Lambda rendered before reloading so the initial render has settled.
     await expect(
       page.locator(".react-flow__node").filter({ hasText: "Lambda" })
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: TIMEOUT_VISIBLE });
 
     // Verify canvas was actually persisted: reload and check node is still visible
     await page.reload();
     await page.waitForLoadState("load");
     await expect(
       page.locator(".react-flow__node").filter({ hasText: "Lambda" })
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: TIMEOUT_VISIBLE });
   });
 
   test("transcript save retries on transient failure and persists", async ({
@@ -156,11 +158,11 @@ test.describe("Handoff resilience", () => {
         res.url().includes("/transcript/batch") &&
         res.request().method() === "POST" &&
         res.status() < 400,
-      { timeout: 30_000 }
+      { timeout: TIMEOUT_SERVER }
     );
 
     await page.goto("/");
-    await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: 20_000 });
+    await page.waitForURL(/\/[0-9a-f-]{36}$/i, { timeout: TIMEOUT_NAVIGATION });
 
     await batchSuccessPromise;
 
@@ -173,8 +175,8 @@ test.describe("Handoff resilience", () => {
 
   test.afterEach(
     async ({}, testInfo) => {
-      // Only clean up the user for the test that just ran to avoid
-      // deleting sessions from parallel workers still in progress.
+      // Derive user ID from test annotation stored in testInfo.annotations,
+      // falling back to the title-based map for backward compatibility.
       const userMap: Record<string, string> = {
         "only one handoff API call despite React Strict Mode double-fire":
           E2E_HANDOFF_DEDUP_USER_ID,
@@ -186,6 +188,8 @@ test.describe("Handoff resilience", () => {
       const userId = userMap[testInfo.title];
       if (userId) {
         await cleanupUserSessions(userId);
+      } else {
+        console.warn(`[e2e cleanup] No user mapping for test: "${testInfo.title}"`);
       }
     },
   );
