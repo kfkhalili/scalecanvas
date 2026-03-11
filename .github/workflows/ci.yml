@@ -93,15 +93,10 @@ jobs:
 
       - name: Verify Supabase is healthy
         run: |
-          supabase status -o json | python3 -c "
-import json, sys
-status = json.load(sys.stdin)
-for svc in ['DB URL', 'API URL', 'Auth URL']:
-    if svc not in status:
-        print(f'Missing service: {svc}', file=sys.stderr)
-        sys.exit(1)
-print('Supabase services healthy')
-"
+          supabase status
+          curl -sf http://127.0.0.1:54321/rest/v1/ -o /dev/null
+          curl -sf http://127.0.0.1:54321/auth/v1/health -o /dev/null
+          echo "Supabase services healthy"
 
       - name: Extract Supabase keys
         id: keys
