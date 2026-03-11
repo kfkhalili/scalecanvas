@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { TIMEOUT_VISIBLE, TIMEOUT_SHORT, TIMEOUT_POLL } from "./env";
 
 /** Locate a ReactFlow node by its visible label text. */
 function nodeByLabel(page: Page, label: string) {
@@ -45,14 +46,14 @@ test.describe("Anonymous canvas persistence", () => {
     // Add a node by using the actual node library UI.
     await dragServiceToCanvas(page, "Lambda");
 
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
 
     // Refresh
     await page.reload();
     await page.waitForLoadState("load");
 
     // Node must still be visible after reload (rehydrated from anonymous workspace).
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
   });
 
   test("edges survive a page refresh", async ({ page }) => {
@@ -65,8 +66,8 @@ test.describe("Anonymous canvas persistence", () => {
     const apiNode = nodeByLabel(page, "API Gateway");
     const lambdaNode = nodeByLabel(page, "Lambda");
 
-    await expect(apiNode).toBeVisible({ timeout: 10_000 });
-    await expect(lambdaNode).toBeVisible({ timeout: 10_000 });
+    await expect(apiNode).toBeVisible({ timeout: TIMEOUT_VISIBLE });
+    await expect(lambdaNode).toBeVisible({ timeout: TIMEOUT_VISIBLE });
 
     // Connect them by dragging from API Gateway handle → Lambda handle using mouse events.
     await connectFirstHandles(page, apiNode, lambdaNode);
@@ -78,8 +79,8 @@ test.describe("Anonymous canvas persistence", () => {
     await page.reload();
     await page.waitForLoadState("load");
 
-    await expect(nodeByLabel(page, "API Gateway")).toBeVisible({ timeout: 10_000 });
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "API Gateway")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
   });
 
   test("canvas does not crash on zoom after refresh", async ({ page }) => {
@@ -87,11 +88,11 @@ test.describe("Anonymous canvas persistence", () => {
     await page.goto("/");
 
     await dragServiceToCanvas(page, "Lambda");
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
 
     await page.reload();
     await page.waitForLoadState("load");
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
 
     // Zoom out with scroll
     const canvas = page.locator(".react-flow");
@@ -109,20 +110,20 @@ test.describe("Anonymous canvas persistence", () => {
     await page.goto("/");
 
     // No nodes initially
-    await expect(page.locator(".react-flow__node")).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator(".react-flow__node")).toHaveCount(0, { timeout: TIMEOUT_SHORT });
 
     await page.reload();
     await page.waitForLoadState("load");
 
     // Still no nodes
-    await expect(page.locator(".react-flow__node")).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator(".react-flow__node")).toHaveCount(0, { timeout: TIMEOUT_SHORT });
   });
 
   test("saved viewport zoom is preserved across refresh", async ({ page }) => {
     await page.goto("/");
 
     await dragServiceToCanvas(page, "Lambda");
-    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: 10_000 });
+    await expect(nodeByLabel(page, "Lambda")).toBeVisible({ timeout: TIMEOUT_VISIBLE });
 
     const viewport = page.locator(".react-flow__viewport");
     const parseScale = (value: string | null): number | null => {
@@ -131,7 +132,7 @@ test.describe("Anonymous canvas persistence", () => {
       return match ? Number(match[1]) : null;
     };
 
-    const initialTransform = await viewport.getAttribute("style", { timeout: 5_000 });
+    const initialTransform = await viewport.getAttribute("style", { timeout: TIMEOUT_SHORT });
     const initialScale = parseScale(initialTransform);
 
     // Zoom to change the viewport scale.
@@ -139,7 +140,7 @@ test.describe("Anonymous canvas persistence", () => {
     await canvas.hover();
     await page.mouse.wheel(0, 300);
 
-    const before = await viewport.getAttribute("style", { timeout: 5_000 });
+    const before = await viewport.getAttribute("style", { timeout: TIMEOUT_SHORT });
     const beforeScale = parseScale(before);
 
     expect(initialScale).not.toBeNull();
@@ -165,7 +166,7 @@ test.describe("Anonymous canvas persistence", () => {
         }
       },
       targetScale,
-      { timeout: 5_000 }
+      { timeout: TIMEOUT_SHORT }
     );
 
     await page.reload();
@@ -173,11 +174,11 @@ test.describe("Anonymous canvas persistence", () => {
 
     // Wait for viewport to be restored from storage (rehydration can be async).
     await expect(async () => {
-      const style = await viewport.getAttribute("style", { timeout: 2_000 });
+      const style = await viewport.getAttribute("style", { timeout: TIMEOUT_POLL });
       const scale = parseScale(style);
       expect(scale).not.toBeNull();
       expect(scale!).toBeCloseTo(targetScale, 1);
-    }).toPass({ timeout: 10_000 });
+    }).toPass({ timeout: TIMEOUT_VISIBLE });
   });
 });
 

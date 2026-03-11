@@ -95,7 +95,10 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
   const onDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
-      if (!isSessionActive) return;
+      // Read directly from the store to avoid stale closure between zustand
+      // update and React re-render (the useCallback dep array only refreshes
+      // on the next render commit).
+      if (!canInteract(useWorkspaceStore.getState().phase)) return;
       const type = e.dataTransfer.getData("application/reactflow-type");
       if (!type) return;
       const label = e.dataTransfer.getData("application/reactflow-label") || type;
@@ -105,7 +108,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
       });
       addNodeAction({ id: crypto.randomUUID(), type, position, data: { label } } as ReactFlowNode);
     },
-    [reactFlowInstance, addNodeAction, isSessionActive]
+    [reactFlowInstance, addNodeAction]
   );
 
   const defaultViewport: RfViewport = Option.match(viewport, {

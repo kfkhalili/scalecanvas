@@ -23,6 +23,8 @@ import {
 import { getNodeIconUrl, getNodeIconComponent } from "@/lib/nodeIconResolver";
 import { shouldFetchPreferencesWhenNoProviders } from "@/lib/nodeLibraryPreferencesLoad";
 import { getProviderIcon } from "@/lib/providerIcons";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { canInteract } from "@/lib/workspacePhase";
 import type { NodeLibraryProvider } from "@/lib/types";
 
 const PROVIDER_OPTIONS: { value: NodeLibraryProvider; label: string }[] = [
@@ -80,9 +82,10 @@ function onDragStart(e: DragEvent, entry: ServiceEntry): void {
 }
 
 function ServiceItem({ entry }: { entry: ServiceEntry }): React.ReactElement {
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
   return (
     <div
-      draggable
+      draggable={isSessionActive}
       onDragStart={(e) => onDragStart(e, entry)}
       className="group flex cursor-grab items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted active:cursor-grabbing"
       title={entry.description}

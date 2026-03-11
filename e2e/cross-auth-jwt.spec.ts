@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { bypassOAuthAndInject, mintServiceRoleToken } from "./jwtBypass";
-import { isLocalSupabase, E2E_JWT_BYPASS_USER_ID } from "./env";
+import { isLocalSupabase, E2E_JWT_BYPASS_USER_ID, TIMEOUT_NAVIGATION } from "./env";
 
 test.describe("Cross-auth JWT bypass", () => {
   test.beforeEach(async () => {
@@ -48,7 +48,7 @@ test.describe("Cross-auth JWT bypass", () => {
         const path = new URL(url).pathname;
         return path === "/" || /^\/[0-9a-f-]{36}$/i.test(path);
       },
-      { timeout: 15_000 }
+      { timeout: TIMEOUT_NAVIGATION }
     );
 
     const pathname = new URL(page.url()).pathname;

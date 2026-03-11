@@ -265,7 +265,7 @@ export async function cleanupUserSessions(userId: string): Promise<void> {
     },
   );
   if (!res.ok) {
-    console.warn(`[e2e cleanup] Failed to delete sessions for ${userId}: ${res.status}`);
+    throw new Error(`[e2e cleanup] Failed to delete sessions for ${userId}: ${res.status}`);
   }
 }
 
@@ -273,21 +273,62 @@ export async function cleanupUserSessions(userId: string): Promise<void> {
 // Error response logging
 // ---------------------------------------------------------------------------
 
+export type ApiErrorEntry = {
+  method: string;
+  url: string;
+  status: number;
+};
+
 /**
- * Installs a response listener that logs non-2xx API responses.
- * Call in `test.beforeEach` after `page` is available.
+ * Installs a response listener that logs non-2xx API responses and collects
+ * unexpected 5xx errors. Returns the list so tests can assert on it in
+ * afterEach via {@link assertNoUnexpected5xx}.
+ *
+ * Call in `test.beforeEach` or at the start of each test after `page` is available.
  */
-export function installApiErrorLogger(page: Page): void {
+export function installApiErrorLogger(page: Page): ApiErrorEntry[] {
+  const errors: ApiErrorEntry[] = [];
   page.on("response", (res) => {
     const url = res.url();
     if (!url.includes("/api/") && !url.includes("/rest/v1/")) return;
     if (res.status() < 400) return;
+    const entry: ApiErrorEntry = {
+      method: res.request().method(),
+      url,
+      status: res.status(),
+    };
+    if (res.status() >= 500) {
+      errors.push(entry);
+    }
     void res.text().then((body) => {
       console.warn(
-        `[e2e api-error] ${res.request().method()} ${url} → ${res.status()}\n${body.slice(0, 500)}`,
+        `[e2e api-error] ${entry.method} ${url} → ${entry.status}\n${body.slice(0, 500)}`,
       );
     }).catch(() => {
       // Response body may not be available
     });
   });
+  return errors;
+}
+
+/**
+ * Assert that no unexpected 5xx responses were captured during the test.
+ * Pass an array of URL substrings that are *expected* to 5xx (e.g. routes
+ * deliberately intercepted with `route.abort` or `route.fulfill`).
+ */
+export function assertNoUnexpected5xx(
+  errors: ApiErrorEntry[],
+  expectedPatterns: string[] = [],
+): void {
+  const unexpected = errors.filter(
+    (e) => !expectedPatterns.some((p) => e.url.includes(p)),
+  );
+  if (unexpected.length > 0) {
+    const summary = unexpected
+      .map((e) => `  ${e.method} ${e.url} → ${e.status}`)
+      .join("\n");
+    throw new Error(
+      `Unexpected 5xx API responses during test:\n${summary}`,
+    );
+  }
 }

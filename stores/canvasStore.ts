@@ -17,6 +17,8 @@ import type {
 } from "@/lib/types";
 import { makeCanvasState, resolveEdgeHandles } from "@/lib/canvas";
 import { readFromStorage, isViewport } from "@/stores/anonymousWorkspaceStorage";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { canInteract } from "@/lib/workspacePhase";
 
 export type EvaluateAction = {
   evaluate: () => void;
@@ -132,7 +134,10 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
           : e
       ),
     }),
-  addNode: (node) => set({ nodes: [...get().nodes, node] }),
+  addNode: (node) => {
+    if (!canInteract(useWorkspaceStore.getState().phase)) return;
+    set({ nodes: [...get().nodes, node] });
+  },
   deselectAll: () =>
     set({
       nodes: get().nodes.map((n) => ({ ...n, selected: false })),
