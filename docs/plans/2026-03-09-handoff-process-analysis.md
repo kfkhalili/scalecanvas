@@ -318,7 +318,9 @@ The 1–3 second wait for sequential transcript appends shows no UI progress. Th
 
 #### L2 — Legacy Storage Migration Code Has No Sunset
 
-`migrateFromLegacyKeys()` in `anonymousWorkspaceStorage.ts` migrates from two old localStorage keys to the unified one. This code runs on every load. If no users remain on the legacy format, it should be removed.
+~~`migrateFromLegacyKeys()` in `anonymousWorkspaceStorage.ts` migrates from two old localStorage keys to the unified one. This code runs on every load. If no users remain on the legacy format, it should be removed.~~
+
+**✅ Resolved (2026-03-11):** `migrateFromLegacyKeys()`, `LEGACY_HANDOFF_KEY`, and `LEGACY_CANVAS_KEY` removed. Pre-production prototype — no users on legacy format.
 
 ---
 
@@ -331,6 +333,8 @@ Both `PostAuthRoot` and `useAuthHandoff` call `loadAnonymousWorkspace()`. The se
 #### L4 — `handoffDoneRef` in `useAuthHandoff` Only Guards on Session ID Equality
 
 If a different `pendingSessionId` is set (edge case: two tabs), the ref won't prevent double processing of the same session if cleared and re-set.
+
+**ℹ️ Kept (2026-03-11):** `HandoffStatus` state machine now provides the primary guard (`idle`→`in-progress`→`done`/`error`). `handoffDoneRef` retained as defense-in-depth — 3 lines, correct, low-risk.
 
 ---
 
@@ -352,7 +356,9 @@ Every session page mount deserializes the canvas JSON from the DB. For large can
 
 #### I3 — `performAnonymousEvalHandoff` Uses `Date.now()` for Teaser ID
 
-The teaser message ID is `plg-teaser-${Date.now()}`. If called twice within the same millisecond (unlikely but possible on fast machines), duplicate IDs could appear.
+~~The teaser message ID is `plg-teaser-${Date.now()}`. If called twice within the same millisecond (unlikely but possible on fast machines), duplicate IDs could appear.~~
+
+**✅ Resolved (2026-03-11):** Changed to `plg-teaser-${crypto.randomUUID()}` — no collision risk.
 
 ---
 
@@ -371,9 +377,9 @@ The teaser message ID is `plg-teaser-${Date.now()}`. If called twice within the 
 | M4 | Missing Retry-After header | ✅ Resolved | API Contract | Client can't backoff intelligently | Low |
 | M5 | No progress during transcript save | ✅ Resolved | UX | App appears frozen | Low |
 | L1 | Option/null type mismatch | 🟡 Low | Maintenance | Future refactor risk | Low |
-| L2 | Legacy migration no sunset | 🟡 Low | Maintenance | Dead code | Low |
+| L2 | Legacy migration no sunset | ✅ Resolved | Maintenance | Dead code | Low |
 | L3 | Double `loadAnonymousWorkspace` call | 🟡 Low | Redundancy | Minor wasted work | Low |
-| L4 | `handoffDoneRef` guard limited | 🟡 Low | Reliability | Edge case with multiple tabs | Low |
+| L4 | `handoffDoneRef` guard limited | ℹ️ Kept | Reliability | Edge case with multiple tabs | Low |
 | L5 | `queueMicrotask` timing assumption | 🟡 Low | Fragility | Breaks if load becomes async | Low |
 
 ---
@@ -398,7 +404,10 @@ The teaser message ID is `plg-teaser-${Date.now()}`. If called twice within the 
 8. **M1 — Batch transcript endpoint** ✅ Done (same as action 4)
 9. **M2 — Debounce localStorage writes** ✅ Done (500ms debounce via `schedulePersist` in `InterviewSplitView`)
 10. **M4 — Add Retry-After to handoff 429 response** ✅ Done (`Retry-After` header computed from `resetAt`)
-11. **L1–L5 — Maintenance cleanup** (L2 deferred — legacy migration kept until user-base migration confirmed)
+11. **L1–L5 — Maintenance cleanup**
+    - L2 ✅ Resolved (2026-03-11) — legacy migration code removed
+    - L4 ℹ️ Kept — `handoffDoneRef` retained as defense-in-depth alongside `HandoffStatus`
+    - I3 ✅ Resolved (2026-03-11) — teaser ID switched to `crypto.randomUUID()`
 
 ### Long-Term
 

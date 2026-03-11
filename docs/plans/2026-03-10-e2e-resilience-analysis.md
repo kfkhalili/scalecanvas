@@ -175,7 +175,7 @@ The codebase's functional style (pure functions, `Effect`/`Either`, `Option`, no
 | GoTrace admin API fragility & duplication | 🟠 Medium | Test infrastructure | ✅ Resolved — shared `e2e/fixtures.ts` |
 | Playwright route semantics undocumented | 🟠 Medium | Test infrastructure | ✅ Resolved — documented in `e2e/README.md` |
 | Transcript retry not unit-tested | 🟡 Low | Test coverage | ✅ Resolved — 2 tests added |
-| Message IDs not UUIDs at creation | ℹ️ Info | Prevention | Open |
+| Message IDs not UUIDs at creation | ℹ️ Info | Prevention | ✅ Resolved — `crypto.randomUUID()` used in ChatPanel + PLG teaser |
 
 ---
 
@@ -184,3 +184,5 @@ The codebase's functional style (pure functions, `Effect`/`Either`, `Option`, no
 The difficulty was not a consequence of the functional style — it was a consequence of **well-tested pure functions being composed through poorly-tested impure infrastructure**. The functional core works exactly as specified. The failures all occurred at boundaries the functional core doesn't control: browser state persistence, database column types, Chromium security policies, and React effect ordering.
 
 **Update (2026-03-10):** All 🔴 High and 🟠 Medium findings have been resolved. The `useAuthHandoff` hook's business logic (`resolveHandoffMessages`) was extracted to `lib/authHandoff.ts` and tested as a pure function, matching the codebase convention. The Zod schema now enforces UUID format at the API boundary. `pendingSessionId` is persisted to `sessionStorage`. E2E test fixtures are shared. Remaining open items (#6, #8, #10, #11) are 🟡 Low / ℹ️ Info severity.
+
+**Update (2026-03-11):** Message ID finding (#8) fully resolved — PLG teaser in `lib/plg.ts` switched from `Date.now()` to `crypto.randomUUID()`. All ℹ️ Info items now resolved.

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mintServiceRoleToken } from "./jwtBypass";
-import { setupAuthenticatedPage, cleanupUserSessions, installApiErrorLogger } from "./fixtures";
+import { setupAuthenticatedPage, ensureUserAndResetTrial, cleanupUserSessions, installApiErrorLogger } from "./fixtures";
 import {
   isLocalSupabase,
   E2E_JOURNEY_USER_ID,
@@ -28,78 +28,10 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
       "JWT bypass requires local Supabase (NEXT_PUBLIC_SUPABASE_URL with 127.0.0.1 or localhost)"
     );
 
-    // Ensure e2e users exist (idempotent: 422 means already present).
-    // The on_auth_user_created trigger creates the profiles row automatically.
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
-    const serviceToken = mintServiceRoleToken();
-    const adminHeaders = {
-      apikey: serviceToken,
-      Authorization: `Bearer ${serviceToken}`,
-      "Content-Type": "application/json",
-    };
-    const createResults = await Promise.all([
-      fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-        method: "POST",
-        headers: adminHeaders,
-        body: JSON.stringify({
-          id: E2E_JOURNEY_USER_ID,
-          email: "e2e-journey@example.com",
-          email_confirm: true,
-          password: "e2e-dummy-password",
-        }),
-      }),
-      fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-        method: "POST",
-        headers: adminHeaders,
-        body: JSON.stringify({
-          id: E2E_JOURNEY_CONCLUSION_USER_ID,
-          email: "e2e-conclusion@example.com",
-          email_confirm: true,
-          password: "e2e-dummy-password",
-        }),
-      }),
+    await Promise.all([
+      ensureUserAndResetTrial(E2E_JOURNEY_USER_ID, "e2e-journey@example.com"),
+      ensureUserAndResetTrial(E2E_JOURNEY_CONCLUSION_USER_ID, "e2e-conclusion@example.com"),
     ]);
-    for (const res of createResults) {
-      if (!res.ok && res.status !== 422) {
-        throw new Error(
-          `Admin user creation failed: ${res.status} ${res.statusText} (${res.url})`
-        );
-      }
-    }
-
-    // Reset trial state so the test is idempotent (prior runs may have claimed the trial).
-    const restHeaders = {
-      apikey: serviceToken,
-      Authorization: `Bearer ${serviceToken}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    };
-
-    const resetResults = await Promise.all([
-      fetch(
-        `${supabaseUrl}/rest/v1/interview_sessions?user_id=eq.${E2E_JOURNEY_USER_ID}`,
-        { method: "DELETE", headers: restHeaders }
-      ),
-      fetch(
-        `${supabaseUrl}/rest/v1/profiles?id=eq.${E2E_JOURNEY_USER_ID}`,
-        { method: "PATCH", headers: restHeaders, body: JSON.stringify({ trial_claimed_at: null }) }
-      ),
-      fetch(
-        `${supabaseUrl}/rest/v1/interview_sessions?user_id=eq.${E2E_JOURNEY_CONCLUSION_USER_ID}`,
-        { method: "DELETE", headers: restHeaders }
-      ),
-      fetch(
-        `${supabaseUrl}/rest/v1/profiles?id=eq.${E2E_JOURNEY_CONCLUSION_USER_ID}`,
-        { method: "PATCH", headers: restHeaders, body: JSON.stringify({ trial_claimed_at: null }) }
-      ),
-    ]);
-    for (const res of resetResults) {
-      if (!res.ok) {
-        throw new Error(
-          `State reset failed: ${res.status} ${res.statusText} (${res.url})`
-        );
-      }
-    }
   });
 
   test("anonymous → sign in (bypass) → handoff → trial session, canvas persisted and survives reload", async ({
@@ -235,8 +167,12 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
     await expect.poll(() => getNodeCount(page), { timeout: 2_000 }).toBe(1);
   });
 
-  test.afterEach(async () => {
-    await cleanupUserSessions(E2E_JOURNEY_USER_ID);
-    await cleanupUserSessions(E2E_JOURNEY_CONCLUSION_USER_ID);
+  test.afterEach(async ({}, testInfo) => {
+    // Only clean up the user for the test that just ran to avoid
+    // deleting sessions from parallel workers still in progress.
+    const isConclusion = testInfo.title.includes("end interview");
+    await cleanupUserSessions(
+      isConclusion ? E2E_JOURNEY_CONCLUSION_USER_ID : E2E_JOURNEY_USER_ID,
+    );
   });
 });

@@ -1,7 +1,6 @@
 /**
  * Single localStorage key for anonymous workspace: chat (topic + messages) and
- * canvas (nodes, edges, viewport) as one unit. Replaces separate
- * scalecanvas-auth-handoff and scalecanvas-canvas keys when anonymous.
+ * canvas (nodes, edges, viewport) as one unit.
  */
 
 import { Option } from "effect";
@@ -28,47 +27,6 @@ export type PersistedAnonymousWorkspace = {
   viewport?: Viewport | null;
 };
 
-const LEGACY_HANDOFF_KEY = "scalecanvas-auth-handoff";
-const LEGACY_CANVAS_KEY = "scalecanvas-canvas";
-
-/** Merge legacy keys into one and write to ANONYMOUS_WORKSPACE_KEY. Returns merged state or null. */
-function migrateFromLegacyKeys(): PersistedAnonymousWorkspace | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const handoffRaw = localStorage.getItem(LEGACY_HANDOFF_KEY);
-    const canvasRaw = localStorage.getItem(LEGACY_CANVAS_KEY);
-    if (!handoffRaw && !canvasRaw) return null;
-    const handoff = handoffRaw
-      ? (JSON.parse(handoffRaw) as { state?: { anonymousMessages?: AnonymousMessage[]; questionTitle?: string | null; questionTopicId?: string | null } })
-      : null;
-    const canvas = canvasRaw
-      ? (JSON.parse(canvasRaw) as { state?: { nodes?: unknown[]; edges?: unknown[]; hasAttemptedEval?: boolean; viewport?: unknown } })
-      : null;
-    // Legacy canvas store serialized viewport as Effect Option: {_tag:"Some",value:{...}}.
-    // Normalize to plain Viewport | null at migration time.
-    const legacyViewport = canvas?.state?.viewport as { _tag?: string; value?: unknown } | null | undefined;
-    const migratedViewport: Viewport | null =
-      legacyViewport != null && legacyViewport._tag === "Some" && isViewport(legacyViewport.value)
-        ? legacyViewport.value
-        : null;
-    const state: PersistedAnonymousWorkspace = {
-      anonymousMessages: handoff?.state?.anonymousMessages ?? [],
-      questionTitle: handoff?.state?.questionTitle ?? null,
-      questionTopicId: handoff?.state?.questionTopicId ?? null,
-      nodes: canvas?.state?.nodes ?? [],
-      edges: canvas?.state?.edges ?? [],
-      hasAttemptedEval: canvas?.state?.hasAttemptedEval ?? false,
-      viewport: migratedViewport,
-    };
-    localStorage.setItem(ANONYMOUS_WORKSPACE_KEY, JSON.stringify({ state, version: 0 }));
-    localStorage.removeItem(LEGACY_HANDOFF_KEY);
-    localStorage.removeItem(LEGACY_CANVAS_KEY);
-    return state;
-  } catch {
-    return null;
-  }
-}
-
 /** Read-only; does not import stores. Used by canvasStore on init to avoid cycles. */
 export function readFromStorage(): PersistedAnonymousWorkspace | null {
   if (typeof window === "undefined") return null;
@@ -78,7 +36,7 @@ export function readFromStorage(): PersistedAnonymousWorkspace | null {
       const parsed = JSON.parse(raw) as { state?: PersistedAnonymousWorkspace; version?: number };
       return parsed?.state ?? null;
     }
-    return migrateFromLegacyKeys();
+    return null;
   } catch {
     return null;
   }
@@ -170,15 +128,13 @@ export function persistAnonymousWorkspace(): void {
 }
 
 /**
- * Clear anonymous workspace (and legacy keys) from localStorage.
+ * Clear anonymous workspace from localStorage.
  * Call on sign-out so the next load gets a clean canvas and a fresh question.
  */
 export function clearAnonymousWorkspaceStorage(): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(ANONYMOUS_WORKSPACE_KEY);
-    localStorage.removeItem(LEGACY_HANDOFF_KEY);
-    localStorage.removeItem(LEGACY_CANVAS_KEY);
   } catch {
     // ignore
   }

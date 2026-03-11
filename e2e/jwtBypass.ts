@@ -44,13 +44,14 @@ export function mintSupabaseToken(userId: string): string {
 
 /**
  * Return a service_role token for admin operations (e.g. test cleanup via PostgREST).
- * Prefers SUPABASE_SERVICE_ROLE_KEY env var (the exact static key Supabase was
- * started with) so Kong accepts it without ambiguity. Falls back to minting a
- * fresh JWT when the env var is absent (local dev without the variable set).
+ * Prefers SUPABASE_SECRET_KEY (Supabase CLI ≥ 2.75) or the legacy
+ * SUPABASE_SERVICE_ROLE_KEY so Kong accepts it without ambiguity.
+ * Falls back to minting a fresh JWT when neither env var is set.
  */
 export function mintServiceRoleToken(): string {
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (key) {
+    return key;
   }
   return jwt.sign(
     {

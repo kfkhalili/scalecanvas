@@ -31,7 +31,7 @@ export function performAnonymousEvalHandoff(
     setMessages((prev) => [
       ...prev,
       {
-        id: `plg-teaser-${Date.now()}`,
+        id: `plg-teaser-${crypto.randomUUID()}`,
         role: "assistant" as const,
         content: PLG_TEASER_MESSAGE,
       },

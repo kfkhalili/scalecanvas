@@ -171,11 +171,22 @@ test.describe("Handoff resilience", () => {
     ).toBeGreaterThanOrEqual(2);
   });
 
-  test.afterEach(async () => {
-    await Promise.all([
-      cleanupUserSessions(E2E_HANDOFF_DEDUP_USER_ID),
-      cleanupUserSessions(E2E_HANDOFF_CANVAS_USER_ID),
-      cleanupUserSessions(E2E_HANDOFF_TRANSCRIPT_USER_ID),
-    ]);
-  });
+  test.afterEach(
+    async ({}, testInfo) => {
+      // Only clean up the user for the test that just ran to avoid
+      // deleting sessions from parallel workers still in progress.
+      const userMap: Record<string, string> = {
+        "only one handoff API call despite React Strict Mode double-fire":
+          E2E_HANDOFF_DEDUP_USER_ID,
+        "canvas save retries on transient failure and persists after retry":
+          E2E_HANDOFF_CANVAS_USER_ID,
+        "transcript save retries on transient failure and persists":
+          E2E_HANDOFF_TRANSCRIPT_USER_ID,
+      };
+      const userId = userMap[testInfo.title];
+      if (userId) {
+        await cleanupUserSessions(userId);
+      }
+    },
+  );
 });
