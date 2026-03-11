@@ -4,7 +4,6 @@ import type { Session } from "@/lib/types";
 
 export type BootstrapContext = {
   readonly hasAnonymousChat: boolean;
-  readonly hasAttemptedEval: boolean;
   readonly questionTitle: Option.Option<string>;
 };
 
@@ -39,6 +38,8 @@ export type BootstrapDeps = {
   ) => Effect.Effect<HandoffResult, { message: string }>;
   setPendingAuthHandoff: (sessionId: string) => void;
   clearAnonymousState: () => void;
+  /** Called when the handoff API returns created:false (trial already claimed). */
+  notifyTrialAlreadyClaimed?: () => void;
 };
 
 async function redirectToMostRecentSession(deps: BootstrapDeps): Promise<void> {
@@ -71,7 +72,8 @@ export async function executeBootstrapAction(
           deps.redirectTo(`/${result.session_id}`);
           return;
         }
-        // Trial already claimed — clear anonymous state and fall through to resume.
+        // Trial already claimed — notify user and fall through to resume.
+        deps.notifyTrialAlreadyClaimed?.();
       }
       // Handoff failed or trial not eligible — clear state, redirect to most recent.
       deps.clearAnonymousState();

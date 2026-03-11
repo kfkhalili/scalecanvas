@@ -7,6 +7,28 @@ export type AnonymousMessage = { id: string; role: string; content: string };
 
 type HandoffTranscript = { sessionId: string; entries: TranscriptEntry[] };
 
+const PENDING_SESSION_KEY = "scalecanvas-pending-session";
+
+/** Read `pendingSessionId` from sessionStorage (survives page navigations within a tab). */
+function readPendingSession(): Option.Option<string> {
+  if (typeof window === "undefined") return Option.none();
+  const stored = sessionStorage.getItem(PENDING_SESSION_KEY);
+  return stored ? Option.some(stored) : Option.none();
+}
+
+/** Sync `pendingSessionId` to sessionStorage so it survives hard navigations. */
+function writePendingSession(opt: Option.Option<string>): void {
+  if (typeof window === "undefined") return;
+  const raw = Option.getOrNull(opt);
+  if (raw !== null) {
+    sessionStorage.setItem(PENDING_SESSION_KEY, raw);
+  } else {
+    sessionStorage.removeItem(PENDING_SESSION_KEY);
+  }
+}
+
+export type HandoffStatus = "idle" | "in-progress" | "done" | "error";
+
 type AuthHandoffStore = {
   /** When set, ChatPanel should run BFF handoff then clear and navigate to this session. */
   pendingSessionId: Option.Option<string>;
@@ -23,11 +45,20 @@ type AuthHandoffStore = {
   /** Stable topic id for the anonymous interview; keeps question consistent across refreshes. */
   questionTopicId: Option.Option<string>;
   setQuestionTopicId: (id: Option.Option<string>) => void;
+  /** Whether authHandoffStore has been rehydrated from localStorage (anonymous workspace restore). */
+  rehydrated: boolean;
+  setRehydrated: (value: boolean) => void;
+  /** Observable handoff lifecycle state for UI and tests. */
+  handoffStatus: HandoffStatus;
+  setHandoffStatus: (status: HandoffStatus) => void;
 };
 
 export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
-  pendingSessionId: Option.none(),
-  setPendingAuthHandoff: (sessionId) => set({ pendingSessionId: sessionId }),
+  pendingSessionId: readPendingSession(),
+  setPendingAuthHandoff: (sessionId) => {
+    writePendingSession(sessionId);
+    set({ pendingSessionId: sessionId });
+  },
   handoffTranscript: Option.none(),
   setHandoffTranscript: (data) => set({ handoffTranscript: data }),
   anonymousMessages: [],
@@ -36,5 +67,9 @@ export const useAuthHandoffStore = create<AuthHandoffStore>()((set) => ({
   setQuestionTitle: (title) => set({ questionTitle: title }),
   questionTopicId: Option.none(),
   setQuestionTopicId: (id) => set({ questionTopicId: id }),
+  rehydrated: false,
+  setRehydrated: (rehydrated) => set({ rehydrated }),
+  handoffStatus: "idle",
+  setHandoffStatus: (handoffStatus) => set({ handoffStatus }),
 }));
 

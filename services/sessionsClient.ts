@@ -4,10 +4,7 @@ import type {
   TranscriptEntry,
   CanvasState,
 } from "@/lib/types";
-import type {
-  CreateSessionBody,
-  AppendTranscriptBody,
-} from "@/lib/api.schemas";
+
 
 /** JSON body shape when API returns an error (e.g. 4xx/5xx). */
 type ApiErrorResponse = { error?: string };
@@ -49,7 +46,7 @@ export function apiGet<T>(path: string): Effect.Effect<T, ApiError> {
 
 function apiPost<T>(
   path: string,
-  body: CreateSessionBody | AppendTranscriptBody
+  body: Record<string, unknown>
 ): Effect.Effect<T, ApiError> {
   return pipe(
     Effect.tryPromise({
@@ -132,6 +129,9 @@ function apiPut(path: string, body: CanvasState): Effect.Effect<undefined, ApiEr
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
           credentials: "include",
+          // keepalive ensures the browser completes this request even if the page
+          // navigates away immediately after firing it (anonymous session migration).
+          keepalive: true,
         }),
       catch: (e) => ({
         message: e instanceof Error ? e.message : "Network error",
@@ -229,6 +229,19 @@ export function appendTranscriptApi(
   return apiPost<TranscriptEntry>(
     `${sessionsPath()}/${sessionId}/transcript`,
     { role, content }
+  );
+}
+
+export function appendTranscriptBatchApi(
+  sessionId: string,
+  entries: { id: string; role: "user" | "assistant"; content: string }[]
+): Effect.Effect<undefined, ApiError> {
+  return pipe(
+    apiPost<{ count: number }>(
+      `${sessionsPath()}/${sessionId}/transcript/batch`,
+      { entries }
+    ),
+    Effect.map(() => undefined)
   );
 }
 

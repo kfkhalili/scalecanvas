@@ -4,14 +4,15 @@ import { Effect, Option } from "effect";
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "ai/react";
-import { generateId } from "ai";
+
 import { Lightbulb, Maximize2, Minimize2 } from "lucide-react";
 import { getRandomQuestion, getRandomTopic, getTopicById, getTopicByTitle } from "@/lib/questions";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useQuestionStore } from "@/stores/questionStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
-import { useSessionStore } from "@/stores/sessionStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { canInteract } from "@/lib/workspacePhase";
 import { useCanvasReview } from "@/hooks/useCanvasReview";
 import { appendTranscriptApi } from "@/services/sessionsClient";
 import { performAnonymousEvalHandoff } from "@/lib/plg";
@@ -39,8 +40,6 @@ type ChatPanelProps = {
   sessionId?: string;
   initialEntries: ReadonlyArray<TranscriptEntry>;
   isAnonymous?: boolean;
-  /** When true, authHandoffStore has been rehydrated; anonymous bootstrap can safely read stored topic + messages. */
-  handoffRehydrated?: boolean;
   /** When true, session is a trial (post-handoff); do not send opening, use design phase from first message. */
   isTrial?: boolean;
   /** When true, session already has a conclusion summary in DB — mark session inactive immediately on mount. */
@@ -53,7 +52,6 @@ export function ChatPanel({
   sessionId,
   initialEntries,
   isAnonymous = false,
-  handoffRehydrated = true,
   isTrial = false,
   isConcluded = false,
 }: ChatPanelProps): React.ReactElement {
@@ -67,8 +65,8 @@ export function ChatPanel({
   const setAnonymousMessages = useAuthHandoffStore((s) => s.setAnonymousMessages);
   const setQuestionTitle = useAuthHandoffStore((s) => s.setQuestionTitle);
   const setQuestionTopicId = useAuthHandoffStore((s) => s.setQuestionTopicId);
-  const isSessionActive = useSessionStore((s) => s.isSessionActive);
-  const setSessionActive = useSessionStore((s) => s.setSessionActive);
+  const handoffRehydrated = useAuthHandoffStore((s) => s.rehydrated);
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
   const activeQuestionOpt = useQuestionStore((s) => s.activeQuestion);
   const hintIndex = useQuestionStore((s) => s.hintIndex);
   const setInitialQuestion = useQuestionStore((s) => s.setInitialQuestion);
@@ -96,6 +94,7 @@ export function ChatPanel({
     useChat({
       api: "/api/chat",
       fetch: fetchWithGuardrail,
+      generateId: () => crypto.randomUUID(),
       initialMessages: initialEntries.map(toMessage),
       body: chatBody,
       onFinish: (message) => {
@@ -131,12 +130,14 @@ export function ChatPanel({
         whenSome(statusCodeOpt, (statusCode) => {
           if (statusCode === 403) {
             toast.error("Interview time has expired.");
-            setSessionActive(false);
+            const p = useWorkspaceStore.getState().phase.phase;
+            if (p === "active" || p === "loading-session") useWorkspaceStore.getState().deactivateSession();
             handled = true;
           }
           if (statusCode === 401) {
             toast.error("Unauthorized.");
-            setSessionActive(false);
+            const p = useWorkspaceStore.getState().phase.phase;
+            if (p === "active" || p === "loading-session") useWorkspaceStore.getState().deactivateSession();
             handled = true;
           }
         });
@@ -164,7 +165,7 @@ export function ChatPanel({
         setMessages((prev) => [
           ...prev,
           {
-            id: `err-${Date.now()}`,
+            id: crypto.randomUUID(),
             role: "assistant",
             content: message,
           },
@@ -262,7 +263,7 @@ export function ChatPanel({
           setQuestionTopicId(Option.some(topicFromTitle.id));
           setMessages([
             {
-              id: generateId(),
+              id: crypto.randomUUID(),
               role: "assistant",
               content: topicFromTitle.comprehensivePrompt,
             },
@@ -282,7 +283,7 @@ export function ChatPanel({
         setQuestionTopicId(Option.some(topic.id));
         setMessages([
           {
-            id: generateId(),
+            id: crypto.randomUUID(),
             role: "assistant",
             content: topic.comprehensivePrompt,
           },
@@ -312,7 +313,7 @@ export function ChatPanel({
           {
             role: "user",
             content: "Start the interview.",
-            id: generateId(),
+            id: crypto.randomUUID(),
           },
           {
             body: {
@@ -333,7 +334,7 @@ export function ChatPanel({
       }
       setMessages([
         {
-          id: generateId(),
+          id: crypto.randomUUID(),
           role: "assistant",
           content: question.prompt,
         },
@@ -365,8 +366,13 @@ export function ChatPanel({
   ]);
 
   useEffect(() => {
-    if (sessionId && !isConcluded) setSessionActive(true);
-  }, [sessionId, isConcluded, setSessionActive]);
+    if (sessionId && !isConcluded) {
+      const p = useWorkspaceStore.getState().phase.phase;
+      if (p === "loading-session" || p === "inactive") {
+        useWorkspaceStore.getState().activateSession();
+      }
+    }
+  }, [sessionId, isConcluded]);
 
   useEffect(() => {
     if (isAnonymous && messages.length > 0) {
@@ -400,11 +406,12 @@ export function ChatPanel({
             () => "Interview ended."
           );
           toast.error(reason);
-          setSessionActive(false);
+          const p = useWorkspaceStore.getState().phase.phase;
+          if (p === "active" || p === "loading-session") useWorkspaceStore.getState().deactivateSession();
         }
       }
     }
-  }, [messages, setSessionActive]);
+  }, [messages]);
 
   const openingRequestedRef = useRef<string | undefined>(undefined);
 
@@ -496,7 +503,7 @@ export function ChatPanel({
     whenSome(activeQuestionOpt, (activeQuestion) => {
       if (!hasMoreHints) return;
       const hintMessage = {
-        id: generateId(),
+        id: crypto.randomUUID(),
         role: "assistant" as const,
         content: activeQuestion.hints[hintIndex],
       };

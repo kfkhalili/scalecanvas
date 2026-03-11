@@ -1,5 +1,14 @@
 import { Option } from "effect";
 import { create } from "zustand";
+import {
+  applyNodeChanges as rfApplyNodeChanges,
+  applyEdgeChanges as rfApplyEdgeChanges,
+  addEdge,
+  reconnectEdge as rfReconnectEdge,
+  type NodeChange,
+  type EdgeChange,
+  type Connection,
+} from "@xyflow/react";
 import type {
   ReactFlowNode,
   ReactFlowEdge,
@@ -23,13 +32,26 @@ type CanvasStore = {
   evaluateAction: Option.Option<EvaluateAction>;
   /** PLG: true after anonymous user clicks Evaluate or sends chat; survives OAuth redirect. */
   hasAttemptedEval: boolean;
+  /** True once canvas data is ready for display (fetched or loaded from storage). */
+  canvasReady: boolean;
   setNodes: (nodes: ReadonlyArray<ReactFlowNode>) => void;
   setEdges: (edges: ReadonlyArray<ReactFlowEdge>) => void;
   setViewport: (viewport: Option.Option<Viewport>) => void;
   setCanvasState: (state: CanvasState) => void;
   setEvaluateAction: (action: Option.Option<EvaluateAction>) => void;
   setHasAttemptedEval: (value: boolean) => void;
+  setCanvasReady: (ready: boolean) => void;
   getCanvasState: () => CanvasState;
+
+  // Domain actions for controlled ReactFlow mode
+  onNodesChange: (changes: NodeChange<ReactFlowNode>[]) => void;
+  onEdgesChange: (changes: EdgeChange<ReactFlowEdge>[]) => void;
+  connectNodes: (connection: Connection) => void;
+  doReconnectEdge: (oldEdge: ReactFlowEdge, connection: Connection) => void;
+  updateEdgeLabel: (edgeId: string, label: string) => void;
+  updateEdgeLabelPosition: (edgeId: string, offsetX: number, offsetY: number) => void;
+  addNode: (node: ReactFlowNode) => void;
+  deselectAll: () => void;
 };
 
 const initialNodes: ReadonlyArray<ReactFlowNode> = [];
@@ -41,11 +63,13 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
   viewport: Option.none(),
   evaluateAction: Option.none(),
   hasAttemptedEval: false,
+  canvasReady: false,
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
   setViewport: (viewport) => set({ viewport }),
   setEvaluateAction: (action) => set({ evaluateAction: action }),
   setHasAttemptedEval: (hasAttemptedEval) => set({ hasAttemptedEval }),
+  setCanvasReady: (canvasReady) => set({ canvasReady }),
   setCanvasState: (state) =>
     set({
       nodes: state.nodes,
@@ -61,6 +85,59 @@ export const useCanvasStore = create<CanvasStore>()((set, get) => ({
       viewportValue
     );
   },
+
+  // Domain actions for controlled ReactFlow mode
+  onNodesChange: (changes) =>
+    set({ nodes: rfApplyNodeChanges(changes, [...get().nodes]) }),
+  onEdgesChange: (changes) =>
+    set({ edges: rfApplyEdgeChanges(changes, [...get().edges]) }),
+  connectNodes: (connection) => {
+    const prev = [...get().edges];
+    const next = addEdge(connection, prev);
+    const prevIds = new Set(prev.map((e) => e.id));
+    set({
+      edges: next.map((e) =>
+        prevIds.has(e.id) ? e : { ...e, data: { ...e.data, label: "" } }
+      ),
+    });
+  },
+  doReconnectEdge: (oldEdge, connection) => {
+    const next = rfReconnectEdge(oldEdge, connection, [...get().edges]);
+    set({
+      edges: next.map((e) =>
+        e.id === oldEdge.id
+          ? { ...e, data: { ...e.data, ...oldEdge.data } }
+          : e
+      ),
+    });
+  },
+  updateEdgeLabel: (edgeId, label) =>
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId ? { ...e, data: { ...e.data, label } } : e
+      ),
+    }),
+  updateEdgeLabelPosition: (edgeId, offsetX, offsetY) =>
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId
+          ? {
+              ...e,
+              data: {
+                ...e.data,
+                labelOffsetX: offsetX,
+                labelOffsetY: offsetY,
+              },
+            }
+          : e
+      ),
+    }),
+  addNode: (node) => set({ nodes: [...get().nodes, node] }),
+  deselectAll: () =>
+    set({
+      nodes: get().nodes.map((n) => ({ ...n, selected: false })),
+      edges: get().edges.map((e) => ({ ...e, selected: false })),
+    }),
 }));
 
 /**

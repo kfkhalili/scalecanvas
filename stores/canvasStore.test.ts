@@ -124,4 +124,95 @@ describe("canvasStore", () => {
       expect(useCanvasStore.getState().hasAttemptedEval).toBe(false);
     });
   });
+
+  describe("domain actions (controlled ReactFlow)", () => {
+    const nodeA: ReactFlowNode = {
+      id: "a",
+      position: { x: 0, y: 0 },
+      data: { label: "A" },
+    };
+    const nodeB: ReactFlowNode = {
+      id: "b",
+      position: { x: 100, y: 100 },
+      data: { label: "B" },
+    };
+
+    it("addNode appends a node", () => {
+      useCanvasStore.getState().setNodes([nodeA]);
+      useCanvasStore.getState().addNode(nodeB);
+      expect(useCanvasStore.getState().nodes).toHaveLength(2);
+      expect(useCanvasStore.getState().nodes[1].id).toBe("b");
+    });
+
+    it("deselectAll clears node and edge selection", () => {
+      useCanvasStore.getState().setNodes([{ ...nodeA, selected: true }]);
+      useCanvasStore.getState().setEdges([
+        { id: "e1", source: "a", target: "b", selected: true },
+      ]);
+      useCanvasStore.getState().deselectAll();
+      expect(useCanvasStore.getState().nodes[0].selected).toBe(false);
+      expect(useCanvasStore.getState().edges[0].selected).toBe(false);
+    });
+
+    it("connectNodes adds an edge with empty label", () => {
+      useCanvasStore.getState().setNodes([nodeA, nodeB]);
+      useCanvasStore.getState().connectNodes({ source: "a", target: "b", sourceHandle: null, targetHandle: null });
+      expect(useCanvasStore.getState().edges).toHaveLength(1);
+      expect(useCanvasStore.getState().edges[0].data?.label).toBe("");
+    });
+
+    it("updateEdgeLabel sets label on matching edge", () => {
+      useCanvasStore.getState().setEdges([
+        { id: "e1", source: "a", target: "b", data: { label: "" } },
+      ]);
+      useCanvasStore.getState().updateEdgeLabel("e1", "calls");
+      expect(useCanvasStore.getState().edges[0].data?.label).toBe("calls");
+    });
+
+    it("updateEdgeLabelPosition sets offsets on matching edge", () => {
+      useCanvasStore.getState().setEdges([
+        { id: "e1", source: "a", target: "b", data: { label: "x" } },
+      ]);
+      useCanvasStore.getState().updateEdgeLabelPosition("e1", 10, 20);
+      const edge = useCanvasStore.getState().edges[0];
+      expect(edge.data?.labelOffsetX).toBe(10);
+      expect(edge.data?.labelOffsetY).toBe(20);
+    });
+
+    it("onNodesChange applies ReactFlow node changes", () => {
+      useCanvasStore.getState().setNodes([nodeA]);
+      useCanvasStore.getState().onNodesChange([
+        { type: "position", id: "a", position: { x: 50, y: 50 } },
+      ]);
+      expect(useCanvasStore.getState().nodes[0].position).toEqual({ x: 50, y: 50 });
+    });
+
+    it("onEdgesChange applies ReactFlow edge changes (remove)", () => {
+      useCanvasStore.getState().setEdges([
+        { id: "e1", source: "a", target: "b" },
+      ]);
+      useCanvasStore.getState().onEdgesChange([
+        { type: "remove", id: "e1" },
+      ]);
+      expect(useCanvasStore.getState().edges).toHaveLength(0);
+    });
+
+    it("doReconnectEdge moves an edge preserving data", () => {
+      const nodeC: ReactFlowNode = {
+        id: "c",
+        position: { x: 200, y: 0 },
+        data: { label: "C" },
+      };
+      useCanvasStore.getState().setNodes([nodeA, nodeB, nodeC]);
+      useCanvasStore.getState().setEdges([
+        { id: "e1", source: "a", target: "b", data: { label: "link" } },
+      ]);
+      useCanvasStore.getState().doReconnectEdge(
+        { id: "e1", source: "a", target: "b", data: { label: "link" } },
+        { source: "a", target: "c", sourceHandle: null, targetHandle: null },
+      );
+      expect(useCanvasStore.getState().edges).toHaveLength(1);
+      expect(useCanvasStore.getState().edges[0].data?.label).toBe("link");
+    });
+  });
 });

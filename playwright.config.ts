@@ -14,6 +14,16 @@ function loadEnvFile(filePath: string): void {
 loadEnvFile(path.join(process.cwd(), ".env.local"));
 loadEnvFile(path.join(__dirname, ".env.local"));
 
+// Bypass corporate proxy for local webServer availability check
+if (!process.env.NO_PROXY?.includes("localhost")) {
+  process.env.NO_PROXY = [process.env.NO_PROXY, "localhost", "127.0.0.1"]
+    .filter(Boolean)
+    .join(",");
+}
+
+// Never auto-open the HTML report in a browser (blocks the terminal)
+process.env.PLAYWRIGHT_HTML_OPEN = process.env.PLAYWRIGHT_HTML_OPEN ?? "never";
+
 /**
  * Playwright E2E test configuration.
  * Run `pnpm exec playwright test` after installing with:
@@ -27,7 +37,7 @@ export default defineConfig({
   testMatch: /\.spec\.ts$/,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 2 : 1,
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? "github" : "html",
   use: {
@@ -42,7 +52,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "pnpm dev",
-    url: "http://localhost:3000",
+    url: "http://127.0.0.1:3000",
     reuseExistingServer: true,
     // 120 s for cold starts on CI; locally the server is usually already running.
     timeout: 120_000,

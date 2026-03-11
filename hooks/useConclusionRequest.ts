@@ -7,6 +7,8 @@ import type { Message } from "ai";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { canInteract } from "@/lib/workspacePhase";
 import { requestConclusion } from "@/services/conclusionClient";
 import { appendTranscriptApi } from "@/services/sessionsClient";
 import { remainingMs } from "@/lib/chatGuardrails";
@@ -66,11 +68,18 @@ export function useConclusionRequest({
   setMessages,
 }: UseConclusionRequestParams): UseConclusionRequestResult {
   const sessions = useSessionStore((s) => s.sessions);
-  const isSessionActive = useSessionStore((s) => s.isSessionActive);
-  const setSessionActive = useSessionStore((s) => s.setSessionActive);
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
   const appendEntry = useTranscriptStore((s) => s.appendEntry);
   const canvasNodes = useCanvasStore((s) => s.nodes);
   const canvasEdges = useCanvasStore((s) => s.edges);
+
+  /** Safely transition to inactive — no-op if already inactive. */
+  const deactivate = useCallback((): void => {
+    const p = useWorkspaceStore.getState().phase.phase;
+    if (p === "active" || p === "loading-session") {
+      useWorkspaceStore.getState().deactivateSession();
+    }
+  }, []);
 
   const conclusionRequestedRef = useRef<string | undefined>(undefined);
   const sessionHadTimeLeftRef = useRef<{ sessionId: string; hadTimeLeft: boolean }>({
@@ -88,10 +97,10 @@ export function useConclusionRequest({
   // Sync server-confirmed conclusion with local ref + session store.
   useEffect(() => {
     if (isConcluded && sessionId) {
-      setSessionActive(false);
+      deactivate();
       conclusionRequestedRef.current = sessionId;
     }
-  }, [isConcluded, sessionId, setSessionActive]);
+  }, [isConcluded, sessionId, deactivate]);
 
   // Auto-conclude when session time expires while the user has the tab open.
   // Skips sessions that already expired on page load (`sessionHadTimeLeftRef.hadTimeLeft` guard).
@@ -133,7 +142,7 @@ export function useConclusionRequest({
           ...prev,
           { id: generateId(), role: "assistant" as const, content: text },
         ]);
-        setSessionActive(false);
+        deactivate();
         if (text.trim().length > 0) {
           void Effect.runPromise(
             Effect.either(appendTranscriptApi(sessionId, "assistant", text))
@@ -146,7 +155,7 @@ export function useConclusionRequest({
         if (err.status === 403) {
           setConclusionRequestedSessionId(sessionId);
           conclusionRequestedRef.current = sessionId;
-          setSessionActive(false);
+          deactivate();
         } else {
           setConclusionRequestedSessionId(undefined);
           conclusionRequestedRef.current = undefined;
@@ -160,7 +169,7 @@ export function useConclusionRequest({
     sessions,
     messages,
     setMessages,
-    setSessionActive,
+    deactivate,
     appendEntry,
     canvasNodes,
     canvasEdges,
@@ -171,7 +180,7 @@ export function useConclusionRequest({
     if (conclusionRequestedRef.current === sessionId) return;
     conclusionRequestedRef.current = sessionId;
     setConclusionRequestedSessionId(sessionId);
-    setSessionActive(false);
+    deactivate();
 
     void Effect.runPromise(
       Effect.either(
@@ -189,7 +198,7 @@ export function useConclusionRequest({
           ...prev,
           { id: generateId(), role: "assistant" as const, content: text },
         ]);
-        setSessionActive(false);
+        deactivate();
         if (text.trim().length > 0) {
           void Effect.runPromise(
             Effect.either(appendTranscriptApi(sessionId, "assistant", text))
@@ -201,12 +210,12 @@ export function useConclusionRequest({
         const err = either.left;
         toast.error(err.error);
         // Keep session concluded even on error — user explicitly chose to end.
-        setSessionActive(false);
+        deactivate();
         conclusionRequestedRef.current = sessionId;
         setConclusionRequestedSessionId(sessionId);
       }
     });
-  }, [sessionId, messages, canvasNodes, canvasEdges, setMessages, setSessionActive, appendEntry]);
+  }, [sessionId, messages, canvasNodes, canvasEdges, setMessages, deactivate, appendEntry]);
 
   const showEndInterviewButton =
     sessionId !== undefined &&

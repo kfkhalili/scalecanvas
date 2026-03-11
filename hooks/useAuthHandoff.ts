@@ -7,11 +7,10 @@ import { useRouter } from "next/navigation";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { loadAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
-import { appendTranscriptApi, saveCanvasApi } from "@/services/sessionsClient";
-import { runBffHandoff } from "@/lib/authHandoff";
+import { appendTranscriptBatchApi, saveCanvasApi } from "@/services/sessionsClient";
+import { runBffHandoff, buildTranscriptEntries, resolveHandoffMessages } from "@/lib/authHandoff";
 import { whenSome } from "@/lib/optionHelpers";
 import { toast } from "sonner";
-import type { TranscriptEntry } from "@/lib/types";
 
 export type UseAuthHandoffParams = {
   messages: Message[];
@@ -23,6 +22,8 @@ export type UseAuthHandoffParams = {
  * - Watches `pendingSessionId` from the auth handoff store.
  * - On first detection: loads the anonymous workspace, persists the canvas and
  *   transcript to the new session, then navigates to it.
+ * - Shows a sonner loading toast for the duration; replaces with an error toast
+ *   if the canvas save fails permanently.
  *
  * Reads canvas and auth-handoff stores directly; takes only `useChat` outputs as params.
  */
@@ -36,29 +37,19 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
 
   const handoffDoneRef = useRef<string | null>(null);
+  const setHandoffStatus = useAuthHandoffStore((s) => s.setHandoffStatus);
 
   useEffect(() => {
     whenSome(pendingSessionIdOpt, (pendingSessionId) => {
       if (handoffDoneRef.current === pendingSessionId) return;
       handoffDoneRef.current = pendingSessionId;
+      setHandoffStatus("in-progress");
+      const loadingToastId = toast.loading("Saving your session…");
 
       loadAnonymousWorkspace();
 
       const anonMsgs = useAuthHandoffStore.getState().anonymousMessages;
-      const messagesToUse: Message[] =
-        messages.length > 0
-          ? messages
-          : anonMsgs.map((m) => ({
-              id: m.id,
-              role:
-                m.role === "user" ||
-                m.role === "assistant" ||
-                m.role === "system" ||
-                m.role === "data"
-                  ? (m.role as Message["role"])
-                  : ("assistant" as const),
-              content: m.content,
-            }));
+      const messagesToUse = resolveHandoffMessages(messages, anonMsgs);
 
       void runBffHandoff({
         sessionId: pendingSessionId,
@@ -66,28 +57,28 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
         getCanvasState,
         saveCanvasApi,
         setMessages,
-        persistTranscript: async (sid, entries) => {
-          for (const { role, content } of entries) {
-            await Effect.runPromise(
-              Effect.either(appendTranscriptApi(sid, role, content))
-            );
-          }
+        persistTranscript: (sid, entries) =>
+            Effect.runPromise(
+              Effect.either(appendTranscriptBatchApi(sid, entries))
+            ),
+        onTranscriptSaveError: () => {
+          toast.dismiss(loadingToastId);
+          setHandoffStatus("error");
+          toast.error(
+            "Part of your conversation couldn't be saved. Sign in again to retry the session transfer."
+          );
         },
-        onCanvasSaveError: () =>
+        onCanvasSaveError: () => {
+          toast.dismiss(loadingToastId);
+          setHandoffStatus("error");
           toast.error(
             "Your diagram couldn't be saved. You can keep working; try refreshing later to see if it's there."
-          ),
+          );
+        },
         onHandoffComplete: (sid, filteredMsgs) => {
-          const now = new Date().toISOString();
-          const entries: TranscriptEntry[] = filteredMsgs.map((m) => ({
-            id: m.id,
-            sessionId: sid,
-            role: (
-              m.role === "user" || m.role === "assistant" ? m.role : "assistant"
-            ) as "user" | "assistant",
-            content: typeof m.content === "string" ? m.content : "",
-            createdAt: now,
-          }));
+          toast.dismiss(loadingToastId);
+          setHandoffStatus("done");
+          const entries = buildTranscriptEntries(sid, filteredMsgs, new Date().toISOString());
           setHandoffTranscript(Option.some({ sessionId: sid, entries }));
           setPendingAuthHandoff(Option.none());
           setAnonymousMessages([]);
@@ -106,5 +97,7 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
     setHandoffTranscript,
     setAnonymousMessages,
     setQuestionTitle,
+    setHandoffStatus,
   ]);
+
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { Option } from "effect";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createBrowserClientInstance } from "@/lib/supabase/client";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
@@ -16,6 +17,7 @@ import {
   type BootstrapDeps,
 } from "@/lib/sessionBootstrap";
 import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 
 /**
  * Renders the workspace at / when the user is logged in. After rehydrating
@@ -28,15 +30,19 @@ import { InterviewSplitView } from "@/components/interview/InterviewSplitView";
  */
 export function PostAuthRoot(): React.ReactElement {
   const router = useRouter();
-  const [storesReady, setStoresReady] = useState(false);
-
-  useEffect(() => {
+  // One-shot guard: prevents double-firing if React Strict Mode remounts this
+  // effect or if storesReady toggles more than once during a rapid re-render.
+  const bootstrapCalledRef = useRef(false);
+  const [storesReady] = useState(() => {
     loadAnonymousWorkspace();
-    queueMicrotask(() => setStoresReady(true));
-  }, []);
+    return true;
+  });
 
   useEffect(() => {
-    if (!storesReady) return;
+    if (bootstrapCalledRef.current) return;
+    bootstrapCalledRef.current = true;
+
+    useWorkspaceStore.getState().enterBootstrapping();
 
     const supabase = createBrowserClientInstance();
     const setHasAttemptedEval = useCanvasStore.getState().setHasAttemptedEval;
@@ -69,7 +75,6 @@ export function PostAuthRoot(): React.ReactElement {
 
       const ctx: BootstrapContext = {
         hasAnonymousChat,
-        hasAttemptedEval: false,
         questionTitle,
       };
 
@@ -83,11 +88,16 @@ export function PostAuthRoot(): React.ReactElement {
           useAuthHandoffStore.getState().setAnonymousMessages([]);
           useAuthHandoffStore.getState().setQuestionTitle(Option.none());
         },
+        notifyTrialAlreadyClaimed: () => {
+          toast.info(
+            "Your trial session was already created. Resuming your existing session."
+          );
+        },
       };
 
       void executeBootstrapAction(action, ctx, deps);
     });
-  }, [storesReady, router]);
+  }, [router]);
 
   if (!storesReady) {
     return (

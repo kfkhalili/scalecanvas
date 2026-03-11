@@ -1,13 +1,11 @@
 "use client";
 
 import { createPortal as _createPortal } from "react-dom";
-import { Effect, Option } from "effect";
+import { Option } from "effect";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import {
   ReactFlow,
   Background,
-  addEdge,
-  reconnectEdge,
   MarkerType,
   type Viewport as RfViewport,
   type Node,
@@ -15,20 +13,20 @@ import {
   type Connection,
   useReactFlow,
   ReactFlowProvider,
-  useNodesState,
-  useEdgesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import { whenSome } from "@/lib/optionHelpers";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { canInteract } from "@/lib/workspacePhase";
 import { awsNodeTypes } from "./nodeTypes";
 import { LabeledEdge } from "@/components/canvas/edges/LabeledEdge";
+import type { ReactFlowNode, ReactFlowEdge } from "@/lib/types";
 
 // Defined at module level so ReactFlow always gets a stable reference (avoids warning #002)
 const EDGE_TYPES = { default: LabeledEdge };
 import { EdgeLabelProvider } from "@/components/canvas/edges/EdgeLabelContext";
-import { saveCanvasApi } from "@/services/sessionsClient";
+import { getPersistence } from "@/lib/persistenceLifecycle";
 import {
   getDiagramShortcutEntries,
   computeShortcutsPanelPosition,
@@ -41,87 +39,35 @@ import {
 } from "@/lib/chatGuardrails";
 import { HelpCircle, Timer } from "lucide-react";
 
-const SAVE_DEBOUNCE_MS = 800;
-
 type FlowCanvasInnerProps = {
   sessionIdOpt: Option.Option<string>;
 };
 
 function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactElement {
-  const storeNodes = useCanvasStore((s) => s.nodes);
-  const storeEdges = useCanvasStore((s) => s.edges);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const viewport = useCanvasStore((s) => s.viewport);
-  const setCanvasState = useCanvasStore((s) => s.setCanvasState);
-  const getCanvasState = useCanvasStore((s) => s.getCanvasState);
   const setViewport = useCanvasStore((s) => s.setViewport);
-  const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const onNodesChange = useCanvasStore((s) => s.onNodesChange);
+  const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
+  const connectNodes = useCanvasStore((s) => s.connectNodes);
+  const doReconnectEdge = useCanvasStore((s) => s.doReconnectEdge);
+  const updateEdgeLabel = useCanvasStore((s) => s.updateEdgeLabel);
+  const updateEdgeLabelPosition = useCanvasStore((s) => s.updateEdgeLabelPosition);
+  const addNodeAction = useCanvasStore((s) => s.addNode);
+  const deselectAll = useCanvasStore((s) => s.deselectAll);
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
 
-  const initialNodes = [...storeNodes];
-  const initialEdges = [...storeEdges];
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactFlowInstance = useReactFlow();
-
-  /**
-   * Track the exact node/edge references we last pushed to the store so we can
-   * tell whether a store change was caused by us (local→store) or externally
-   * (fetchCanvas, session switch, rehydrate). A simple boolean flag doesn't
-   * work because it can't survive interleaved async updates (e.g. fetchCanvas
-   * resolving after the initial local→store sync on mount).
-   */
-  const lastPushedNodesRef = useRef<readonly Node[] | null>(null);
-  const lastPushedEdgesRef = useRef<readonly Edge[] | null>(null);
-  const viewportRef = useRef(viewport);
-  useEffect(() => {
-    viewportRef.current = viewport;
-  }, [viewport]);
-
-  // Sync store -> local only when store was updated externally (e.g. fetchCanvas, session switch)
-  useEffect(() => {
-    // Skip when the store still holds exactly what we wrote — avoids
-    // store→local→store echo loop while letting external updates through.
-    if (
-      storeNodes === lastPushedNodesRef.current &&
-      storeEdges === lastPushedEdgesRef.current
-    ) {
-      return;
-    }
-    setNodes([...storeNodes]);
-    setEdges([...storeEdges]);
-  }, [storeNodes, storeEdges, setNodes, setEdges]);
-
-  // Push local state to store (for save, Evaluate, getCanvasState). Viewport
-  // is read from a ref so we don't depend on it here — it is updated in the
-  // store by onMoveEnd; depending on it would cause an infinite loop because
-  // setCanvasState produces new Option references.
-  useEffect(() => {
-    lastPushedNodesRef.current = nodes;
-    lastPushedEdgesRef.current = edges;
-    setCanvasState({
-      nodes,
-      edges,
-      viewport: Option.getOrUndefined(viewportRef.current),
-    });
-  }, [nodes, edges, setCanvasState]);
 
   // Escape: clear selection so the shortcuts-panel hint is accurate
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") {
-        setNodes((prev) =>
-          prev.map((n) => ({ ...n, selected: false }))
-        );
-        setEdges((prev) =>
-          prev.map((edge) => ({ ...edge, selected: false }))
-        );
-      }
+      if (e.key === "Escape") deselectAll();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [setNodes, setEdges]);
+  }, [deselectAll]);
 
   const onMoveEnd = useCallback(
     (_ev: MouseEvent | TouchEvent | null, vp: RfViewport) => {
@@ -131,59 +77,14 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
   );
 
   const onConnect = useCallback(
-    (connection: Connection) => {
-      setEdges((prev) => {
-        const next = addEdge(connection, prev);
-        const prevIds = new Set(prev.map((e) => e.id));
-        return next.map((e) =>
-          prevIds.has(e.id) ? e : { ...e, data: { ...e.data, label: "" } }
-        );
-      });
-    },
-    [setEdges]
+    (connection: Connection) => connectNodes(connection),
+    [connectNodes]
   );
 
   const onReconnect = useCallback(
-    (oldEdge: Edge, newConnection: Connection) => {
-      setEdges((prev) => {
-        const next = reconnectEdge(oldEdge, newConnection, prev);
-        return next.map((e) =>
-          e.id === oldEdge.id ? { ...e, data: { ...e.data, ...oldEdge.data } } : e
-        );
-      });
-    },
-    [setEdges]
-  );
-
-  const updateEdgeLabel = useCallback(
-    (edgeId: string, label: string) => {
-      setEdges((prev) =>
-        prev.map((e) =>
-          e.id === edgeId ? { ...e, data: { ...e.data, label } } : e
-        )
-      );
-    },
-    [setEdges]
-  );
-
-  const updateEdgeLabelPosition = useCallback(
-    (edgeId: string, offsetX: number, offsetY: number) => {
-      setEdges((prev) =>
-        prev.map((e) =>
-          e.id === edgeId
-            ? {
-                ...e,
-                data: {
-                  ...e.data,
-                  labelOffsetX: offsetX,
-                  labelOffsetY: offsetY,
-                },
-              }
-            : e
-        )
-      );
-    },
-    [setEdges]
+    (oldEdge: Edge, newConnection: Connection) =>
+      doReconnectEdge(oldEdge as ReactFlowEdge, newConnection),
+    [doReconnectEdge]
   );
 
   const onDragOver = useCallback((e: DragEvent) => {
@@ -202,35 +103,10 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
         x: e.clientX,
         y: e.clientY,
       });
-      setNodes((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), type, position, data: { label } } as Node,
-      ]);
+      addNodeAction({ id: crypto.randomUUID(), type, position, data: { label } } as ReactFlowNode);
     },
-    [reactFlowInstance, setNodes, isSessionActive]
+    [reactFlowInstance, addNodeAction, isSessionActive]
   );
-
-  useEffect(() => {
-    if (!isSessionActive) return;
-    whenSome(sessionIdOpt, (sessionId) => {
-      if (sessionId === "ephemeral") return;
-      if (saveTimeoutRef.current !== null) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      saveTimeoutRef.current = setTimeout(() => {
-        saveTimeoutRef.current = null;
-        const state = getCanvasState();
-        void Effect.runPromise(
-          Effect.either(saveCanvasApi(sessionId, state))
-        ).then(() => {});
-      }, SAVE_DEBOUNCE_MS);
-    });
-    return () => {
-      if (saveTimeoutRef.current !== null) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [sessionIdOpt, nodes, edges, viewport, getCanvasState, isSessionActive]);
 
   const defaultViewport: RfViewport = Option.match(viewport, {
     onNone: () => ({ x: 0, y: 0, zoom: 1 }),
@@ -244,8 +120,8 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
       >
       <ReactFlow
         key={Option.getOrElse(sessionIdOpt, () => "no-session")}
-        nodes={nodes}
-        edges={edges}
+        nodes={nodes as Node[]}
+        edges={edges as Edge[]}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -289,7 +165,7 @@ function InterviewCountdownBadge({
   sessionIdOpt: Option.Option<string>;
 }): React.ReactElement | null {
   const sessions = useSessionStore((s) => s.sessions);
-  const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
   const sessionId = Option.getOrUndefined(sessionIdOpt);
   const session =
     sessionId && sessionId !== "ephemeral"
@@ -372,8 +248,21 @@ function InterviewCountdownBadge({
 
 export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElement {
   const evaluateActionOpt = useCanvasStore((s) => s.evaluateAction);
-  const isSessionActive = useSessionStore((s) => s.isSessionActive);
+  const isSessionActive = useWorkspaceStore((s) => canInteract(s.phase));
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  // Subscribe to persistence state for the data-save-status attribute.
+  const [saveStatus, setSaveStatus] = useState<string>("idle");
+  useEffect(() => {
+    const update = (): void => {
+      const s = getPersistence().getState();
+      const status = s.isSaving ? "saving" : s.error ? "error" : s.isDirty ? "dirty" : "saved";
+      setSaveStatus(status);
+    };
+    update();
+    return getPersistence().subscribe(update);
+  }, []);
+
   const [panelPosition, setPanelPosition] = useState<{
     bottom: number;
     left: number;
@@ -458,6 +347,8 @@ export function FlowCanvas({ sessionIdOpt }: FlowCanvasProps): React.ReactElemen
     <div
       className="relative h-full w-full"
       style={{ minHeight: 400, minWidth: 300 }}
+      data-save-status={saveStatus}
+      data-read-only={!isSessionActive}
     >
       {shortcutsPanel}
       <InterviewCountdownBadge sessionIdOpt={sessionIdOpt} />

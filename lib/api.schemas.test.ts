@@ -3,6 +3,7 @@ import {
   CreateSessionBodySchema,
   UpdateSessionBodySchema,
   AppendTranscriptBodySchema,
+  AppendTranscriptBatchBodySchema,
   CanvasBodySchema,
   ChatBodySchema,
   CheckoutBodySchema,
@@ -12,6 +13,7 @@ import {
   MAX_NODES,
   MAX_EDGES,
   MAX_MESSAGES,
+  MAX_BATCH_ENTRIES,
 } from "./api.schemas";
 
 describe("NodeLibraryProviderSchema", () => {
@@ -115,6 +117,76 @@ describe("AppendTranscriptBodySchema", () => {
     expect(
       AppendTranscriptBodySchema.safeParse({ role: "user", content: longContent }).success
     ).toBe(false);
+  });
+});
+
+describe("AppendTranscriptBatchBodySchema", () => {
+  it("accepts valid entries array", () => {
+    expect(
+      AppendTranscriptBatchBodySchema.safeParse({
+        entries: [
+          { id: "a0000000-0000-4000-8000-000000000001", role: "user", content: "Hello" },
+          { id: "a0000000-0000-4000-8000-000000000002", role: "assistant", content: "Hi" },
+        ],
+      }).success
+    ).toBe(true);
+  });
+
+  it("rejects entry with non-UUID id", () => {
+    expect(
+      AppendTranscriptBatchBodySchema.safeParse({
+        entries: [{ id: "m1", role: "user", content: "Hello" }],
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects empty entries array", () => {
+    expect(AppendTranscriptBatchBodySchema.safeParse({ entries: [] }).success).toBe(false);
+  });
+
+  it("rejects missing entries field", () => {
+    expect(AppendTranscriptBatchBodySchema.safeParse({}).success).toBe(false);
+  });
+
+  it("rejects entry with invalid role", () => {
+    expect(
+      AppendTranscriptBatchBodySchema.safeParse({
+        entries: [{ id: "a0000000-0000-4000-8000-000000000001", role: "system", content: "Hi" }],
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects entry with empty content", () => {
+    expect(
+      AppendTranscriptBatchBodySchema.safeParse({
+        entries: [{ id: "a0000000-0000-4000-8000-000000000001", role: "user", content: "" }],
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects entry with content exceeding 50K chars", () => {
+    expect(
+      AppendTranscriptBatchBodySchema.safeParse({
+        entries: [{ id: "a0000000-0000-4000-8000-000000000001", role: "user", content: "x".repeat(50_001) }],
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects entry missing id", () => {
+    expect(
+      AppendTranscriptBatchBodySchema.safeParse({
+        entries: [{ role: "user", content: "Hello" }],
+      }).success
+    ).toBe(false);
+  });
+
+  it(`rejects arrays exceeding ${MAX_BATCH_ENTRIES} entries`, () => {
+    const entries = Array.from({ length: MAX_BATCH_ENTRIES + 1 }, (_, i) => ({
+      id: `a0000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      role: "user" as const,
+      content: "x",
+    }));
+    expect(AppendTranscriptBatchBodySchema.safeParse({ entries }).success).toBe(false);
   });
 });
 

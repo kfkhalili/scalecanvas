@@ -192,6 +192,33 @@ export function appendTranscriptEntry(
   );
 }
 
+export function appendTranscriptBatch(
+  client: ServerSupabaseClient,
+  sessionId: string,
+  entries: { id: string; role: "user" | "assistant"; content: string }[]
+): Effect.Effect<undefined, SessionError> {
+  if (entries.length === 0) return Effect.succeed(undefined);
+  const rows: DbSessionTranscriptInsert[] = entries.map(({ id, role, content }) => ({
+    id,
+    session_id: sessionId,
+    role,
+    content,
+  }));
+  return pipe(
+    Effect.promise(() =>
+      client
+        .from("session_transcripts")
+        // upsert with ignoreDuplicates provides ON CONFLICT (id) DO NOTHING semantics,
+        // making batch retries safe: if the first request succeeded but the response was
+        // lost, a retry will silently skip already-inserted rows.
+        .upsert(rows as never, { ignoreDuplicates: true })
+    ),
+    Effect.flatMap(({ error }) =>
+      error ? Effect.fail(toSessionError(error)) : Effect.succeed(undefined)
+    )
+  );
+}
+
 export function getTranscript(
   client: ServerSupabaseClient,
   sessionId: string

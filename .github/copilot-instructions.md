@@ -93,3 +93,11 @@ For any file whose name includes a date or timestamp (Supabase migrations, dated
 |------------------------|-----------------------------------------------------|
 | `supabase/migrations/` | `{YYYYMMDDHHMMSS}_name.sql`                         |
 | `docs/plans/`          | `{YYYY-MM-DD}-name.md`                              |
+
+---
+
+## 10. E2E Tests — Headless Only
+
+- Always run Playwright E2E tests **headless** — never use `--headed` or `headless: false`.
+- Use `pnpm test:e2e` or `npx playwright test` (both default to headless).
+- When filtering tests use flags like `--project=chromium -g "pattern"` — never add `--headed`.

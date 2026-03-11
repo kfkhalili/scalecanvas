@@ -3,18 +3,13 @@ import { Option } from "effect";
 import { getGcpIconUrl, isGcpNodeType } from "./gcpNodeIcons";
 
 describe("getGcpIconUrl", () => {
-  it("returns some(/icons/gcp/) for known GCP types", () => {
-    expect(Option.getOrNull(getGcpIconUrl("gcpCloudRun"))).toMatch(
-      /^\/icons\/gcp\//
-    );
-    expect(Option.getOrNull(getGcpIconUrl("gcpCloudRun"))).toContain(".svg");
-    expect(Option.getOrNull(getGcpIconUrl("gcpGke"))).toMatch(/^\/icons\/gcp\//);
-    expect(Option.getOrNull(getGcpIconUrl("gcpPubSub"))).toMatch(
-      /^\/icons\/gcp\//
-    );
-    expect(Option.getOrNull(getGcpIconUrl("gcpBigQuery"))).toMatch(
-      /^\/icons\/gcp\//
-    );
+  it("returns some(unpkg gcp-icons URL) for known GCP types", () => {
+    const url = Option.getOrNull(getGcpIconUrl("gcpCloudRun"));
+    expect(url).toMatch(/^https:\/\/unpkg\.com\/gcp-icons@1\.0\.4\/dist\/icons\//);
+    expect(url).toContain(".svg");
+    expect(Option.getOrNull(getGcpIconUrl("gcpGke"))).toContain("gke-512-color.svg");
+    expect(Option.getOrNull(getGcpIconUrl("gcpPubSub"))).toContain("integrationservices-512-color.svg");
+    expect(Option.getOrNull(getGcpIconUrl("gcpBigQuery"))).toContain("bigquery-512-color.svg");
   });
 
   it("returns none for non-GCP types", () => {

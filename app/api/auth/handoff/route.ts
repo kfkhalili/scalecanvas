@@ -18,9 +18,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     Effect.either(checkRateLimit(supabase, `handoff:${user.id}`, HANDOFF_RATE_LIMIT))
   );
   if (Either.isLeft(rateLimitEither)) {
+    const resetAt = new Date(rateLimitEither.left.resetAt);
+    const retryAfterSecs = Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000));
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
-      { status: 429 }
+      { status: 429, headers: { "Retry-After": String(retryAfterSecs) } }
     );
   }
 
