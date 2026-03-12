@@ -30,16 +30,16 @@ export default async function SessionPage({ params }: PageProps) {
     onLeft: () => false,
     onRight: (session) => session.isTrial,
   });
-  const isConcluded = Either.match(sessionEither, {
-    onLeft: () => false,
+  const isActive = Either.match(sessionEither, {
+    onLeft: () => true,
     onRight: (session) =>
-      session.conclusionSummary !== null && session.conclusionSummary !== "",
+      session.conclusionSummary === null || session.conclusionSummary === "",
   });
 
   return (
     <main className="flex h-screen flex-col">
       <div className="min-h-0 flex-1">
-        <InterviewSplitView sessionId={sessionId} isTrial={isTrial} isConcluded={isConcluded} />
+        <InterviewSplitView sessionId={sessionId} isTrial={isTrial} isActive={isActive} />
       </div>
     </main>
   );

@@ -72,4 +72,42 @@ describe("canEvaluateFromSnapshot", () => {
       )
     ).toBe(false);
   });
+
+  it("returns false when both isEvaluating and isLoading are true", () => {
+    expect(
+      canEvaluateFromSnapshot(
+        "Nodes:\n- A (a)",
+        Option.none(),
+        true,
+        true,
+        true
+      )
+    ).toBe(false);
+  });
+
+  it("returns false when isEvaluating even if snapshot changed", () => {
+    // This is the critical guard: even if canvas changed, evaluating blocks re-entry
+    expect(
+      canEvaluateFromSnapshot(
+        "Nodes:\n- A (a)\n- B (b)",
+        Option.some("Nodes:\n- A (a)"),
+        true,
+        true,
+        false
+      )
+    ).toBe(false);
+  });
+
+  it("returns false when isLoading even if never evaluated", () => {
+    // While chat is loading, evaluate button should be disabled
+    expect(
+      canEvaluateFromSnapshot(
+        "Nodes:\n- A (a)",
+        Option.none(),
+        true,
+        false,
+        true
+      )
+    ).toBe(false);
+  });
 });

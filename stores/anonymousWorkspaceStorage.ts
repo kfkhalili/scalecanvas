@@ -95,14 +95,18 @@ let storageWarningShown = false;
  * Call when the anonymous view is active and either store changes.
  */
 export function persistAnonymousWorkspace(): void {
-  if (typeof window === "undefined") return;
+  persistAnonymousWorkspaceFromSnapshot(captureAnonymousSnapshot());
+}
+
+/** Capture a snapshot of the anonymous workspace state for deferred persistence. */
+export function captureAnonymousSnapshot(): PersistedAnonymousWorkspace {
   const canvas = useCanvasStore.getState();
   const handoff = useAuthHandoffStore.getState();
 
   const viewport = canvas.viewport;
   const viewportPayload: Viewport | null = Option.getOrNull(viewport);
 
-  const state: PersistedAnonymousWorkspace = {
+  return {
     anonymousMessages: handoff.anonymousMessages,
     questionTitle: Option.getOrNull(handoff.questionTitle),
     questionTopicId: Option.getOrNull(handoff.questionTopicId),
@@ -111,6 +115,13 @@ export function persistAnonymousWorkspace(): void {
     hasAttemptedEval: canvas.hasAttemptedEval,
     viewport: viewportPayload,
   };
+}
+
+/** Persist a pre-captured snapshot to localStorage. */
+export function persistAnonymousWorkspaceFromSnapshot(
+  state: PersistedAnonymousWorkspace,
+): void {
+  if (typeof window === "undefined") return;
 
   try {
     localStorage.setItem(

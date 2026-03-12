@@ -42,8 +42,8 @@ type ChatPanelProps = {
   isAnonymous?: boolean;
   /** When true, session is a trial (post-handoff); do not send opening, use design phase from first message. */
   isTrial?: boolean;
-  /** When true, session already has a conclusion summary in DB — mark session inactive immediately on mount. */
-  isConcluded?: boolean;
+  /** Whether the session is currently active (no conclusion summary in DB). When false, session starts inactive immediately on mount. */
+  isActive?: boolean;
 };
 
 const toMessage = transcriptEntryToMessage;
@@ -53,7 +53,7 @@ export function ChatPanel({
   initialEntries,
   isAnonymous = false,
   isTrial = false,
-  isConcluded = false,
+  isActive = true,
 }: ChatPanelProps): React.ReactElement {
   const router = useRouter();
   const appendEntry = useTranscriptStore((s) => s.appendEntry);
@@ -366,13 +366,13 @@ export function ChatPanel({
   ]);
 
   useEffect(() => {
-    if (sessionId && !isConcluded) {
+    if (sessionId && isActive) {
       const p = useWorkspaceStore.getState().phase.phase;
-      if (p === "loading-session" || p === "inactive") {
+      if (p === "loading-session") {
         useWorkspaceStore.getState().activateSession();
       }
     }
-  }, [sessionId, isConcluded]);
+  }, [sessionId, isActive]);
 
   useEffect(() => {
     if (isAnonymous && messages.length > 0) {
@@ -416,7 +416,7 @@ export function ChatPanel({
   const openingRequestedRef = useRef<string | undefined>(undefined);
 
   const { requestEndInterview, showEndInterviewButton } =
-    useConclusionRequest({ sessionId, isAnonymous, isConcluded, messages, setMessages });
+    useConclusionRequest({ sessionId, isAnonymous, isActive, messages, setMessages });
 
   useAuthHandoff({ messages, setMessages });
 

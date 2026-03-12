@@ -76,6 +76,7 @@ export function useCanvasReview({
   const edges = useCanvasStore((s) => s.edges);
   const lastEvaluatedSnapshotRef = useRef<Option.Option<string>>(Option.none());
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const isEvaluatingRef = useRef(false);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
@@ -90,7 +91,7 @@ export function useCanvasReview({
   );
 
   const evaluate = useCallback(async () => {
-    if (isEvaluating || isLoading) return;
+    if (isEvaluatingRef.current || isLoading) return;
     const state = useCanvasStore.getState();
     const snapshot = parseCanvasState(state.nodes, state.edges);
     const alreadyEvaluated = Option.match(lastEvaluatedSnapshotRef.current, {
@@ -100,6 +101,7 @@ export function useCanvasReview({
     if (alreadyEvaluated) return;
     if (state.nodes.length < MIN_NODES_FOR_REVIEW) return;
 
+    isEvaluatingRef.current = true;
     setIsEvaluating(true);
 
     try {
@@ -131,6 +133,7 @@ export function useCanvasReview({
       });
 
       if (!res.ok) {
+        isEvaluatingRef.current = false;
         setIsEvaluating(false);
         return;
       }
@@ -150,9 +153,10 @@ export function useCanvasReview({
     } catch {
       // silently ignore review failures
     } finally {
+      isEvaluatingRef.current = false;
       setIsEvaluating(false);
     }
-  }, [setMessages, isLoading, isEvaluating, sessionId]);
+  }, [setMessages, isLoading, sessionId]);
 
   return { evaluate, canEvaluate, isEvaluating };
 }

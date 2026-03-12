@@ -16,12 +16,13 @@ import {
   createNullPersistence,
   type PersistenceService,
 } from "@/lib/persistence";
-import { persistAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
+import { persistAnonymousWorkspaceFromSnapshot, captureAnonymousSnapshot } from "@/stores/anonymousWorkspaceStorage";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { saveCanvasApi } from "@/services/sessionsClient";
 import { persistenceMode, sessionIdOf, type PersistenceMode } from "@/lib/workspacePhase";
+import type { CanvasState } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -65,22 +66,35 @@ export function swapPersistence(
   currentMode = mode;
 
   if (mode === "local") {
+    // Snapshot captured at markDirty time — mirrors the API-mode pattern.
+    // The write closure uses the frozen snapshot, not live store state.
+    let localSnapshot = captureAnonymousSnapshot();
+
     current = createPersistence(
       async () => {
-        persistAnonymousWorkspace();
+        persistAnonymousWorkspaceFromSnapshot(localSnapshot);
       },
     );
     storeUnsubs = [
-      useCanvasStore.subscribe(() => current.markDirty()),
-      useAuthHandoffStore.subscribe(() => current.markDirty()),
+      useCanvasStore.subscribe(() => {
+        localSnapshot = captureAnonymousSnapshot();
+        current.markDirty();
+      }),
+      useAuthHandoffStore.subscribe(() => {
+        localSnapshot = captureAnonymousSnapshot();
+        current.markDirty();
+      }),
     ];
   } else if (mode === "api" && sessionId) {
+    // Snapshot captured at markDirty time — write uses the snapshot, not live
+    // store state, so a session swap between markDirty and the deferred write
+    // cannot cause cross-session data corruption (Finding #1).
+    let snapshot: CanvasState = useCanvasStore.getState().getCanvasState();
+
     current = createPersistence(
       async () => {
         const result = await Effect.runPromise(
-          Effect.either(
-            saveCanvasApi(sessionId, useCanvasStore.getState().getCanvasState()),
-          ),
+          Effect.either(saveCanvasApi(sessionId, snapshot)),
         );
         Either.match(result, {
           onLeft: (err) => {
@@ -91,7 +105,10 @@ export function swapPersistence(
       },
     );
     storeUnsubs = [
-      useCanvasStore.subscribe(() => current.markDirty()),
+      useCanvasStore.subscribe(() => {
+        snapshot = useCanvasStore.getState().getCanvasState();
+        current.markDirty();
+      }),
     ];
   } else {
     current = createNullPersistence();

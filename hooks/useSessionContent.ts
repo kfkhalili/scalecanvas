@@ -1,9 +1,9 @@
 /**
  * useSessionContent — encapsulates canvas + transcript fetch orchestration.
  *
- * Owns the staleness guards, handoff detection, and ready-state management
- * that InterviewSplitView used to contain inline. The component just reads
- * `canvasReady`, `transcriptReady`, and `sessionReady`.
+ * Uses the session-scoped AbortController from the workspace store to cancel
+ * in-flight fetches on session switch, replacing manual staleness refs.
+ * The component just reads `canvasReady`, `transcriptReady`, and `sessionReady`.
  */
 
 import { Effect, Either, Option } from "effect";
@@ -12,6 +12,7 @@ import { useCanvasStore } from "@/stores/canvasStore";
 import { useTranscriptStore } from "@/stores/transcriptStore";
 import { useAuthHandoffStore } from "@/stores/authHandoffStore";
 import { fetchCanvas, fetchTranscript } from "@/services/sessionsClient";
+import { getSessionSignal } from "@/stores/workspaceStore";
 import { getPersistence } from "@/lib/persistenceLifecycle";
 import { whenSome } from "@/lib/optionHelpers";
 import { isSessionContentReady } from "@/lib/sessionLoading";
@@ -37,8 +38,6 @@ export function useSessionContent(
   const canvasReady = useCanvasStore((s) => s.canvasReady);
 
   const previousSessionIdRef = useRef<string | null>(null);
-  const loadingCanvasSessionIdRef = useRef<string | null>(null);
-  const loadingTranscriptSessionIdRef = useRef<string | null>(null);
 
   // ── Canvas fetch ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -70,13 +69,12 @@ export function useSessionContent(
       void getPersistence().flush();
     }
 
-    loadingCanvasSessionIdRef.current = sessionId;
+    const signal = getSessionSignal();
     useCanvasStore.getState().setCanvasReady(false);
 
-    void Effect.runPromise(Effect.either(fetchCanvas(sessionId))).then(
+    void Effect.runPromise(Effect.either(fetchCanvas(sessionId, { signal }))).then(
       (canvasEither) => {
-        const stale = loadingCanvasSessionIdRef.current !== sessionId;
-        if (stale) return;
+        if (signal?.aborted) return;
         Either.match(canvasEither, {
           onLeft: () => useCanvasStore.getState().setCanvasReady(true),
           onRight: (state) =>
@@ -131,12 +129,11 @@ export function useSessionContent(
       return;
     }
 
-    loadingTranscriptSessionIdRef.current = sessionId;
+    const signal = getSessionSignal();
     useTranscriptStore.getState().setTranscriptReady(false);
-    void Effect.runPromise(Effect.either(fetchTranscript(sessionId))).then(
+    void Effect.runPromise(Effect.either(fetchTranscript(sessionId, { signal }))).then(
       (result) => {
-        const stale = loadingTranscriptSessionIdRef.current !== sessionId;
-        if (stale) return;
+        if (signal?.aborted) return;
         Either.match(result, {
           onLeft: () => setEntries([]),
           onRight: (list) => setEntries(list),

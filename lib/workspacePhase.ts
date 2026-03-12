@@ -13,20 +13,20 @@
  *             └──→ loading-session  (direct page load of /[sessionId])
  *
  *   loading-session ──→ active     (session is currently running)
- *   loading-session ──→ inactive   (not yet started, or concluded)
+ *   loading-session ──→ inactive   (session is not currently active)
  *
- *   inactive ──→ active            (user claims trial or spends token)
+ *   inactive ──→ active            (user spends a token)
  *   inactive ──→ loading-session   (switch to another session)
  *
- *   active ──→ inactive            (interview ends: time expired / user ended)
+ *   active ──→ inactive            (time expired, or interview ended)
  *   active ──→ loading-session     (switch to another session)
  *
  * `anonymous` has no outgoing client transitions — leaving anonymous mode is
  * an OAuth redirect (page reload). A new state machine starts at `boot`.
  *
- * `inactive` merges the old "pending" and "concluded" concepts: both mean
- * "session exists, AI is off." The session can be (re-)activated with a trial
- * or token. Canvas and chat are view-only; an "Activate" CTA is shown.
+ * `inactive` means "session exists but is not currently active." The user can
+ * reactivate by spending a token. Canvas and chat are view-only; an "Activate"
+ * CTA is shown.
  */
 
 import { match, P } from "ts-pattern";

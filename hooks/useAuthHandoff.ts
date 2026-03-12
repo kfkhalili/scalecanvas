@@ -37,7 +37,12 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
   const getCanvasState = useCanvasStore((s) => s.getCanvasState);
 
   const handoffDoneRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
   const setHandoffStatus = useAuthHandoffStore((s) => s.setHandoffStatus);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     whenSome(pendingSessionIdOpt, (pendingSessionId) => {
@@ -63,6 +68,7 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
             ),
         onTranscriptSaveError: () => {
           toast.dismiss(loadingToastId);
+          if (!mountedRef.current) return;
           setHandoffStatus("error");
           toast.error(
             "Part of your conversation couldn't be saved. Sign in again to retry the session transfer."
@@ -70,6 +76,7 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
         },
         onCanvasSaveError: () => {
           toast.dismiss(loadingToastId);
+          if (!mountedRef.current) return;
           setHandoffStatus("error");
           toast.error(
             "Your diagram couldn't be saved. You can keep working; try refreshing later to see if it's there."
@@ -77,6 +84,7 @@ export function useAuthHandoff({ messages, setMessages }: UseAuthHandoffParams):
         },
         onHandoffComplete: (sid, filteredMsgs) => {
           toast.dismiss(loadingToastId);
+          if (!mountedRef.current) return;
           setHandoffStatus("done");
           const entries = buildTranscriptEntries(sid, filteredMsgs, new Date().toISOString());
           setHandoffTranscript(Option.some({ sessionId: sid, entries }));

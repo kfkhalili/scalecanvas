@@ -144,7 +144,7 @@ test.describe("Cross-auth user journeys (JWT bypass, no manual auth)", () => {
       page.getByPlaceholder("This interview has ended.")
     ).toBeVisible({ timeout: TIMEOUT_SERVER });
 
-    // Persist conclusion to DB so that after reload the server returns isConcluded=true.
+    // Persist conclusion to DB so that after reload the server returns isActive=false.
     // In e2e, Bedrock is unavailable so the conclusion API cannot stream a real summary.
     // We PATCH directly via PostgREST instead. The conclusion API's onFinish persistence
     // logic is covered by unit tests (app/api/sessions/[id]/conclusion/route.test.ts).

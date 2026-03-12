@@ -8,6 +8,24 @@ function guardTransition(from: PhaseName, to: PhaseName): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Session-scoped AbortController
+// ---------------------------------------------------------------------------
+
+let sessionController: AbortController | null = null;
+
+function abortSession(): void {
+  if (sessionController) {
+    sessionController.abort();
+    sessionController = null;
+  }
+}
+
+/** Signal scoped to the current session. Aborted on session switch or reset. */
+export function getSessionSignal(): AbortSignal | undefined {
+  return sessionController?.signal;
+}
+
 type WorkspaceStore = {
   readonly phase: WorkspacePhase;
 
@@ -40,6 +58,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   phase: { phase: "boot" },
 
   reset: (): void => {
+    abortSession();
     set({ phase: { phase: "boot" } });
   },
 
@@ -55,13 +74,18 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
   loadSession: (sessionId: string): void => {
     guardTransition(get().phase.phase, "loading-session");
+    abortSession();
+    sessionController = new AbortController();
     set({ phase: { phase: "loading-session", sessionId } });
   },
 
   activateSession: (): void => {
     const current = get().phase;
     guardTransition(current.phase, "active");
-    if (current.phase === "loading-session" || current.phase === "inactive") {
+    if (
+      current.phase === "loading-session" ||
+      current.phase === "inactive"
+    ) {
       set({ phase: { phase: "active", sessionId: current.sessionId } });
     }
   },

@@ -1,13 +1,24 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type { PersistedAnonymousWorkspace } from "@/stores/anonymousWorkspaceStorage";
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before imports
 // ---------------------------------------------------------------------------
 
-const mockPersistAnonymousWorkspace = vi.fn();
+const mockPersistAnonymousWorkspaceFromSnapshot = vi.fn();
+const mockCaptureAnonymousSnapshot = vi.fn((): PersistedAnonymousWorkspace => ({
+  anonymousMessages: [],
+  questionTitle: null,
+  questionTopicId: null,
+  nodes: [],
+  edges: [],
+  hasAttemptedEval: false,
+  viewport: null,
+}));
 vi.mock("@/stores/anonymousWorkspaceStorage", () => ({
-  persistAnonymousWorkspace: (...args: ReadonlyArray<unknown>) =>
-    mockPersistAnonymousWorkspace(...args),
+  persistAnonymousWorkspaceFromSnapshot: (...args: ReadonlyArray<unknown>) =>
+    mockPersistAnonymousWorkspaceFromSnapshot(...args),
+  captureAnonymousSnapshot: () => mockCaptureAnonymousSnapshot(),
 }));
 
 const mockSaveCanvasApi = vi.fn();
@@ -21,7 +32,11 @@ const canvasUnsub = vi.fn();
 const authUnsub = vi.fn();
 const canvasSubscribe = vi.fn((_cb: () => void) => canvasUnsub);
 const authSubscribe = vi.fn((_cb: () => void) => authUnsub);
-const mockGetCanvasState = vi.fn(() => ({
+const mockGetCanvasState = vi.fn((): {
+  nodes: ReadonlyArray<{ id: string }>;
+  edges: ReadonlyArray<Record<string, unknown>>;
+  viewport: null;
+} => ({
   nodes: [],
   edges: [],
   viewport: null,
@@ -98,6 +113,11 @@ function resetModule(): void {
   workspacePhase = { phase: "boot" };
   workspaceListeners.clear();
   vi.clearAllMocks();
+  mockGetCanvasState.mockReturnValue({
+    nodes: [],
+    edges: [],
+    viewport: null,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +173,7 @@ describe("persistenceLifecycle", () => {
       swapPersistence("local");
       getPersistence().markDirty();
       await vi.advanceTimersByTimeAsync(500);
-      expect(mockPersistAnonymousWorkspace).toHaveBeenCalledOnce();
+      expect(mockPersistAnonymousWorkspaceFromSnapshot).toHaveBeenCalledOnce();
     });
 
     it("auto-marks dirty when canvasStore changes", () => {
@@ -169,6 +189,72 @@ describe("persistenceLifecycle", () => {
       const authCb = authSubscribe.mock.calls[0]![0];
       authCb();
       expect(getPersistence().getState().isDirty).toBe(true);
+    });
+
+    it("uses snapshot captured at markDirty time, not live store state", async () => {
+      // First snapshot from captureAnonymousSnapshot
+      const snapshotA: PersistedAnonymousWorkspace = {
+        anonymousMessages: [],
+        questionTitle: null,
+        questionTopicId: null,
+        nodes: [{ id: "a" }],
+        edges: [],
+        hasAttemptedEval: false,
+        viewport: null,
+      };
+      const snapshotB: PersistedAnonymousWorkspace = {
+        ...snapshotA,
+        nodes: [{ id: "b" }],
+      };
+
+      mockCaptureAnonymousSnapshot.mockReturnValueOnce(snapshotA);
+      swapPersistence("local");
+      const canvasCb = canvasSubscribe.mock.calls[0]![0];
+
+      // Simulate first store change: captures snapshot A
+      mockCaptureAnonymousSnapshot.mockReturnValueOnce(snapshotA);
+      canvasCb();
+
+      // Now live store would return B, but snapshot should be A
+      mockCaptureAnonymousSnapshot.mockReturnValue(snapshotB);
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Write should have used snapshot A, not B
+      expect(mockPersistAnonymousWorkspaceFromSnapshot).toHaveBeenCalledWith(snapshotA);
+    });
+
+    it("snapshot updates on subsequent markDirty calls within debounce window", async () => {
+      const snapshotOld: PersistedAnonymousWorkspace = {
+        anonymousMessages: [],
+        questionTitle: null,
+        questionTopicId: null,
+        nodes: [{ id: "old" }],
+        edges: [],
+        hasAttemptedEval: false,
+        viewport: null,
+      };
+      const snapshotNew: PersistedAnonymousWorkspace = {
+        ...snapshotOld,
+        nodes: [{ id: "new" }],
+      };
+
+      mockCaptureAnonymousSnapshot.mockReturnValueOnce(snapshotOld);
+      swapPersistence("local");
+      const canvasCb = canvasSubscribe.mock.calls[0]![0];
+
+      // First change
+      mockCaptureAnonymousSnapshot.mockReturnValueOnce(snapshotOld);
+      canvasCb();
+
+      // Second change within debounce window
+      mockCaptureAnonymousSnapshot.mockReturnValueOnce(snapshotNew);
+      canvasCb();
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Write should use the latest snapshot
+      expect(mockPersistAnonymousWorkspaceFromSnapshot).toHaveBeenCalledWith(snapshotNew);
     });
   });
 
@@ -209,6 +295,70 @@ describe("persistenceLifecycle", () => {
       svc.markDirty();
       expect(svc.getState().isDirty).toBe(false);
     });
+
+    it("uses snapshot captured at markDirty time, not live store state", async () => {
+      mockSaveCanvasApi.mockReturnValue(Effect.succeed(undefined));
+      swapPersistence("api", "sess-snap");
+
+      // Simulate a canvas subscription callback — the subscription captures
+      // the snapshot (via getCanvasState) and calls markDirty.
+      const canvasCb = canvasSubscribe.mock.calls[0]![0];
+
+      // First change: mock returns session-A data
+      mockGetCanvasState.mockReturnValue({
+        nodes: [{ id: "a" }],
+        edges: [],
+        viewport: null,
+      });
+      canvasCb();
+
+      // Now change the live store to session-B data BEFORE the write fires
+      mockGetCanvasState.mockReturnValue({
+        nodes: [{ id: "b" }],
+        edges: [],
+        viewport: null,
+      });
+
+      // Let the debounced write fire
+      await vi.advanceTimersByTimeAsync(500);
+
+      // The write should have used the snapshot from the FIRST change (session-A),
+      // not the current live state (session-B).
+      expect(mockSaveCanvasApi).toHaveBeenCalledWith(
+        "sess-snap",
+        expect.objectContaining({ nodes: [{ id: "a" }] }),
+      );
+    });
+
+    it("snapshot updates on subsequent markDirty calls", async () => {
+      mockSaveCanvasApi.mockReturnValue(Effect.succeed(undefined));
+      swapPersistence("api", "sess-upd");
+      const canvasCb = canvasSubscribe.mock.calls[0]![0];
+
+      // First change
+      mockGetCanvasState.mockReturnValue({
+        nodes: [{ id: "old" }],
+        edges: [],
+        viewport: null,
+      });
+      canvasCb();
+
+      // Second change (still within debounce window) overwrites snapshot
+      mockGetCanvasState.mockReturnValue({
+        nodes: [{ id: "new" }],
+        edges: [],
+        viewport: null,
+      });
+      canvasCb();
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Write should use the LATEST snapshot
+      expect(mockSaveCanvasApi).toHaveBeenCalledWith(
+        "sess-upd",
+        expect.objectContaining({ nodes: [{ id: "new" }] }),
+      );
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -242,7 +392,7 @@ describe("persistenceLifecycle", () => {
       swapPersistence("none");
       // The flush from swap is fire-and-forget but uses the old write fn
       await vi.advanceTimersByTimeAsync(0);
-      expect(mockPersistAnonymousWorkspace).toHaveBeenCalledOnce();
+      expect(mockPersistAnonymousWorkspaceFromSnapshot).toHaveBeenCalledOnce();
     });
 
     it("unsubscribes old store listeners on swap", () => {
@@ -306,7 +456,7 @@ describe("persistenceLifecycle", () => {
       expect(svc.getState().isDirty).toBe(false);
       // Pending flush completes
       await vi.advanceTimersByTimeAsync(0);
-      expect(mockPersistAnonymousWorkspace).toHaveBeenCalledOnce();
+      expect(mockPersistAnonymousWorkspaceFromSnapshot).toHaveBeenCalledOnce();
     });
 
     it("unsubscribes all store listeners", () => {
@@ -406,7 +556,7 @@ describe("persistenceLifecycle", () => {
       simulatePhaseChange({ phase: "anonymous" });
       getPersistence().markDirty();
       await vi.advanceTimersByTimeAsync(500);
-      expect(mockPersistAnonymousWorkspace).toHaveBeenCalledOnce();
+      expect(mockPersistAnonymousWorkspaceFromSnapshot).toHaveBeenCalledOnce();
 
       // 2. reset → boot (simulates page navigation)
       simulatePhaseChange({ phase: "boot" });

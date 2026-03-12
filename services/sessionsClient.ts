@@ -15,10 +15,10 @@ function parseErrorResponse(data: ApiErrorResponse): string {
   return data.error ?? "Unknown error";
 }
 
-export function apiGet<T>(path: string): Effect.Effect<T, ApiError> {
+export function apiGet<T>(path: string, options?: { signal?: AbortSignal }): Effect.Effect<T, ApiError> {
   return pipe(
     Effect.tryPromise({
-      try: () => fetch(path, { credentials: "include" }),
+      try: () => fetch(path, { credentials: "include", signal: options?.signal }),
       catch: (e) => ({
         message: e instanceof Error ? e.message : "Network error",
       }),
@@ -214,10 +214,12 @@ export function deleteSessionApi(
 }
 
 export function fetchTranscript(
-  sessionId: string
+  sessionId: string,
+  options?: { signal?: AbortSignal },
 ): Effect.Effect<TranscriptEntry[], ApiError> {
   return apiGet<TranscriptEntry[]>(
-    `${sessionsPath()}/${sessionId}/transcript`
+    `${sessionsPath()}/${sessionId}/transcript`,
+    options,
   );
 }
 
@@ -246,9 +248,13 @@ export function appendTranscriptBatchApi(
 }
 
 export function fetchCanvas(
-  sessionId: string
+  sessionId: string,
+  options?: { signal?: AbortSignal },
 ): Effect.Effect<CanvasState, ApiError> {
-  return apiGet<CanvasState>(`${sessionsPath()}/${sessionId}/canvas`);
+  return apiGet<CanvasState>(
+    `${sessionsPath()}/${sessionId}/canvas`,
+    options,
+  );
 }
 
 export function saveCanvasApi(

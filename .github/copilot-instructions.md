@@ -101,3 +101,26 @@ For any file whose name includes a date or timestamp (Supabase migrations, dated
 - Always run Playwright E2E tests **headless** — never use `--headed` or `headless: false`.
 - Use `pnpm test:e2e` or `npx playwright test` (both default to headless).
 - When filtering tests use flags like `--project=chromium -g "pattern"` — never add `--headed`.
+
+---
+
+## 11. Async Safety & Race Prevention
+
+### Cancellation
+- **Session-scoped signal**: `workspaceStore` owns a module-level `AbortController`, recreated in `loadSession()` and aborted on session switch or `reset()`. Hooks obtain it via `getSessionSignal()` — do **not** create per-effect controllers for session-scoped fetches.
+- Check `signal?.aborted` before writing state after any awaited fetch. If aborted, return silently.
+- Per-effect `AbortController` is still correct for non-session work (e.g. a timer, a one-shot user action). Create it in `useEffect`, abort in cleanup.
+
+### Guards & refs
+- Synchronous guards (dedup, re-entry prevention) **must** use `useRef`, not `useState`. React state is batched — a second caller in the same tick sees the old value.
+- If the guard also drives UI (button disable, spinner), keep **both**: ref for the guard, state for the render. Example: `isEvaluatingRef` + `isEvaluating` state in `useCanvasReview`.
+- Hooks with fire-and-forget async callbacks must track mount state with a `mountedRef` (set `false` in cleanup) and check it before writing state.
+
+### Lifecycle transitions
+- Deactivation (`deactivateSession`) must execute **before** any early-return guard in user-intent handlers (e.g. "End Interview"). The guard prevents duplicate API calls; deactivation prevents stale UI state.
+- Activation effects must **never** auto-activate from `inactive` phase. `inactive` means the session is not currently active; only an explicit user action (spending a token) may transition `inactive → active`. Automatic activation effects must only fire from `loading-session`.
+- Zustand store transitions are synchronous `get → guard → set` in a single method — never split the read and write across async boundaries or callbacks.
+
+### Persistence — snapshot rule
+- **Both local and API modes**: the write closure must operate on a **snapshot** captured at subscription-callback time (when `markDirty()` is called), not on live `getState()` at write-execution time. A `let snapshot = capture()` is updated in the store subscription and read inside the `createPersistence(async () => …)` closure.
+- Before creating a new persistence instance, the previous instance must be flushed + destroyed. Two concurrent persistence writers is a data-corruption bug.
