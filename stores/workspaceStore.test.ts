@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useWorkspaceStore } from "./workspaceStore";
+import { useWorkspaceStore, getSessionSignal } from "./workspaceStore";
 
 const SID_A = "00000000-0000-0000-0000-00000000000a";
 const SID_B = "00000000-0000-0000-0000-00000000000b";
 
 beforeEach(() => {
-  useWorkspaceStore.setState({ phase: { phase: "boot" } });
+  useWorkspaceStore.getState().reset();
 });
 
 describe("workspaceStore", () => {
@@ -202,5 +202,79 @@ describe("workspaceStore", () => {
     s().reset();
     s().loadSession(SID_A);
     expect(s().phase).toEqual({ phase: "loading-session", sessionId: SID_A });
+  });
+
+  // ── session-scoped AbortController ──────────────────────────────────
+  describe("session-scoped AbortController", () => {
+    it("getSessionSignal returns undefined before any loadSession", () => {
+      expect(getSessionSignal()).toBeUndefined();
+    });
+
+    it("loadSession creates a new signal", () => {
+      useWorkspaceStore.getState().loadSession(SID_A);
+      const signal = getSessionSignal();
+      expect(signal).toBeDefined();
+      expect(signal!.aborted).toBe(false);
+    });
+
+    it("loadSession aborts the previous session signal", () => {
+      useWorkspaceStore.getState().loadSession(SID_A);
+      const signalA = getSessionSignal()!;
+      useWorkspaceStore.getState().activateSession();
+      useWorkspaceStore.getState().loadSession(SID_B);
+      expect(signalA.aborted).toBe(true);
+      const signalB = getSessionSignal()!;
+      expect(signalB.aborted).toBe(false);
+      expect(signalB).not.toBe(signalA);
+    });
+
+    it("reset aborts the session signal", () => {
+      useWorkspaceStore.getState().loadSession(SID_A);
+      const signal = getSessionSignal()!;
+      useWorkspaceStore.getState().reset();
+      expect(signal.aborted).toBe(true);
+      expect(getSessionSignal()).toBeUndefined();
+    });
+
+    it("deactivateSession does not abort the session signal", () => {
+      useWorkspaceStore.getState().loadSession(SID_A);
+      const signal = getSessionSignal()!;
+      useWorkspaceStore.getState().deactivateSession();
+      expect(signal.aborted).toBe(false);
+    });
+
+    it("signal chaining: load A → B → C aborts A and B, C remains active", () => {
+      useWorkspaceStore.getState().loadSession(SID_A);
+      const signalA = getSessionSignal()!;
+
+      useWorkspaceStore.getState().activateSession();
+      useWorkspaceStore.getState().loadSession(SID_B);
+      const signalB = getSessionSignal()!;
+
+      useWorkspaceStore.getState().activateSession();
+      useWorkspaceStore.getState().loadSession("00000000-0000-0000-0000-00000000000c");
+      const signalC = getSessionSignal()!;
+
+      expect(signalA.aborted).toBe(true);
+      expect(signalB.aborted).toBe(true);
+      expect(signalC.aborted).toBe(false);
+      // All signals are distinct
+      expect(signalA).not.toBe(signalB);
+      expect(signalB).not.toBe(signalC);
+    });
+
+    it("reset after load → load creates fresh signal space", () => {
+      useWorkspaceStore.getState().loadSession(SID_A);
+      const signalA = getSessionSignal()!;
+      useWorkspaceStore.getState().reset();
+      expect(signalA.aborted).toBe(true);
+      expect(getSessionSignal()).toBeUndefined();
+
+      // After reset, new loadSession creates a fresh signal
+      useWorkspaceStore.getState().loadSession(SID_B);
+      const signalB = getSessionSignal()!;
+      expect(signalB.aborted).toBe(false);
+      expect(signalB).not.toBe(signalA);
+    });
   });
 });
