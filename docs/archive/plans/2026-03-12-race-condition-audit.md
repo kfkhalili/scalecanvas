@@ -117,7 +117,7 @@ The fire-and-forget flush from `teardownPersistence()` / `swapPersistence()` is 
 
 ---
 
-### 5. 🟠 ChatPanel activation effect races with deactivation
+### 5. ✅ RESOLVED — ChatPanel activation effect races with deactivation
 
 **File:** `components/chat/ChatPanel.tsx`, lines 367–375  
 **Concurrent operations:**
@@ -133,9 +133,7 @@ The fire-and-forget flush from `teardownPersistence()` / `swapPersistence()` is 
 
 This is safe because: (a) the activation effect only fires from `loading-session`, not `inactive`, and (b) the deps `[sessionId, isActive]` don't change so it won't re-fire.
 
-**Guard status:** ✅ **Effectively resolved** by the structural fix (activation only from `loading-session`). The remaining theoretical risk is if `isActive` were to toggle at runtime — but it's a server-rendered prop that doesn't change during the component's lifetime.
-
-**Remaining risk:** The `isActive` prop comes from server-rendered page data. If the component remounts after deactivation (e.g. HMR, key change), it receives `isActive=true` from the server (which hasn't re-rendered). The activation effect fires and sees phase is `inactive` — but since the guard only activates from `loading-session`, the session stays inactive. **Safe.**
+**Status:** ✅ **Resolved** by the structural fix (activation only from `loading-session`). The `isActive` prop is server-rendered and doesn't change during the component's lifetime. If the component remounts after deactivation (e.g. HMR, key change), the activation effect sees phase is `inactive` and does not re-activate. Safe.
 
 ---
 
@@ -263,7 +261,7 @@ Both local and API modes now follow the same snapshot-at-dirty-time pattern.
 
 ### Priority 3 — Monitor / low risk
 
-5. **Finding #5 (activation vs deactivation race):** ✅ **Effectively resolved** by the structural fix. The activation effect only fires from `loading-session`, so even if deactivation fires first, the subsequent activation effect won't revive the session. Monitor for regressions.
+5. **Finding #5 (activation vs deactivation race):** ✅ **Resolved** by the structural fix. The activation effect only fires from `loading-session`, so even if deactivation fires first, the subsequent activation effect won't revive the session.
 
 6. **Finding #6 (double-evaluate):** ✅ **Resolved.** Added `isEvaluatingRef` as synchronous guard alongside React state. Prevents duplicate `fetch` calls on same-tick double-clicks.
 
