@@ -88,6 +88,7 @@ function FlowCanvasInner({ sessionIdOpt }: FlowCanvasInnerProps): React.ReactEle
   );
 
   const onDragOver = useCallback((e: DragEvent) => {
+    if (!canInteract(useWorkspaceStore.getState().phase)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   }, []);

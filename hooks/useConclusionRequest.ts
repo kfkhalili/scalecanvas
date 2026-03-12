@@ -37,7 +37,7 @@ export function toConclusionMessages(messages: Message[]): ConclusionMessage[] {
 export type UseConclusionRequestParams = {
   sessionId: string | undefined;
   isAnonymous: boolean;
-  isConcluded: boolean;
+  isActive: boolean;
   messages: Message[];
   setMessages: (valueOrUpdater: Message[] | ((prev: Message[]) => Message[])) => void;
 };
@@ -53,7 +53,7 @@ export type UseConclusionRequestResult = {
 
 /**
  * Manages all conclusion orchestration:
- * - Syncs server-confirmed `isConcluded` flag into session store and dedup ref.
+ * - Syncs server-confirmed `isActive` flag into session store and dedup ref.
  * - Detects session time expiry and auto-requests a conclusion.
  * - Provides `requestEndInterview` for voluntary end flows.
  *
@@ -63,7 +63,7 @@ export type UseConclusionRequestResult = {
 export function useConclusionRequest({
   sessionId,
   isAnonymous,
-  isConcluded,
+  isActive,
   messages,
   setMessages,
 }: UseConclusionRequestParams): UseConclusionRequestResult {
@@ -73,7 +73,7 @@ export function useConclusionRequest({
   const canvasNodes = useCanvasStore((s) => s.nodes);
   const canvasEdges = useCanvasStore((s) => s.edges);
 
-  /** Safely transition to inactive — no-op if already inactive. */
+  /** Transition to inactive — no-op if already inactive. */
   const deactivate = useCallback((): void => {
     const p = useWorkspaceStore.getState().phase.phase;
     if (p === "active" || p === "loading-session") {
@@ -90,17 +90,17 @@ export function useConclusionRequest({
     string | undefined
   >(undefined);
 
-  // Derive: if the server confirmed the session is already concluded, treat as requested.
+  // Derive: if the server confirmed the session is not active, treat as requested.
   const conclusionRequestedSessionId =
-    isConcluded && sessionId ? sessionId : _conclusionRequestedSessionId;
+    !isActive && sessionId ? sessionId : _conclusionRequestedSessionId;
 
-  // Sync server-confirmed conclusion with local ref + session store.
+  // Sync server-confirmed inactive status with local ref + session store.
   useEffect(() => {
-    if (isConcluded && sessionId) {
+    if (!isActive && sessionId) {
       deactivate();
       conclusionRequestedRef.current = sessionId;
     }
-  }, [isConcluded, sessionId, deactivate]);
+  }, [isActive, sessionId, deactivate]);
 
   // Auto-conclude when session time expires while the user has the tab open.
   // Skips sessions that already expired on page load (`sessionHadTimeLeftRef.hadTimeLeft` guard).
@@ -160,6 +160,8 @@ export function useConclusionRequest({
           setConclusionRequestedSessionId(undefined);
           conclusionRequestedRef.current = undefined;
         }
+        // Summary generation failed but time is up — deactivate anyway.
+        deactivate();
         toast.error(err.error);
       }
     });
@@ -177,10 +179,12 @@ export function useConclusionRequest({
 
   const requestEndInterview = useCallback((): void => {
     if (!sessionId) return;
+    // Always deactivate on explicit user action, even if the auto-expiry
+    // timer already fired a (possibly in-flight) conclusion request.
+    deactivate();
     if (conclusionRequestedRef.current === sessionId) return;
     conclusionRequestedRef.current = sessionId;
     setConclusionRequestedSessionId(sessionId);
-    deactivate();
 
     void Effect.runPromise(
       Effect.either(
@@ -209,7 +213,7 @@ export function useConclusionRequest({
       } else {
         const err = either.left;
         toast.error(err.error);
-        // Keep session concluded even on error — user explicitly chose to end.
+        // Keep session inactive even on error — user explicitly chose to end.
         deactivate();
         conclusionRequestedRef.current = sessionId;
         setConclusionRequestedSessionId(sessionId);

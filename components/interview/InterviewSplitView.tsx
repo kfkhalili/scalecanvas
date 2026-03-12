@@ -24,15 +24,15 @@ type InterviewSplitViewProps = {
   isAnonymous?: boolean;
   /** When true, session is a trial (post-handoff); ChatPanel uses design phase from first message. */
   isTrial?: boolean;
-  /** When true, session already has a conclusion summary — show canvas as read-only on mount. */
-  isConcluded?: boolean;
+  /** Whether the session is currently active (no conclusion summary in DB). When false, session starts inactive on mount. */
+  isActive?: boolean;
 };
 
 export function InterviewSplitView({
   sessionId,
   isAnonymous = false,
   isTrial = false,
-  isConcluded = false,
+  isActive = true,
 }: InterviewSplitViewProps): React.ReactElement {
   const setCurrentSessionId = useSessionStore((s) => s.setCurrentSessionId);
   const entries = useTranscriptStore((s) => s.entries);
@@ -51,10 +51,10 @@ export function InterviewSplitView({
     }
 
     ws.loadSession(sessionId);
-    if (isConcluded) ws.deactivateSession();
+    if (!isActive) ws.deactivateSession();
     useAuthHandoffStore.getState().setRehydrated(true);
     return () => { cleanupBridge(); teardownPersistence(); };
-  }, [sessionId, isConcluded, isAnonymous]);
+  }, [sessionId, isActive, isAnonymous]);
 
   // ── Session ID sync ──────────────────────────────────────────────────
   useEffect(() => {
@@ -103,7 +103,7 @@ export function InterviewSplitView({
                   initialEntries={entries}
                   isAnonymous={isAnonymous}
                   isTrial={isTrial}
-                  isConcluded={isConcluded}
+                  isActive={isActive}
                 />
               ) : (
                 <div className="min-h-0 flex-1 bg-muted/30" />
